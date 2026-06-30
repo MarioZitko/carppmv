@@ -13,5 +13,8 @@ class ListingData(BaseModel):
     co2_g_km: float | None = None  # often unavailable — PPMV must handle None, never guess
     fuel_type: str | None = None
     first_registration_date: str | None = None  # raw string; caller parses/validates
+    title: str | None = None
     mileage_km: int | None = None
-    power_kw: int | None = None
+    power_kw: float | None = None
+    variant: str | None = None
+    seat_count: int | None = None

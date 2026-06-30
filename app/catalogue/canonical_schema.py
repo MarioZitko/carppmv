@@ -20,9 +20,12 @@ Two-stage pipeline:
   2. apply_mapping(sheet_rows, mapping) -> list[CanonicalRow]      [deterministic, pure]
 """
 
+import re
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, datetime
 from enum import Enum
+
+from app.core.config import get_settings
 
 
 class FuelCategory(str, Enum):
@@ -165,6 +168,239 @@ def map_sheet_columns(
     )
 
 
+# Below this confidence, a row is flagged needs_review even if every field
+# parsed cleanly — separate from (and lower-stakes than) the CLI's
+# whole-sheet ingestion gate in scripts/ingest_catalogue.py, which decides
+# whether to attempt a sheet at all.
+NEEDS_REVIEW_CONFIDENCE_THRESHOLD = 0.7
+
+# Fuel vocabulary confirmed against the 4 known format families. Letter
+# codes are VW-group's (and, confirmed against real Porsche files,
+# Porsche's too — Porsche's column NAMES differ but its fuel CODES turned
+# out to be the same B/D scheme, not "different vocabulary" as originally
+# assumed; see apply_mapping module notes). 'H' is plug-in (not plain
+# hybrid) per real VW data: e-tron/GTE rows coded 'H' have a populated
+# PLUG-IN (DOSEG) value and near-zero CO2. Any code/word not listed here
+# (e.g. VW's 'G' for Erdgas/CNG) deliberately falls through to UNKNOWN —
+# there is no GAS category, and guessing one would violate the "never
+# silently default" rule in FuelCategory's docstring.
+_LETTER_CODE_FUEL_MAP: dict[str, FuelCategory] = {
+    "D": FuelCategory.DIESEL,
+    "B": FuelCategory.PETROL,
+    "MH": FuelCategory.PETROL_HYBRID,
+    "H": FuelCategory.PETROL_PLUG_IN_HYBRID,
+    "E": FuelCategory.ELECTRIC,
+}
+
+# Spelled-out words confirmed across BMW ('benzin'/'diesel') and Mercedes
+# ('benzin'/'dizel') — note BMW spells diesel the English way, Mercedes
+# the Croatian way; both must be recognized. Neither family's spelled-out
+# vocabulary distinguishes mild-hybrid/plug-in from plain petrol (unlike
+# VW's MH/H codes), so that distinction is recovered separately from the
+# power-boost-suffix and plug-in-range signals in _categorize_fuel.
+_WORD_FUEL_MAP: dict[str, FuelCategory] = {
+    "dizel": FuelCategory.DIESEL,
+    "diesel": FuelCategory.DIESEL,
+    "benzin": FuelCategory.PETROL,
+    "petrol": FuelCategory.PETROL,
+    "elektro": FuelCategory.ELECTRIC,
+    "električni": FuelCategory.ELECTRIC,
+    "electric": FuelCategory.ELECTRIC,
+}
+
+_EUR_HEADER_PATTERN = re.compile(r"eur|€", re.IGNORECASE)
+_HEADER_WORD_PATTERN = re.compile(r"[a-zčćžšđ]+", re.IGNORECASE)
+
+
+def _is_blank(value: object) -> bool:
+    return value is None or (isinstance(value, str) and not value.strip())
+
+
+def _to_str(value: object) -> str | None:
+    if value is None:
+        return None
+    text = str(value).strip()
+    return text or None
+
+
+def _to_bool(value: object) -> bool:
+    if value is None:
+        return False
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)):
+        return bool(value)
+    return str(value).strip().lower() in ("da", "yes", "true", "1", "x")
+
+
+def _parse_numeric(value: object) -> float | None:
+    """Parses ints/floats and numeric-looking strings, including BMW's
+    trailing-asterisk footnote marker (e.g. CO2 '122*', power '230*') —
+    confirmed present in real BMW files, unrelated to the '+NN' hybrid
+    boost suffix handled separately in _parse_power."""
+    if value is None:
+        return None
+    if isinstance(value, (int, float)):
+        return float(value)
+    text = str(value).strip().rstrip("*").strip().replace(",", ".")
+    if not text:
+        return None
+    try:
+        return float(text)
+    except ValueError:
+        return None
+
+
+def _parse_power(value: object) -> tuple[float | None, float | None]:
+    """Splits Mercedes-style hybrid boost suffixes (e.g. '380+16' kW ->
+    base 380, boost 16). Plain numeric power (int, float, or a bare
+    numeric string) has no boost component."""
+    if value is None:
+        return None, None
+    if isinstance(value, (int, float)):
+        return float(value), None
+    text = str(value).strip()
+    if not text:
+        return None, None
+    if "+" in text:
+        base_part, boost_part = text.split("+", 1)
+        return _parse_numeric(base_part), _parse_numeric(boost_part)
+    return _parse_numeric(text), None
+
+
+def _parse_date(value: object) -> date | None:
+    """Real catalogue files mix native Excel dates with VRIJEDI OD as
+    plain strings — confirmed formats: 'DD.MM.YYYY.' (BMW 2020, trailing
+    dot), 'DD.MM.YYYY' (BMW 2023, no trailing dot), and 'D.M.YYYY.'
+    (single-digit day/month seen in one BMW sheet)."""
+    if value is None:
+        return None
+    if isinstance(value, datetime):
+        return value.date()
+    if isinstance(value, date):
+        return value
+    if isinstance(value, str):
+        text = value.strip().rstrip(".")
+        parts = text.split(".")
+        if len(parts) != 3:
+            return None
+        try:
+            day, month, year = (int(part) for part in parts)
+            return date(year, month, day)
+        except ValueError:
+            return None
+    return None
+
+
+def _detect_currency_from_header(header: str | None) -> str | None:
+    """Reads currency off the price column's own header text rather than
+    trusting ColumnMapping.price_currency blindly — a defensive
+    cross-check in the same spirit as llm_mapper's hallucinated-column
+    rejection. Handles both '(kn)'/'(EUR)'/'(€)' parenthetical styles
+    (VW/BMW/Mercedes) and Porsche's currency-in-the-identifier style
+    ('osnovica_kn', no parens) by tokenizing on letters only, so 'kn'
+    must appear as its own word/token rather than as a substring."""
+    if not header:
+        return None
+    if _EUR_HEADER_PATTERN.search(header):
+        return "EUR"
+    if "kn" in _HEADER_WORD_PATTERN.findall(header.lower()):
+        return "HRK"
+    return None
+
+
+def _categorize_fuel(
+    fuel_raw: object,
+    power_boost_kw: float | None,
+    plug_in_range_km: float | None,
+) -> FuelCategory:
+    """Letter codes (D/B/MH/H/E) are unambiguous on their own — confirmed
+    against real VW data that 'H' rows are themselves already plug-in
+    (populated DOSEG, near-zero CO2), not plain hybrid. Spelled-out words
+    ('benzin'/'dizel'/'diesel') only ever mean plain petrol/diesel in the
+    BMW/Mercedes files seen, so mild-hybrid and plug-in have to be
+    recovered from other columns for those families: Mercedes signals
+    mild-hybrid via the power '+NN' boost suffix (e.g. GLS 580 '380+16'),
+    and Porsche signals plug-in via a populated doseg/plug-in-range column
+    even though its GORIVO value is plain 'B' (e.g. Cayenne S e-hybrid).
+    Anything unrecognized (e.g. VW's 'G' for Erdgas/CNG) is UNKNOWN —
+    never guessed into petrol/diesel."""
+    text = _to_str(fuel_raw)
+    if text is None:
+        return FuelCategory.UNKNOWN
+
+    base = _LETTER_CODE_FUEL_MAP.get(text.upper())
+    if base is None:
+        base = _WORD_FUEL_MAP.get(text.lower())
+    if base is None:
+        return FuelCategory.UNKNOWN
+
+    if base is FuelCategory.PETROL:
+        if plug_in_range_km is not None and plug_in_range_km > 0:
+            return FuelCategory.PETROL_PLUG_IN_HYBRID
+        if power_boost_kw is not None and power_boost_kw > 0:
+            return FuelCategory.PETROL_HYBRID
+
+    return base
+
+
+def _resolve_co2(
+    co2_raw: object,
+    co2_min_raw: object,
+    co2_max_raw: object,
+    policy: str,
+) -> tuple[float | None, float | None, float | None, str | None]:
+    co2_min = _parse_numeric(co2_min_raw)
+    co2_max = _parse_numeric(co2_max_raw)
+    if co2_min is not None or co2_max is not None:
+        if policy == "max":
+            resolved = co2_max if co2_max is not None else co2_min
+        elif policy == "min":
+            resolved = co2_min if co2_min is not None else co2_max
+        elif policy == "average":
+            if co2_min is not None and co2_max is not None:
+                resolved = (co2_min + co2_max) / 2
+            else:
+                resolved = co2_max if co2_max is not None else co2_min
+        else:
+            raise ValueError(f"Unknown co2_min_max_policy: {policy!r}")
+        return resolved, co2_min, co2_max, policy
+
+    single = _parse_numeric(co2_raw)
+    if single is not None:
+        return single, None, None, "single_column"
+    return None, None, None, None
+
+
+def _cell(row: tuple, column_index: dict[str, int], column_name: str | None) -> object:
+    if column_name is None:
+        return None
+    index = column_index.get(column_name)
+    if index is None or index >= len(row):
+        return None
+    return row[index]
+
+
+def _is_junk_row(
+    model_name_column: str | None,
+    model_name_raw: object,
+    fuel_raw: object,
+    price_raw: object,
+) -> bool:
+    """Confirmed against real BMW files: section-header rows (e.g. 'BMW
+    serije 1 (F40)' sitting alone in the brand column) and stray
+    misplaced values (e.g. the HRK/EUR conversion rate sitting alone in
+    the price column) both leave the model-name column blank — so 'model
+    name blank' alone catches both junk shapes seen so far without
+    needing to pattern-match specific header strings, which wouldn't
+    generalize to unseen files anyway. Falls back to 'fuel AND price both
+    blank' when a sheet has no model_name_column at all, so that case
+    doesn't mark every row in such a sheet as junk."""
+    if model_name_column is not None:
+        return _is_blank(model_name_raw)
+    return _is_blank(fuel_raw) and _is_blank(price_raw)
+
+
 def apply_mapping(
     rows: list[tuple],
     header_row: list[str],
@@ -172,11 +408,19 @@ def apply_mapping(
     source_file: str,
     source_sheet: str,
     co2_min_max_policy: str = "max",
+    skip_log: list[tuple[int, str]] | None = None,
 ) -> list[CanonicalRow]:
     """Deterministic, pure — applies an already-computed ColumnMapping to
     every data row in a sheet. No LLM calls happen here; this is plain
     pandas-equivalent row transformation, safe to re-run and unit test
     without any API cost.
+
+    rows must be the sheet's data rows only (header_row already stripped
+    out), each a tuple positionally aligned with header_row — e.g.
+    `openpyxl`'s `ws.iter_rows(values_only=True)` after consuming the
+    first row. source_row_index on the resulting CanonicalRow is computed
+    as rows-offset + 2 (1-indexed, plus one for the header row), so it
+    points back at the real Excel row.
 
     co2_min_max_policy: how to resolve CO2 when a sheet splits it into
     min/max columns (Mercedes-style). Default "max" is the more
@@ -185,10 +429,100 @@ def apply_mapping(
     if challenged) — but this is a judgment call, not a verified rule
     from carina.gov.hr, and should be confirmed before relying on it.
 
-    Raises:
-        NotImplementedError: stub — fill in once ColumnMapping shape is
-        validated against a real LLM response on at least the 4 known
-        format families (VW-group, BMW, Mercedes, Porsche) plus one
-        unseen file, to confirm the mapping generalizes as intended.
+    skip_log: if provided, every dropped row appends an
+    (source_row_index, reason) tuple — used by scripts/ingest_catalogue.py
+    to print a reason breakdown without re-walking the rows.
     """
-    raise NotImplementedError("Implement once map_sheet_columns is wired in and validated.")
+    column_index = {name: i for i, name in enumerate(header_row)}
+    settings = get_settings()
+    results: list[CanonicalRow] = []
+
+    for offset, row in enumerate(rows):
+        source_row_index = offset + 2
+
+        def skip(reason: str) -> None:
+            if skip_log is not None:
+                skip_log.append((source_row_index, reason))
+
+        model_name_raw = _cell(row, column_index, mapping.model_name_column)
+        fuel_raw = _cell(row, column_index, mapping.fuel_column)
+        price_raw = _cell(row, column_index, mapping.price_column)
+
+        if _is_junk_row(mapping.model_name_column, model_name_raw, fuel_raw, price_raw):
+            skip("junk_row")
+            continue
+
+        brand = _to_str(_cell(row, column_index, mapping.brand_column))
+        if brand is None:
+            skip("missing_brand")
+            continue
+
+        price_value = _parse_numeric(price_raw)
+        if price_value is None:
+            skip("missing_price")
+            continue
+
+        currency = _detect_currency_from_header(mapping.price_column) or mapping.price_currency
+        if currency == "HRK":
+            price_eur = round(price_value / settings.hrk_to_eur_rate, 2)
+        elif currency == "EUR":
+            price_eur = price_value
+        else:
+            skip("unrecognized_currency")
+            continue
+
+        valid_from = _parse_date(_cell(row, column_index, mapping.valid_from_column))
+        if valid_from is None:
+            skip("missing_or_unparseable_valid_from")
+            continue
+
+        power_kw, power_boost_kw = _parse_power(_cell(row, column_index, mapping.power_kw_column))
+        plug_in_range_km = _parse_numeric(_cell(row, column_index, mapping.plug_in_range_column))
+
+        fuel_category = _categorize_fuel(fuel_raw, power_boost_kw, plug_in_range_km)
+
+        co2_g_km, co2_min_g_km, co2_max_g_km, co2_policy = _resolve_co2(
+            _cell(row, column_index, mapping.co2_column),
+            _cell(row, column_index, mapping.co2_min_column),
+            _cell(row, column_index, mapping.co2_max_column),
+            co2_min_max_policy,
+        )
+        if co2_g_km is None:
+            skip("missing_co2")
+            continue
+
+        results.append(
+            CanonicalRow(
+                brand=brand,
+                model_name=_to_str(model_name_raw),
+                type_code=_to_str(_cell(row, column_index, mapping.type_code_column)),
+                full_name=_to_str(_cell(row, column_index, mapping.full_name_column)),
+                fuel_category=fuel_category,
+                fuel_raw_value=_to_str(fuel_raw) or "",
+                price_eur=price_eur,
+                price_source_currency=currency,
+                price_raw_value=price_value,
+                valid_from=valid_from,
+                co2_g_km=co2_g_km,
+                co2_min_g_km=co2_min_g_km,
+                co2_max_g_km=co2_max_g_km,
+                co2_resolution_policy=co2_policy,
+                power_kw=power_kw,
+                power_boost_kw=power_boost_kw,
+                plug_in_range_km=plug_in_range_km,
+                is_camper=_to_bool(_cell(row, column_index, mapping.camper_column)),
+                is_pickup_8704=_to_bool(_cell(row, column_index, mapping.pickup_8704_column)),
+                seats_7plus1=_to_bool(_cell(row, column_index, mapping.seats_7plus1_column)),
+                seats_8plus1=_to_bool(_cell(row, column_index, mapping.seats_8plus1_column)),
+                source_file=source_file,
+                source_sheet=source_sheet,
+                source_row_index=source_row_index,
+                mapping_confidence=mapping.confidence,
+                needs_review=(
+                    fuel_category is FuelCategory.UNKNOWN
+                    or mapping.confidence < NEEDS_REVIEW_CONFIDENCE_THRESHOLD
+                ),
+            )
+        )
+
+    return results

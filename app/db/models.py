@@ -63,8 +63,22 @@ class Catalogue(Base):
     model: Mapped[str] = mapped_column(String(128), index=True)
     variant: Mapped[str] = mapped_column(String(256))  # exact trim/variant string as it appears in the source Excel
 
+    # Normalized brand+model+variant (lowercased, diacritics/punctuation stripped),
+    # computed at ingestion. Drives listing→catalogue matching: the exact tier
+    # hits this index directly, the fuzzy tier scores against it. See
+    # app/catalogue/matching.py (build_match_key). A scraped listing never carries
+    # the source Excel's internal code (MODEL KOD / KOD MODELA / Porsche `model`),
+    # so this human-readable normalized text — not any of those codes — is the
+    # only viable cross-source key.
+    match_key: Mapped[str] = mapped_column(String(512), index=True, default="")
+
     price_eur: Mapped[float] = mapped_column(Float)  # always normalized to EUR at ingestion (HRK_TO_EUR_RATE if source was HRK)
     co2_g_km: Mapped[float] = mapped_column(Float)
+    # Base engine power in kW, when the source Excel had it. Not part of the
+    # lookup key, but the strongest disambiguator between same-named variants
+    # with different engines (e.g. 320d ~140 kW vs 330d ~190 kW) — the matcher
+    # uses it to reject a wrong-engine fuzzy hit the listing's power contradicts.
+    power_kw: Mapped[float | None] = mapped_column(Float, nullable=True)
     co2_standard: Mapped[CO2Standard] = mapped_column(SAEnum(CO2Standard, native_enum=False))
     fuel_type: Mapped[FuelType] = mapped_column(SAEnum(FuelType, native_enum=False))
 
