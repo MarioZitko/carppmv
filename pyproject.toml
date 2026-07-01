@@ -17,6 +17,7 @@ dependencies = [
     "beautifulsoup4>=4.12",
     "lxml>=5.0",
     "playwright-stealth>=1.0.6",
+    "xlrd>=2.0.2",
 ]
 
 [project.optional-dependencies]
