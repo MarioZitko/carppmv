@@ -31,17 +31,18 @@ from app.core.exceptions import ScrapingError
 # ---------------------------------------------------------------------------
 
 _AUTOBID_URL = (
-    "https://www.autobid.de/de/auktionen"  # TODO: replace with a specific vehicle detail page
+    "https://autobid.de/hr/artikal/audi-a5-sportback-40-tdi-quattro-s-tronic-s-line-3464608"
 )
 _NJUSKALO_URL = (
-    "https://www.njuskalo.hr/osobni-automobili/volkswagen-golf-2020-dizel-oglas58713227"
+    "https://www.njuskalo.hr/auti/audi-a3-2.0-tdi-sport-automatik-oglas-50586146"
 )
 _AUTOSCOUT24_URL = (
-    "https://www.autoscout24.com/offers/"
-    "volkswagen-golf-tdi-2020-grey-23467897-fb38fd11-8e6b-4f5f-be69-a4abd00c7b3e"  # TODO: replace with valid listing UUID
+    "https://www.autoscout24.de/angebote/audi-a4-35-tfsi-navi-pdc-sihz-s-tronic-benzin-schwarz-cat_ma9mo1626-4e26643e-0e3f-48f3-8ab4-3d4640516761"
+    "?source=autocatalog_carousel&position=3"
 )
 _MOBILE_DE_URL = (
-    "https://suchen.mobile.de/fahrzeuge/details.html?id=367890123"  # TODO: replace with valid listing ID
+    "https://suchen.mobile.de/auto-inserat/"
+    "audi-a5-coupe-3-0d-sport-s-line-18-b-o-standhz-nav-x-bebra/456779908.html"
 )
 
 
@@ -73,12 +74,19 @@ async def test_autobid_de_extractor() -> None:
     assert result.source_url == _AUTOBID_URL
     # CO2 is never available pre-login on autobid.de
     assert result.co2_g_km is None, "autobid.de must never return CO2 (not exposed pre-login)"
-    # At minimum we expect title or price to have been extracted
-    assert result.price_eur is not None or result.title is not None, (
-        "Expected at least price_eur or title from autobid.de listing"
-    )
-    if result.price_eur is not None:
-        assert result.price_eur > 0
+
+    assert result.price_eur is not None, "Expected price_eur from autobid.de listing"
+    assert result.price_eur > 0
+
+    assert result.brand is not None, "Expected brand from autobid.de listing"
+    assert result.brand.lower() == "audi", f"Expected brand='Audi', got {result.brand!r}"
+    assert result.model is not None, "Expected model from autobid.de listing"
+    assert "a5" in result.model.lower(), f"Expected model to contain 'A5', got {result.model!r}"
+
+    # mileage / power are in the spec table; present when the page renders them in
+    # parseable HTML, may be None when hidden behind login on this auction site.
+    if result.mileage_km is not None:
+        assert result.mileage_km > 0
     if result.power_kw is not None:
         assert result.power_kw > 0
     if result.seat_count is not None:

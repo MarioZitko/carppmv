@@ -10,6 +10,7 @@ seat_count is extracted only when explicitly stated (e.g. "7 sjedala"), never in
 import re
 
 from bs4 import BeautifulSoup
+from playwright.async_api import TimeoutError as PlaywrightTimeoutError
 from playwright.async_api import async_playwright
 from playwright_stealth import Stealth
 
@@ -152,13 +153,17 @@ _LABEL_MAP: dict[str, str] = {
     "sjedala": "seat_count",
     "verzija": "variant",
     "oprema": "variant",
-    "model": "variant",
+    "marka": "brand",
+    "proizvođač": "brand",
+    "model": "model",
     # English fallbacks (some listings are bilingual)
     "fuel": "fuel_type",
     "mileage": "mileage_km",
     "power": "power_kw",
     "seats": "seat_count",
     "variant": "variant",
+    "make": "brand",
+    "brand": "brand",
     "first registration": "first_registration",
 }
 
@@ -183,7 +188,17 @@ class NjuskaloExtractor:
                     raise ScrapingError(
                         f"njuskalo.hr returned {response.status} for {url}"
                     )
-                await page.wait_for_load_state("networkidle", timeout=15_000)
+                try:
+                    await page.wait_for_load_state("networkidle", timeout=15_000)
+                except PlaywrightTimeoutError:
+                    pass  # bot-challenge pages poll indefinitely; fall through to the block check below
+                # njuskalo.hr fronts listings with a Radware bot-management challenge that
+                # redirects to validate.perfdrive.com instead of returning a 4xx — detect the
+                # redirect so callers get a clear error instead of an all-None ListingData.
+                if "perfdrive.com" in page.url:
+                    raise ScrapingError(
+                        f"njuskalo.hr returned 403 (blocked by bot-management challenge) for {url}"
+                    )
                 html = await page.content()
             finally:
                 await browser.close()
@@ -219,6 +234,8 @@ class NjuskaloExtractor:
         co2_g_km: float | None = None
         seat_count: int | None = None
         variant: str | None = None
+        brand: str | None = None
+        model: str | None = None
         year: str | None = None
 
         for raw_label, raw_value in specs.items():
@@ -247,6 +264,10 @@ class NjuskaloExtractor:
                 seat_count = _extract_seat_count(raw_value)
             elif canonical == "variant":
                 variant = raw_value.strip() or None
+            elif canonical == "brand":
+                brand = raw_value.strip() or None
+            elif canonical == "model":
+                model = raw_value.strip() or None
 
         # Use year as first_registration_date if more specific date not found
         if first_registration_date is None and year:
@@ -267,4 +288,6 @@ class NjuskaloExtractor:
             power_kw=power_kw,
             variant=variant,
             seat_count=seat_count,
+            brand=brand,
+            model=model,
         )

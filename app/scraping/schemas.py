@@ -18,3 +18,5 @@ class ListingData(BaseModel):
     power_kw: float | None = None
     variant: str | None = None
     seat_count: int | None = None
+    brand: str | None = None
+    model: str | None = None

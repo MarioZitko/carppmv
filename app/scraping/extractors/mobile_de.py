@@ -10,6 +10,7 @@ with BeautifulSoup rather than fighting hashed class names.
 import re
 
 from bs4 import BeautifulSoup
+from playwright.async_api import TimeoutError as PlaywrightTimeoutError
 from playwright.async_api import async_playwright
 from playwright_stealth import Stealth
 
@@ -30,6 +31,11 @@ _FUEL_MAP: dict[str, str] = {
     "mild-hybrid (diesel)": "hybrid",
     "plug-in-hybrid (benzin)": "hybrid",
     "plug-in-hybrid (diesel)": "hybrid",
+    "diesel mildhybrid": "diesel",
+    "benzin mildhybrid": "petrol",
+    "mild hybrid diesel": "diesel",
+    "mild hybrid benzin": "petrol",
+    "mildhybrid": "hybrid",
     "erdgas (cng)": "cng",
     "autogas (lpg)": "lpg",
 }
@@ -50,6 +56,15 @@ _LABEL_MAP: dict[str, str] = {
     "fahrzeugbeschreibung": "variant",
     "ausstattung": "variant",
     "variante": "variant",
+    # Brand / manufacturer
+    "marke": "brand",
+    "hersteller": "brand",
+    "make": "brand",
+    "fahrzeugmarke": "brand",
+    # Model
+    "modell": "model",
+    "model": "model",
+    "fahrzeugmodell": "model",
 }
 
 
@@ -184,8 +199,22 @@ class MobileDeExtractor:
                     raise ScrapingError(
                         f"mobile.de returned {response.status} for {url}"
                     )
-                await page.wait_for_load_state("networkidle", timeout=15_000)
+                try:
+                    await page.wait_for_load_state("networkidle", timeout=15_000)
+                except PlaywrightTimeoutError:
+                    pass  # Akamai challenge pages poll indefinitely; fall through to the block check below
                 html = await page.content()
+                # mobile.de fronts listings with an Akamai behavioral challenge that returns
+                # HTTP 200 with a near-empty page instead of a 4xx — detect it directly so
+                # callers get a clear error instead of an all-None ListingData.
+                if "sec-if-cpt-container" in html:
+                    raise ScrapingError(
+                        f"mobile.de returned 403 (blocked by Akamai bot-management challenge) for {url}"
+                    )
+                if len(html) < 2000:
+                    raise ScrapingError(
+                        f"mobile.de: unexpectedly short page ({len(html)} bytes) for {url} — listing may be expired"
+                    )
             finally:
                 await browser.close()
 
@@ -206,6 +235,8 @@ class MobileDeExtractor:
         co2_g_km: float | None = None
         seat_count: int | None = None
         variant: str | None = None
+        brand: str | None = None
+        model: str | None = None
 
         for raw_label, raw_value in specs.items():
             canonical = _LABEL_MAP.get(raw_label)
@@ -232,6 +263,10 @@ class MobileDeExtractor:
                 seat_count = _extract_seat_count(raw_value)
             elif canonical == "variant":
                 variant = raw_value.strip() or None
+            elif canonical == "brand":
+                brand = raw_value.strip() or None
+            elif canonical == "model":
+                model = raw_value.strip() or None
 
         if variant is None and title:
             variant = title
@@ -248,4 +283,6 @@ class MobileDeExtractor:
             power_kw=power_kw,
             variant=variant,
             seat_count=seat_count,
+            brand=brand,
+            model=model,
         )

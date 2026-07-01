@@ -56,7 +56,16 @@ def _find_listing(data: dict) -> dict | None:
     page_props = _get(data, "props", "pageProps")
     if page_props is None:
         return None
-    # Variant A (most common as of 2024)
+    # Variant D (current as of 2026) — details split across "listingDetails" with
+    # vehicle specs nested under "vehicle" and pricing/imgAltText at the top level.
+    details = _get(page_props, "listingDetails")
+    if isinstance(details, dict) and details:
+        merged = dict(details.get("vehicle") or {})
+        merged["prices"] = details.get("prices")
+        merged["price"] = details.get("price")
+        merged["imgAltText"] = details.get("imgAltText")
+        return merged
+    # Variant A (common as of 2024)
     listing = _get(page_props, "listing")
     if isinstance(listing, dict) and listing:
         return listing
@@ -72,6 +81,10 @@ def _find_listing(data: dict) -> dict | None:
 
 
 def _parse_price(listing: dict) -> float | None:
+    # Current structure: prices.public.priceRaw (a dict, not a list)
+    val = _get(listing, "prices", "public", "priceRaw")
+    if isinstance(val, (int, float)):
+        return float(val)
     # prices is a list; first entry is the main asking price
     prices = listing.get("prices")
     if isinstance(prices, list) and prices:
@@ -89,6 +102,12 @@ def _parse_price(listing: dict) -> float | None:
 
 
 def _parse_fuel(listing: dict) -> str | None:
+    # Current structure: fuelCategory.raw is a single-letter code (e.g. "B", "D")
+    val = _get(listing, "fuelCategory", "raw")
+    if isinstance(val, str):
+        mapped = _FUEL_MAP.get(val.lower().strip())
+        if mapped:
+            return mapped
     # fuel.id or fuel.key
     for path in [("fuel", "id"), ("fuel", "key"), ("fuelCategory", "key"), ("fuel",)]:
         val = _get(listing, *path) if len(path) > 1 else listing.get(path[0])
@@ -100,7 +119,11 @@ def _parse_fuel(listing: dict) -> str | None:
 
 
 def _parse_power_kw(listing: dict) -> float | None:
-    # engine.power.kw is the most reliable path
+    # Current structure: rawPowerInKw is a plain int
+    val = listing.get("rawPowerInKw")
+    if isinstance(val, (int, float)):
+        return float(val)
+    # engine.power.kw is the most reliable path in older structures
     for path in [
         ("engine", "power", "kw"),
         ("power", "kw"),
@@ -113,6 +136,10 @@ def _parse_power_kw(listing: dict) -> float | None:
 
 
 def _parse_mileage(listing: dict) -> int | None:
+    # Current structure: mileageInKmRaw is a plain int
+    val = listing.get("mileageInKmRaw")
+    if isinstance(val, (int, float)):
+        return int(val)
     for path in [("mileage", "value"), ("mileage",), ("km",)]:
         val = _get(listing, *path) if len(path) > 1 else listing.get(path[0])
         if isinstance(val, (int, float)):
@@ -121,6 +148,10 @@ def _parse_mileage(listing: dict) -> int | None:
 
 
 def _parse_co2(listing: dict) -> float | None:
+    # Current structure: co2emissionInGramPerKmWithFallback.raw (often None — not guessed)
+    val = _get(listing, "co2emissionInGramPerKmWithFallback", "raw")
+    if isinstance(val, (int, float)):
+        return float(val)
     for path in [
         ("co2Emission", "value"),
         ("emissionCo2", "value"),
@@ -133,7 +164,14 @@ def _parse_co2(listing: dict) -> float | None:
 
 
 def _parse_first_registration(listing: dict) -> str | None:
-    for key in ("firstRegistration", "first_registration", "registrationDate", "registered"):
+    for key in (
+        "firstRegistrationDateRaw",
+        "firstRegistrationDate",
+        "firstRegistration",
+        "first_registration",
+        "registrationDate",
+        "registered",
+    ):
         val = listing.get(key)
         if isinstance(val, str) and val.strip():
             return val.strip()
@@ -141,7 +179,7 @@ def _parse_first_registration(listing: dict) -> str | None:
 
 
 def _parse_variant(listing: dict) -> str | None:
-    for key in ("version", "trim", "variant", "versionId"):
+    for key in ("version", "trim", "variant", "versionId", "modelVersionInput"):
         val = listing.get(key)
         if isinstance(val, str) and val.strip():
             return val.strip()
@@ -156,8 +194,26 @@ def _parse_seat_count(listing: dict) -> int | None:
     return None
 
 
+def _parse_brand(listing: dict) -> str | None:
+    make = listing.get("make")
+    if isinstance(make, dict):
+        return make.get("name") or make.get("label") or None
+    if isinstance(make, str) and make.strip():
+        return make.strip()
+    return None
+
+
+def _parse_model_name(listing: dict) -> str | None:
+    model = listing.get("model")
+    if isinstance(model, dict):
+        return model.get("name") or model.get("label") or None
+    if isinstance(model, str) and model.strip():
+        return model.strip()
+    return None
+
+
 def _parse_title(listing: dict) -> str | None:
-    for key in ("title", "name", "shortTitle"):
+    for key in ("imgAltText", "title", "name", "shortTitle"):
         val = listing.get(key)
         if isinstance(val, str) and val.strip():
             return val.strip()
@@ -233,4 +289,6 @@ class AutoScout24Extractor:
             power_kw=_parse_power_kw(listing),
             variant=_parse_variant(listing),
             seat_count=_parse_seat_count(listing),
+            brand=_parse_brand(listing),
+            model=_parse_model_name(listing),
         )

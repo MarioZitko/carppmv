@@ -9,7 +9,9 @@ underlying C parser when we pass parser="lxml", so parse throughput is identical
 CO2 is not exposed pre-login on autobid.de — always returned as None.
 """
 
+import json
 import re
+import urllib.parse
 from decimal import Decimal, InvalidOperation
 
 import httpx
@@ -20,6 +22,7 @@ from app.scraping.schemas import ListingData
 
 # Maps the German spec-table labels used on autobid.de to canonical names.
 _LABEL_MAP: dict[str, str] = {
+    # German
     "erstzulassung": "first_registration",
     "first registration": "first_registration",
     "kraftstoff": "fuel_type",
@@ -37,6 +40,34 @@ _LABEL_MAP: dict[str, str] = {
     "variante": "variant",
     "ausstattung": "variant",
     "trim": "variant",
+    # Brand / manufacturer
+    "marke": "brand",
+    "hersteller": "brand",
+    "make": "brand",
+    "fahrzeugmarke": "brand",
+    # Model
+    "modell": "model",
+    "model": "model",
+    "fahrzeugmodell": "model",
+    # Croatian
+    "datum prve registracije": "first_registration",
+    "prva registracija": "first_registration",
+    "gorivo": "fuel_type",
+    "vrsta goriva": "fuel_type",
+    "kilometraža": "mileage_km",
+    "prijeđeni km": "mileage_km",
+    "snaga motora": "power_kw",
+    "snaga": "power_kw",
+    "broj sjedala": "seat_count",
+    "sjedala": "seat_count",
+    "verzija": "variant",
+    "oprema": "variant",
+    "marka": "brand",
+    "proizvođač": "brand",
+    # Icon-card labels synthesized by _parse_car_parameter_cards()
+    "first registration": "first_registration",
+    "mileage": "mileage_km",
+    "power": "power_kw",
 }
 
 _FUEL_MAP: dict[str, str] = {
@@ -107,8 +138,8 @@ def _extract_power_kw(text: str) -> float | None:
 
 
 def _extract_mileage(text: str) -> int | None:
-    """Parse '50.000 km' or '50000 km' → 50000."""
-    m = re.search(r"(\d[\d.,]*)\s*km", text, re.IGNORECASE)
+    """Parse '50.000 km', '50000 km', or '233.900 kilometrima' → mileage int."""
+    m = re.search(r"(\d[\d.,]*)\s*(?:km|kilomet)", text, re.IGNORECASE)
     if m:
         v = _parse_german_float(m.group(1))
         return int(v) if v is not None else None
@@ -129,6 +160,67 @@ def _normalise_first_reg(text: str) -> str | None:
     if not text or text in ("-", "n/a", "N/A"):
         return None
     return text
+
+
+def _parse_json_ld(soup: BeautifulSoup) -> dict:
+    """Extract the first schema.org Vehicle/Car JSON-LD block, if present."""
+    for tag in soup.find_all("script", type="application/ld+json"):
+        try:
+            data = json.loads(tag.string or "")
+        except (json.JSONDecodeError, TypeError):
+            continue
+        if isinstance(data, list):
+            data = next((d for d in data if isinstance(d, dict)), {})
+        if isinstance(data, dict) and data.get("@type", "").lower() in ("car", "vehicle"):
+            return data
+    return {}
+
+
+def _brand_model_from_url_slug(url: str) -> tuple[str | None, str | None]:
+    """Parse brand and model from the autobid.de URL slug.
+
+    URL format: /…/artikal/audi-a5-sportback-…-{numeric-id}
+    The slug is the reliable source when the page title is the auction center name.
+    """
+    path = urllib.parse.urlparse(url).path
+    slug = path.rstrip("/").rsplit("/", 1)[-1]
+    # Strip trailing numeric ID
+    slug = re.sub(r"-\d+$", "", slug)
+    parts = slug.split("-")
+    if not parts or not parts[0]:
+        return None, None
+    brand = parts[0].capitalize()
+    model = parts[1].upper() if len(parts) > 1 else None
+    return brand, model
+
+
+def _parse_car_parameter_cards(soup: BeautifulSoup) -> dict[str, str]:
+    """Collect label->value pairs from autobid.de's icon-based '.car-parameter' cards.
+
+    The Vue/Nuxt frontend renders mileage/power/first-registration/owner-count as
+    icon + value pairs (no visible text label, no dt/dd or th/td) — e.g.
+    <i class="ab-icon ab-icon-speedmeter">...<span class="car-parameter-value">233.900 kilometrima</span>.
+    The icon class is the only reliable label, so map icon name -> canonical field.
+    """
+    icon_to_label = {
+        "ab-icon-date": "first registration",
+        "ab-icon-speedmeter": "mileage",
+        "ab-icon-performance": "power",
+        "ab-icon-owner": "owner",
+    }
+    specs: dict[str, str] = {}
+    for card in soup.select(".car-parameter"):
+        icon = card.select_one("i[class*='ab-icon-']")
+        if not icon:
+            continue
+        classes = icon.get("class") or []
+        label = next((icon_to_label[c] for c in classes if c in icon_to_label), None)
+        if label is None:
+            continue
+        value_el = card.select_one(".car-parameter-value")
+        if value_el:
+            specs.setdefault(label, value_el.get_text(strip=True))
+    return specs
 
 
 def _parse_spec_table(soup: BeautifulSoup) -> dict[str, str]:
@@ -183,13 +275,25 @@ class AutobidDeExtractor:
 
         soup = BeautifulSoup(response.text, "lxml")
 
+        # og:title / page <title> usually carries the vehicle name on autobid.de;
+        # H1 is often the auction-center name on the /hr/ (Croatian) site variant.
         title = None
-        h1 = soup.find("h1")
-        if h1:
-            title = h1.get_text(strip=True) or None
+        og_title = soup.find("meta", property="og:title")
+        if og_title and og_title.get("content", "").strip():
+            title = og_title["content"].strip()
+        if not title:
+            h2 = soup.find("h2")
+            if h2:
+                title = h2.get_text(strip=True) or None
+        if not title:
+            h1 = soup.find("h1")
+            if h1:
+                title = h1.get_text(strip=True) or None
 
         price_eur = _extract_price(soup)
+        json_ld = _parse_json_ld(soup)
         specs = _parse_spec_table(soup)
+        specs.update(_parse_car_parameter_cards(soup))
 
         first_registration_date: str | None = None
         fuel_type: str | None = None
@@ -197,6 +301,8 @@ class AutobidDeExtractor:
         power_kw: float | None = None
         seat_count: int | None = None
         variant: str | None = None
+        brand: str | None = None
+        model: str | None = None
 
         for raw_label, raw_value in specs.items():
             canonical = _LABEL_MAP.get(raw_label)
@@ -221,10 +327,45 @@ class AutobidDeExtractor:
                 seat_count = _extract_seat_count(raw_value)
             elif canonical == "variant":
                 variant = raw_value.strip() or None
+            elif canonical == "brand":
+                brand = raw_value.strip() or None
+            elif canonical == "model":
+                model = raw_value.strip() or None
+
+        # Fill from JSON-LD Vehicle schema when spec table didn't cover a field
+        if json_ld:
+            if brand is None:
+                brand = json_ld.get("brand", {}).get("name") or json_ld.get("manufacturer") or None
+                if isinstance(brand, dict):
+                    brand = brand.get("name")
+            if model is None:
+                model = json_ld.get("model") or None
+            if mileage_km is None:
+                ld_m = json_ld.get("mileageFromOdometer", {})
+                if isinstance(ld_m, dict):
+                    v = ld_m.get("value")
+                    if isinstance(v, (int, float)):
+                        mileage_km = int(v)
+            if power_kw is None:
+                ld_p = json_ld.get("vehicleEngine", {})
+                if isinstance(ld_p, dict):
+                    v = ld_p.get("enginePower", {}).get("value")
+                    if isinstance(v, (int, float)):
+                        power_kw = float(v)
 
         # Variant fallback: pull from title if not in spec table
         if variant is None and title:
             variant = title
+
+        # Brand/model URL-slug fallback: autobid.de embeds the vehicle slug in the URL
+        # ("…/audi-a5-sportback-…-3464608") which is more reliable than the H1 (which
+        # shows the auction center name on the Croatian /hr/ site variant).
+        if brand is None or model is None:
+            slug_brand, slug_model = _brand_model_from_url_slug(url)
+            if brand is None:
+                brand = slug_brand
+            if model is None:
+                model = slug_model
 
         return ListingData(
             source_url=url,
@@ -238,4 +379,6 @@ class AutobidDeExtractor:
             power_kw=power_kw,
             variant=variant,
             seat_count=seat_count,
+            brand=brand,
+            model=model,
         )

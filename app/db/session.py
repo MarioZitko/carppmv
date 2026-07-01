@@ -13,7 +13,14 @@ from app.core.config import get_settings
 
 settings = get_settings()
 
-engine = create_async_engine(settings.database_url, echo=settings.debug)
+engine = create_async_engine(
+    settings.database_url,
+    echo=settings.debug,
+    pool_size=20,          # allow up to 20 steady connections
+    max_overflow=30,       # allow burst up to 50 total connections
+    pool_timeout=30,       # wait up to 30 seconds for a connection
+    pool_pre_ping=True,    # test connections before handing them out
+)
 
 AsyncSessionLocal = async_sessionmaker(engine, expire_on_commit=False)
 

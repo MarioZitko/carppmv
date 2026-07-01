@@ -2,4 +2,8 @@
 __pycache__/
 *.pyc
 .venv/
-app/data/catalogues
+# catalogue data dirs and noise — only .py files in catalogues root are tracked
+app/data/catalogues/*/
+app/data/catalogues/errors.log
+app/data/catalogues/manifest.jsonl
+.DS_Store

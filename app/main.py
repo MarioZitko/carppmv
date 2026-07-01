@@ -4,6 +4,7 @@ from fastapi import FastAPI
 
 from app.db.models import Base
 from app.db.session import engine
+from app.calculate.router import router as calculate_router
 from app.ppmv.router import router as ppmv_router
 from app.scraping.router import router as scraping_router
 from app.core.config import get_settings
@@ -32,6 +33,7 @@ def create_app() -> FastAPI:
     # Each feature owns its own router; main.py only wires them together.
     app.include_router(ppmv_router, prefix="/ppmv", tags=["ppmv"])
     app.include_router(scraping_router, prefix="/scrape", tags=["scraping"])
+    app.include_router(calculate_router, tags=["calculate"])
 
     return app
 
