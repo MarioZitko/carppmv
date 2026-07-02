@@ -1,6 +1,5 @@
 """Application entrypoint. Builds the FastAPI app and mounts feature routers."""
 
-import sqlalchemy as sa
 from fastapi import FastAPI
 
 from app.db.models import Base
@@ -22,24 +21,11 @@ def create_app() -> FastAPI:
 
     @app.on_event("startup")
     async def _create_tables() -> None:
+        # Creates any tables that don't exist yet, using the column/constraint
+        # definitions in db/models.py directly. Does not alter existing tables —
+        # schema changes to existing tables need an explicit migration.
         async with engine.begin() as conn:
-            # 1. Create any missing tables (idempotent)
             await conn.run_sync(Base.metadata.create_all)
-
-            # 2. Add missing columns to existing tables
-            await conn.execute(
-                sa.text("""
-                    ALTER TABLE catalogue
-                    ADD COLUMN IF NOT EXISTS match_key VARCHAR(256) NOT NULL DEFAULT ''
-                """)
-            )
-            # 3. Ensure unique constraint exists
-            await conn.execute(
-                sa.text("ALTER TABLE catalogue DROP CONSTRAINT IF EXISTS uq_catalogue_lookup_key")
-            )
-            await conn.execute(
-                sa.text("ALTER TABLE catalogue ADD CONSTRAINT uq_catalogue_lookup_key UNIQUE (match_key)")
-            )
 
     register_exception_handlers(app)
 

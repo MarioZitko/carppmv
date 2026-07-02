@@ -138,7 +138,7 @@ async def ingest_file(xlsx_path: Path, co2_standard: CO2Standard) -> None:
 
         print(f"[{sheet_name}] Mapping {len(header_row)} columns via LLM...", end=" ", flush=True)
         try:
-            mapping = map_sheet_columns(header_row, data_rows[:5])
+            mapping = await map_sheet_columns(header_row, data_rows[:5])
         except Exception as exc:
             print(f"FAILED\n  LLM error: {exc}")
             continue
@@ -181,7 +181,11 @@ async def ingest_file(xlsx_path: Path, co2_standard: CO2Standard) -> None:
             inserted = await _insert_rows(catalogue_dicts)
             duplicates = len(catalogue_dicts) - inserted
         except Exception as exc:
-            print(f"[{sheet_name}] DB insert failed: {exc}")
+            # SQLAlchemy exceptions stringify to the full SQL statement plus every
+            # bound parameter — unreadable for a batch of hundreds of rows.
+            orig = getattr(exc, "orig", None)
+            short = f"{type(orig).__name__}: {orig}" if orig is not None else f"{type(exc).__name__}: {exc}"
+            print(f"[{sheet_name}] DB insert failed: {short}")
             inserted = 0
             duplicates = 0
 

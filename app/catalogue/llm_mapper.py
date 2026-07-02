@@ -123,7 +123,7 @@ def _build_user_prompt(header_row: list[str], sample_data_rows: list[tuple]) -> 
     )
 
 
-def map_sheet_columns(
+async def map_sheet_columns(
     header_row: list[str],
     sample_data_rows: list[tuple],
     timeout_seconds: float = 30.0,
@@ -161,15 +161,21 @@ def map_sheet_columns(
         "temperature": 0,
     }
 
-    response = httpx.post(
-        OPENROUTER_URL,
+    request_kwargs = dict(
+        url=OPENROUTER_URL,
         headers={
             "Authorization": f"Bearer {settings.openrouter_api_key}",
             "Content-Type": "application/json",
         },
         json=payload,
-        timeout=timeout_seconds,
     )
+    async with httpx.AsyncClient(timeout=timeout_seconds) as client:
+        try:
+            response = await client.post(**request_kwargs)
+        except (httpx.TimeoutException, httpx.TransportError):
+            # OpenRouter occasionally stalls a connection well past the read
+            # timeout without erroring; one retry on a fresh connection clears it.
+            response = await client.post(**request_kwargs)
     response.raise_for_status()
     data = response.json()
 
