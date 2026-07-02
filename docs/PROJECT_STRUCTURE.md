@@ -54,6 +54,21 @@ tests/
 scripts/
   ingest_catalogue.py    # Single-file manual ingest CLI (kept for one-off debugging;
                           # app/data/catalogues/ingest.py is the real pipeline)
+
+frontend/                # Next.js app — DONE (PPMV Calculator page); Profitability is a shell
+  app/
+    page.tsx                # PPMV Calculator (landing page)
+    profitability/page.tsx  # Shell only, no backend to call yet
+    layout.tsx               # Nav + shared chrome
+  lib/
+    api.ts                    # fetch wrappers for /calculate and /ppmv/calculate
+    types.ts                   # TS mirrors of the Pydantic schemas
+    format.ts, fuel.ts          # small client-side formatting/parsing helpers
+  components/
+    UrlInputForm.tsx
+    ParsedFieldsCard.tsx
+    PPMVBreakdownCard.tsx
+    ManualFieldsForm.tsx
 ```
 
 ---
@@ -127,7 +142,8 @@ per unique column layout per brand, not just file count).
 - **Sweep scraping** (nightly/weekly bulk) — njuškalo and mobile.de are
   hard-blocked by bot detection on sweep patterns (not single-page fetches);
   needs an Apify cost/actor decision that hasn't been made.
-- **Frontend** — not started. See [`FRONTEND_GUIDE.md`](FRONTEND_GUIDE.md).
+- **Profitability page content** — `frontend/app/profitability` is a shell only;
+  waits on the `app/profitability` backend above.
 
 ---
 

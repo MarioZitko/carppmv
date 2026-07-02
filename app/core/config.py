@@ -10,6 +10,10 @@ class Settings(BaseSettings):
     debug: bool = False
     database_url: str = "postgresql+asyncpg://localhost/carppmv"
 
+    # Comma-separated list of origins allowed to call the API from a browser
+    # (the Next.js frontend runs on a different port/host in dev and prod).
+    cors_allow_origins: str = "http://localhost:3000"
+
     # HRK→EUR fixed conversion rate used when normalizing pre-euro catalogue prices.
     hrk_to_eur_rate: float = 7.53450
 

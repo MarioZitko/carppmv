@@ -55,6 +55,17 @@ POWER_BONUS = 4.0
 POWER_PENALTY_GAP_KW = 25.0
 POWER_PENALTY = 25.0
 
+# Model disambiguation. token_set_ratio on the full brand+model+variant blob is
+# fooled by shared trim/engine tokens (e.g. "Audi A3 Sportback 35 TDI S tronic"
+# vs "Audi Q3 35 TDI S tronic" scores ~93 on the blob alone — nearly every token
+# except the model letter matches). Scoring the model field on its own catches
+# this: "a3" vs "q3" scores ~50, nowhere near "a3" vs "a3" at 100. When the
+# model-only score falls below MODEL_MATCH_THRESHOLD, the blob score is
+# penalised hard enough to drop a wrong-model row out of auto-accept and,
+# usually, out of CANDIDATE_FLOOR entirely.
+MODEL_MATCH_THRESHOLD = 70.0
+MODEL_MISMATCH_PENALTY = 40.0
+
 # Token-level canonicalisation for the few body-style synonyms that genuinely
 # differ between listing sites and customs sheets. Kept tiny and conservative on
 # purpose — over-eager synonym folding hides real distinctions. Extend only with
@@ -147,8 +158,19 @@ class MatchResult:
     candidates: list[ScoredCandidate]  # ranked best-first; empty when NO_MATCH
 
 
-def _score_one(query_key: str, cand: CandidateRow, listing_power_kw: float | None) -> float:
+def _score_one(
+    query_key: str,
+    cand: CandidateRow,
+    listing_power_kw: float | None,
+    query_model: str | None = None,
+) -> float:
     base = float(fuzz.token_set_ratio(query_key, cand.match_key))
+
+    if query_model and cand.model:
+        model_score = fuzz.token_set_ratio(normalize_text(query_model), normalize_text(cand.model))
+        if model_score < MODEL_MATCH_THRESHOLD:
+            base = max(0.0, base - MODEL_MISMATCH_PENALTY)
+
     if listing_power_kw is not None and cand.power_kw is not None:
         diff = abs(listing_power_kw - cand.power_kw)
         if diff <= POWER_TOLERANCE_KW:
@@ -162,6 +184,8 @@ def rank_candidates(
     query_key: str,
     candidates: list[CandidateRow],
     listing_power_kw: float | None = None,
+    limit: int = MAX_CANDIDATES,
+    query_model: str | None = None,
 ) -> MatchResult:
     """Pure scoring + decision. Sorts candidates by adjusted score (most recent
     valid_from breaks ties, so the freshest price wins among equals), then
@@ -171,11 +195,18 @@ def rank_candidates(
     within ACCEPT_MARGIN of the top shares the top's price_eur — i.e. the only
     near-ties are the same priced answer under different validity periods, not a
     genuinely different (differently-priced) variant. Otherwise the caller gets
-    ranked candidates to confirm."""
+    ranked candidates to confirm.
+
+    `limit` caps how many ranked candidates are returned to the caller — the
+    decision policy above always scores the full candidate set first, so a
+    larger limit only affects how many alternatives a human sees, never the
+    auto-accept/no-match decision itself."""
     if not candidates:
         return MatchResult(MatchStatus.NO_MATCH, None, [])
 
-    scored = [ScoredCandidate(c, _score_one(query_key, c, listing_power_kw)) for c in candidates]
+    scored = [
+        ScoredCandidate(c, _score_one(query_key, c, listing_power_kw, query_model)) for c in candidates
+    ]
     scored.sort(
         key=lambda s: (s.score, s.row.valid_from or date.min),
         reverse=True,
@@ -188,9 +219,9 @@ def rank_candidates(
     near_top = [s for s in scored if top.score - s.score <= ACCEPT_MARGIN]
     distinct_prices = {round(s.row.price_eur, 2) for s in near_top}
     if top.score >= ACCEPT_SCORE and len(distinct_prices) == 1:
-        return MatchResult(MatchStatus.AUTO_MATCHED, top.row, scored[:MAX_CANDIDATES])
+        return MatchResult(MatchStatus.AUTO_MATCHED, top.row, scored[:limit])
 
-    return MatchResult(MatchStatus.CANDIDATES, None, scored[:MAX_CANDIDATES])
+    return MatchResult(MatchStatus.CANDIDATES, None, scored[:limit])
 
 
 # Listing fuel strings are messy and multilingual; only map the unambiguous
@@ -236,6 +267,7 @@ async def find_match(
     variant: str | None,
     fuel_type: str | None = None,
     power_kw: float | None = None,
+    limit: int = MAX_CANDIDATES,
 ) -> MatchResult:
     """Fetch this brand's catalogue rows and rank them against the listing.
 
@@ -255,4 +287,4 @@ async def find_match(
         if narrowed:  # don't let an over-strict fuel filter erase a real match
             candidates = narrowed
 
-    return rank_candidates(query_key, candidates, listing_power_kw=power_kw)
+    return rank_candidates(query_key, candidates, listing_power_kw=power_kw, limit=limit, query_model=model)

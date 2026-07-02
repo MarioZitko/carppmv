@@ -3,19 +3,23 @@
 Pipeline:
   1. Detect site from URL domain → pick extractor
   2. Run extractor → ListingData
-  3. If co2_g_km missing → catalogue matcher → fill or flag manual_required
+  3. Catalogue matcher always runs (when brand is known) → fills CO2 when
+     missing, and always surfaces ranked candidates so the user can pick a
+     different catalogue row (different price/CO2) than the auto-picked one.
   4. Run PPMV engine
   5. Return CalculateResponse
 """
 
 import logging
-from datetime import date
+import re
+from datetime import date, datetime
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.calculate.schemas import CalculateRequest, CalculateResponse, ParsedFields
 from app.catalogue.matching import MatchStatus, find_match
+from app.catalogue.schemas import CatalogueCandidate
 from app.core.config import get_settings
 from app.db.session import get_db_session
 from app.ppmv.engine import calculate_ppmv
@@ -36,6 +40,11 @@ _EXTRACTORS = {
 }
 
 _UNSUPPORTED_SITES = {"mobile.de"}
+
+# A scraped listing already carries a strong brand/model/variant/power signal,
+# so it's worth surfacing more alternatives than the catalogue-search default —
+# the frontend renders these in a scrollable list, not a page-length one.
+_CALCULATE_CANDIDATE_LIMIT = 15
 
 _FUEL_MAP: dict[str, FuelType] = {
     "diesel": FuelType.DIESEL,
@@ -63,16 +72,48 @@ def _parse_fuel(raw: str | None) -> FuelType | None:
 
 
 def _parse_date(raw: str | None) -> date | None:
+    """Parses whatever date format a scraper handed back. Listing sites are
+    inconsistent about this — ISO datetimes with a time suffix, single-digit
+    day/month, a trailing "." (Croatian convention), slash-separated dates,
+    "MM/YYYY", or a bare year are all seen in practice, so this deliberately
+    tries several shapes rather than requiring one exact format."""
     if not raw:
         return None
-    # Support YYYY-MM-DD (ISO) and DD.MM.YYYY (European)
-    for fmt in ("%Y-%m-%d", "%d.%m.%Y"):
+
+    text = raw.strip()
+
+    # ISO date, optionally with a time component ("2021-05-17T00:00:00.000Z").
+    iso_prefix = text[:10]
+    try:
+        return datetime.strptime(iso_prefix, "%Y-%m-%d").date()
+    except ValueError:
+        pass
+
+    # Normalize whitespace around separators ("17. 05. 2021." -> "17.05.2021.")
+    normalized = re.sub(r"\s*([./])\s*", r"\1", text)
+
+    for fmt in ("%d.%m.%Y.", "%d.%m.%Y", "%d/%m/%Y", "%m/%Y", "%Y-%m", "%Y"):
         try:
-            from datetime import datetime
-            return datetime.strptime(raw, fmt).date()
+            return datetime.strptime(normalized, fmt).date()
         except ValueError:
             continue
     return None
+
+
+def _to_candidate(row, score: float) -> CatalogueCandidate:
+    return CatalogueCandidate(
+        catalogue_id=row.catalogue_id,
+        brand=row.brand,
+        model=row.model,
+        variant=row.variant,
+        price_eur=row.price_eur,
+        co2_g_km=row.co2_g_km,
+        co2_standard=row.co2_standard,
+        fuel_type=row.fuel_type,
+        power_kw=row.power_kw,
+        valid_from=row.valid_from,
+        score=score,
+    )
 
 
 @router.post("/calculate", response_model=CalculateResponse)
@@ -116,11 +157,15 @@ async def calculate(
     co2_source = "scraped"
     confidence = "high"
     debug: dict | None = None
+    match_status = "not_attempted"
+    candidates: list[CatalogueCandidate] = []
 
     co2_g_km = listing.co2_g_km
 
-    # Catalogue lookup if CO2 missing.
-    if co2_g_km is None and listing.brand:
+    # Catalogue matching always runs when the brand is known — it fills CO2
+    # when missing, and always surfaces ranked candidates so the user can
+    # override the auto-picked row with a different price/CO2 combination.
+    if listing.brand:
         match_result = await find_match(
             session,
             brand=listing.brand,
@@ -128,28 +173,32 @@ async def calculate(
             variant=listing.variant,
             fuel_type=listing.fuel_type,
             power_kw=listing.power_kw,
+            limit=_CALCULATE_CANDIDATE_LIMIT,
         )
+        match_status = match_result.status.value
+        candidates = [_to_candidate(c.row, c.score) for c in match_result.candidates]
 
-        if match_result.status == MatchStatus.AUTO_MATCHED and match_result.matched:
-            row = match_result.matched
-            co2_g_km = row.co2_g_km
-            co2_source = "catalogue"
-            parsed.co2_g_km = co2_g_km
+        if co2_g_km is None:
+            if match_result.status == MatchStatus.AUTO_MATCHED and match_result.matched:
+                row = match_result.matched
+                co2_g_km = row.co2_g_km
+                co2_source = "catalogue"
+                parsed.co2_g_km = co2_g_km
 
-            if settings.debug:
-                debug = {
-                    "catalogue_match": {
-                        "brand": row.brand,
-                        "model": row.model,
-                        "variant": row.variant,
-                        "power_kw": row.power_kw,
-                        "catalogue_id": row.catalogue_id,
+                if settings.debug:
+                    debug = {
+                        "catalogue_match": {
+                            "brand": row.brand,
+                            "model": row.model,
+                            "variant": row.variant,
+                            "power_kw": row.power_kw,
+                            "catalogue_id": row.catalogue_id,
+                        }
                     }
-                }
-        else:
-            co2_source = "manual_required"
-            confidence = "low"
-            warnings.append("CO2 value could not be determined automatically — please enter it manually.")
+            else:
+                co2_source = "manual_required"
+                confidence = "low"
+                warnings.append("CO2 vrijednost nije moguće automatski odrediti — unesite je ručno.")
 
     # Guard: zero/negative CO2 is only valid for electric; invalidate it for all others.
     if co2_g_km is not None and co2_g_km <= 0:
@@ -159,10 +208,11 @@ async def calculate(
             parsed.co2_g_km = None
             co2_source = "manual_required"
             confidence = "low"
-            warnings.append("CO2 value invalid (≤ 0) — manual input required.")
+            warnings.append("CO2 vrijednost nije ispravna (≤ 0) — potreban je ručni unos.")
 
-    # If CO2 still None after catalogue, can't compute PPMV.
-    if co2_g_km is None:
+    def _early_return(msg: str | None = None) -> CalculateResponse:
+        if msg:
+            warnings.append(msg)
         return CalculateResponse(
             ppmv_eur=None,
             parsed=parsed,
@@ -170,44 +220,26 @@ async def calculate(
             confidence=confidence,  # type: ignore[arg-type]
             warnings=warnings,
             debug=debug,
+            match_status=match_status,  # type: ignore[arg-type]
+            candidates=candidates,
         )
+
+    # If CO2 still None after catalogue, can't compute PPMV.
+    if co2_g_km is None:
+        return _early_return()
 
     # Resolve fuel type.
     fuel_type = _parse_fuel(listing.fuel_type)
     if fuel_type is None:
-        warnings.append(f"Unrecognized fuel type {listing.fuel_type!r} — PPMV calculation skipped.")
-        return CalculateResponse(
-            ppmv_eur=None,
-            parsed=parsed,
-            co2_source=co2_source,  # type: ignore[arg-type]
-            confidence=confidence,  # type: ignore[arg-type]
-            warnings=warnings,
-            debug=debug,
-        )
+        return _early_return(f"Nepoznata vrsta goriva {listing.fuel_type!r} — izračun PPMV-a preskočen.")
 
     # Resolve registration date.
     reg_date = _parse_date(listing.first_registration_date)
     if reg_date is None:
-        warnings.append("Missing or unrecognized first registration date — PPMV calculation skipped.")
-        return CalculateResponse(
-            ppmv_eur=None,
-            parsed=parsed,
-            co2_source=co2_source,  # type: ignore[arg-type]
-            confidence=confidence,  # type: ignore[arg-type]
-            warnings=warnings,
-            debug=debug,
-        )
+        return _early_return("Nedostaje ili je neprepoznat datum prve registracije — izračun PPMV-a preskočen.")
 
     if listing.price_eur is None:
-        warnings.append("Missing price — PPMV calculation skipped.")
-        return CalculateResponse(
-            ppmv_eur=None,
-            parsed=parsed,
-            co2_source=co2_source,  # type: ignore[arg-type]
-            confidence=confidence,  # type: ignore[arg-type]
-            warnings=warnings,
-            debug=debug,
-        )
+        return _early_return("Nedostaje cijena — izračun PPMV-a preskočen.")
 
     breakdown = calculate_ppmv(
         price_eur=listing.price_eur,
@@ -226,4 +258,6 @@ async def calculate(
         confidence=confidence,  # type: ignore[arg-type]
         warnings=warnings,
         debug=debug,
+        match_status=match_status,  # type: ignore[arg-type]
+        candidates=candidates,
     )

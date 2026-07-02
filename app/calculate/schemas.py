@@ -5,6 +5,8 @@ from typing import Literal
 
 from pydantic import BaseModel, HttpUrl
 
+from app.catalogue.schemas import CatalogueCandidate
+
 
 class CalculateRequest(BaseModel):
     url: HttpUrl
@@ -30,3 +32,7 @@ class CalculateResponse(BaseModel):
     confidence: Literal["high", "low"]
     warnings: list[str]
     debug: dict | None = None
+    # Ranked catalogue rows the listing was matched against, so the user can
+    # pick a different one (and its price/CO2) instead of the auto-picked row.
+    match_status: Literal["auto_matched", "candidates", "no_match", "not_attempted"] = "not_attempted"
+    candidates: list[CatalogueCandidate] = []

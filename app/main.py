@@ -1,10 +1,12 @@
 """Application entrypoint. Builds the FastAPI app and mounts feature routers."""
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
 from app.db.models import Base
 from app.db.session import engine
 from app.calculate.router import router as calculate_router
+from app.catalogue.router import router as catalogue_router
 from app.ppmv.router import router as ppmv_router
 from app.scraping.router import router as scraping_router
 from app.core.config import get_settings
@@ -27,11 +29,19 @@ def create_app() -> FastAPI:
         async with engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
 
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=[origin.strip() for origin in settings.cors_allow_origins.split(",") if origin.strip()],
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+
     register_exception_handlers(app)
 
     app.include_router(ppmv_router, prefix="/ppmv", tags=["ppmv"])
     app.include_router(scraping_router, prefix="/scrape", tags=["scraping"])
     app.include_router(calculate_router, tags=["calculate"])
+    app.include_router(catalogue_router, prefix="/catalogue", tags=["catalogue"])
 
     return app
 

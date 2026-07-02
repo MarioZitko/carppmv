@@ -1,0 +1,104 @@
+@import "tailwindcss";
+
+:root {
+  --bg: #eef1fb;
+  --bg-alt: #e4e9fb;
+  --surface: #ffffff;
+  --surface-alt: #f4f6fd;
+  --border: #e1e5f2;
+  --text: #161a2e;
+  --text-soft: #666e8c;
+
+  --primary: #4f46e5;
+  --primary-dark: #4338ca;
+  --primary-soft: #eceafd;
+
+  --accent: #0d9488;
+  --accent-soft: #e6fbf8;
+
+  --ok: #0f9d67;
+  --ok-bg: #e7f9f0;
+  --warn: #b45309;
+  --warn-bg: #fef3e2;
+  --err: #dc2626;
+  --err-bg: #fdeeee;
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-alt: var(--surface-alt);
+  --color-border: var(--border);
+  --color-text: var(--text);
+  --color-text-soft: var(--text-soft);
+  --color-primary: var(--primary);
+  --color-primary-dark: var(--primary-dark);
+  --color-primary-soft: var(--primary-soft);
+  --color-accent: var(--accent);
+  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+html {
+  background: var(--bg);
+}
+
+body {
+  background:
+    radial-gradient(1200px 500px at 10% -10%, var(--bg-alt), transparent),
+    radial-gradient(900px 500px at 100% 0%, var(--accent-soft), transparent),
+    var(--bg);
+  color: var(--text);
+  font-family: var(--font-sans);
+}
+
+.font-mono-tab {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+input,
+select,
+button {
+  font-family: inherit;
+}
+
+::placeholder {
+  color: var(--text-soft);
+  opacity: 1;
+}
+
+:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--border);
+}
+
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 18px;
+  width: 18px;
+  border-radius: 999px;
+  background: var(--primary);
+  border: 3px solid white;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+  cursor: pointer;
+}
+
+input[type="range"]::-moz-range-thumb {
+  height: 18px;
+  width: 18px;
+  border-radius: 999px;
+  background: var(--primary);
+  border: 3px solid white;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+  cursor: pointer;
+}
