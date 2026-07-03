@@ -2,6 +2,7 @@
 
 import { Tooltip } from "@/components/Tooltip";
 import { ToggleSwitch } from "@/components/ToggleSwitch";
+import { DateInput } from "@/components/DateInput";
 import { VehicleFormValues } from "@/lib/vehicleForm";
 import { FuelType } from "@/lib/types";
 
@@ -21,9 +22,17 @@ export function VehicleForm({ values, onChange }: Props) {
   const input =
     "w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3.5 py-2 text-sm text-[var(--text)] focus:border-[var(--primary)] transition-colors disabled:opacity-50 disabled:bg-[var(--surface-alt)]";
 
+  const hasMoreSeats = values.seatCount !== "" && Number(values.seatCount) >= 8;
+  const is9Plus = Number(values.seatCount) >= 9;
+
   return (
     <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] shadow-sm p-4 space-y-4">
       <h3 className="text-sm font-semibold text-[var(--text)]">Podaci o vozilu</h3>
+      <p className="text-xs text-[var(--text-soft)] italic">
+        Napomena: baza sadrži cijene osnovnih izvedbi (trim varijanti) bez dodatne opreme. Stvarna cijena
+        novog vozila može biti viša zbog paketa opreme i dodatnih značajki, a to može utjecati i na
+        CO2 emisiju, a time i na iznos PPMV-a.
+      </p>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
         <div>
@@ -66,27 +75,8 @@ export function VehicleForm({ values, onChange }: Props) {
         </div>
 
         <div>
-          <label className={`${label} flex items-center`}>
-            Broj sjedala (opc.)
-            <Tooltip text="Vozila s 8 ukupnih sjedala (7+1) imaju sniženu poreznu osnovicu za 50%, a s 9+ sjedala (8+1) za 75% — kombiji i veća vozila registrirana kao osobna time plaćaju znatno manji PPMV." />
-          </label>
-          <input
-            className={input}
-            type="number"
-            min="1"
-            value={values.seatCount}
-            onChange={(e) => onChange({ seatCount: e.target.value })}
-          />
-        </div>
-
-        <div>
           <label className={label}>Datum prve registracije</label>
-          <input
-            className={input}
-            type="date"
-            value={values.regDate}
-            onChange={(e) => onChange({ regDate: e.target.value })}
-          />
+          <DateInput className={input} value={values.regDate} onChange={(v) => onChange({ regDate: v })} />
         </div>
 
         <div>
@@ -94,22 +84,48 @@ export function VehicleForm({ values, onChange }: Props) {
             Datum deklaracije
             <Tooltip text="Datum kada se vozilo prijavljuje carini u Hrvatskoj. Razlika između ovog datuma i datuma prve registracije određuje starost vozila u mjesecima, koja izravno smanjuje poreznu osnovicu kroz tablicu amortizacije (npr. vozilo staro 5 godina plaća samo ~40% PPMV-a novog vozila)." />
           </label>
-          <input
-            className={input}
-            type="date"
-            value={values.declDate}
-            onChange={(e) => onChange({ declDate: e.target.value })}
-          />
+          <DateInput className={input} value={values.declDate} onChange={(v) => onChange({ declDate: v })} />
         </div>
       </div>
 
-      <div className="pt-3 border-t border-[var(--border)]">
+      <div className="pt-3 border-t border-[var(--border)] space-y-3">
         <ToggleSwitch
           checked={values.isNew}
           onChange={(v) => onChange({ isNew: v })}
           label="Novo vozilo"
           hint="Uključite ako vozilo nije prethodno registrirano — amortizacija se tada ne primjenjuje."
         />
+
+        <div>
+          <ToggleSwitch
+            checked={hasMoreSeats}
+            onChange={(v) => onChange({ seatCount: v ? "8" : "" })}
+            label="Vozilo ima više sjedala"
+            hint="Kombiji/kamperi (7+1 ili 8+1) registrirani kao osobna vozila imaju sniženu poreznu osnovicu."
+          />
+          {hasMoreSeats && (
+            <div className="mt-2 flex gap-1 rounded-xl bg-[var(--surface-alt)] p-1 w-fit">
+              <button
+                type="button"
+                onClick={() => onChange({ seatCount: "8" })}
+                className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
+                  !is9Plus ? "bg-[var(--surface)] text-[var(--primary)] shadow-sm" : "text-[var(--text-soft)]"
+                }`}
+              >
+                8 sjedala (7+1) — 50%
+              </button>
+              <button
+                type="button"
+                onClick={() => onChange({ seatCount: "9" })}
+                className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
+                  is9Plus ? "bg-[var(--surface)] text-[var(--primary)] shadow-sm" : "text-[var(--text-soft)]"
+                }`}
+              >
+                9+ sjedala (8+1) — 75%
+              </button>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

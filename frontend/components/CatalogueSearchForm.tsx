@@ -23,6 +23,7 @@ export function CatalogueSearchForm({ onResult }: Props) {
   const [model, setModel] = useState("");
   const [variant, setVariant] = useState("");
   const [year, setYear] = useState("");
+  const [powerKw, setPowerKw] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -49,7 +50,13 @@ export function CatalogueSearchForm({ onResult }: Props) {
     setLoading(true);
     onResult(null);
     try {
-      const result = await searchCatalogue({ brand, model, variant, year: year ? Number(year) : undefined });
+      const result = await searchCatalogue({
+        brand,
+        model,
+        variant,
+        year: year ? Number(year) : undefined,
+        powerKw: powerKw ? Number(powerKw) : undefined,
+      });
       onResult(result);
       if (result.candidates.length === 0 && !result.matched) {
         setError("Nema podudaranja u bazi vozila za uneseni model/varijantu.");
@@ -66,7 +73,7 @@ export function CatalogueSearchForm({ onResult }: Props) {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-3">
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
         <select
           className={inputCls}
           value={brand}
@@ -113,6 +120,16 @@ export function CatalogueSearchForm({ onResult }: Props) {
             </option>
           ))}
         </select>
+
+        <input
+          className={inputCls}
+          type="number"
+          min="0"
+          step="1"
+          placeholder="Snaga u kW (opc.)"
+          value={powerKw}
+          onChange={(e) => setPowerKw(e.target.value)}
+        />
       </div>
 
       <button

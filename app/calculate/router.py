@@ -161,10 +161,14 @@ async def calculate(
     candidates: list[CatalogueCandidate] = []
 
     co2_g_km = listing.co2_g_km
+    reg_date = _parse_date(listing.first_registration_date)
 
     # Catalogue matching always runs when the brand is known — it fills CO2
     # when missing, and always surfaces ranked candidates so the user can
     # override the auto-picked row with a different price/CO2 combination.
+    # The first-registration year (when known) picks the catalogue validity
+    # period that actually applied on that date, instead of defaulting to
+    # the most recent one regardless of how old the vehicle is.
     if listing.brand:
         match_result = await find_match(
             session,
@@ -174,6 +178,7 @@ async def calculate(
             fuel_type=listing.fuel_type,
             power_kw=listing.power_kw,
             limit=_CALCULATE_CANDIDATE_LIMIT,
+            year=reg_date.year if reg_date else None,
         )
         match_status = match_result.status.value
         candidates = [_to_candidate(c.row, c.score) for c in match_result.candidates]
@@ -234,7 +239,6 @@ async def calculate(
         return _early_return(f"Nepoznata vrsta goriva {listing.fuel_type!r} — izračun PPMV-a preskočen.")
 
     # Resolve registration date.
-    reg_date = _parse_date(listing.first_registration_date)
     if reg_date is None:
         return _early_return("Nedostaje ili je neprepoznat datum prve registracije — izračun PPMV-a preskočen.")
 

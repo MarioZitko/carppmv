@@ -164,6 +164,31 @@ def test_power_guard_picks_right_engine_among_siblings():
     assert result.candidates[0].row.catalogue_id == 1
 
 
+def test_power_mid_gap_still_demotes_wrong_engine():
+    # Real case: a BMW 120i listing (131 kW) parsed with only "120" for model
+    # and no useful variant text ("Limousine"), scraped against a catalogue
+    # that also has a plain "120" 115 kW trim. 16 kW apart — inside the old
+    # flat "untouched" mid band (tolerance 7, penalty gap 25) — so fuzzy text
+    # alone left the wrong-engine row within ~1 point of the correct one. The
+    # linear ramp between the two bands must pull them decisively apart.
+    query = build_match_key("BMW", "120", "Limousine")
+    rows = [
+        _cand(brand="BMW", model="120i", variant="120i", price_eur=28771.9, power_kw=130.0, catalogue_id=1),
+        _cand(
+            brand="BMW",
+            model="120",
+            variant="120_automatski_7stupnjevaPrijenosa_5vata_1499ccm_115kW",
+            price_eur=35125.0,
+            power_kw=115.0,
+            catalogue_id=2,
+        ),
+    ]
+    result = rank_candidates(query, rows, listing_power_kw=131.0)
+    assert result.candidates[0].row.catalogue_id == 1
+    top, runner_up = result.candidates[0].score, result.candidates[1].score
+    assert top - runner_up > 5.0
+
+
 # ---------------------------------------------------------------------------
 # rank_candidates — ambiguous → confirm
 # ---------------------------------------------------------------------------
@@ -194,6 +219,48 @@ def test_same_price_different_periods_collapse_to_auto():
     assert result.status == MatchStatus.AUTO_MATCHED
     assert result.matched.valid_from == date(2024, 1, 1)
     assert result.matched.catalogue_id == 2
+
+
+# ---------------------------------------------------------------------------
+# rank_candidates — year-aware period selection
+# ---------------------------------------------------------------------------
+
+def test_no_year_defaults_to_most_recent_period():
+    # Unchanged legacy behaviour when no year is known (e.g. no target year
+    # signal at all) — most recent valid_from wins among same-priced periods.
+    query = build_match_key("BMW", "serija 3", "320d xDrive")
+    rows = [
+        _cand(variant="320d xDrive", price_eur=50000.0, valid_from=date(2022, 1, 1), catalogue_id=1),
+        _cand(variant="320d xDrive", price_eur=50000.0, valid_from=date(2024, 1, 1), catalogue_id=2),
+    ]
+    result = rank_candidates(query, rows, listing_power_kw=140.0)
+    assert result.matched.catalogue_id == 2
+
+
+def test_year_picks_closest_validity_period_not_most_recent():
+    # Three periods, same variant, different prices per period (realistic —
+    # customs prices change yearly). A 2015-registered car must match the
+    # 2015 period's price, not silently fall through to the newest one.
+    query = build_match_key("BMW", "serija 3", "320d xDrive")
+    rows = [
+        _cand(variant="320d xDrive", price_eur=40000.0, valid_from=date(2014, 1, 1), catalogue_id=1),
+        _cand(variant="320d xDrive", price_eur=45000.0, valid_from=date(2016, 1, 1), catalogue_id=2),
+        _cand(variant="320d xDrive", price_eur=52000.0, valid_from=date(2024, 1, 1), catalogue_id=3),
+    ]
+    result = rank_candidates(query, rows, listing_power_kw=140.0, year=2015)
+    assert result.candidates[0].row.catalogue_id == 1
+
+
+def test_year_tiebreak_survives_truncation_by_limit():
+    # The correct-year period must not be discarded by `limit` before the
+    # year tiebreak gets to run — it has to be sorted to the front first.
+    query = build_match_key("BMW", "serija 3", "320d xDrive")
+    rows = [
+        _cand(variant="320d xDrive", price_eur=30000.0 + i, valid_from=date(2000 + i, 1, 1), catalogue_id=i)
+        for i in range(10)
+    ]
+    result = rank_candidates(query, rows, listing_power_kw=140.0, year=2001, limit=3)
+    assert result.candidates[0].row.catalogue_id == 1
 
 
 # ---------------------------------------------------------------------------

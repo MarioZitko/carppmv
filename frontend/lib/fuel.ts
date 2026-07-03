@@ -41,6 +41,10 @@ export function toIsoDate(raw: string | null): string {
   m = text.match(/^(\d{1,2})\/(\d{4})$/);
   if (m) return `${m[2]}-${pad2(m[1])}-01`;
 
+  // Day-less month.year, dot-separated ("05.2021.") — seen on autobid.de.
+  m = text.match(/^(\d{1,2})\.(\d{4})\.?$/);
+  if (m) return `${m[2]}-${pad2(m[1])}-01`;
+
   m = text.match(/^(\d{4})-(\d{1,2})$/);
   if (m) return `${m[1]}-${pad2(m[2])}-01`;
 

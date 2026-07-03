@@ -23,6 +23,11 @@ export function PriceFineTune({ priceEur, onChange }: Props) {
         Prilagodite cijenu ako se stvarna cijena vozila razlikuje od one pronađene u bazi/oglasu — PPMV se
         preračunava odmah.
       </p>
+      <p className="text-xs text-[var(--text-soft)] italic">
+        Napomena: baza sadrži cijene osnovnih izvedbi (trim varijanti) bez dodatne opreme. Stvarna cijena
+        novog vozila može biti viša zbog paketa opreme i dodatnih značajki, a to može utjecati i na
+        CO2 emisiju, a time i na iznos PPMV-a.
+      </p>
 
       <div className="flex items-center justify-between font-mono-tab text-xl font-semibold text-[var(--text)]">
         {formatEur(priceEur)}

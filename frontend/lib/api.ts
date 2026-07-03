@@ -59,11 +59,13 @@ export function searchCatalogue(params: {
   model?: string;
   variant?: string;
   year?: number;
+  powerKw?: number;
 }): Promise<CatalogueSearchResponse> {
   const qs = new URLSearchParams();
   qs.set("brand", params.brand);
   if (params.model) qs.set("model", params.model);
   if (params.variant) qs.set("variant", params.variant);
   if (params.year) qs.set("year", String(params.year));
+  if (params.powerKw) qs.set("power_kw", String(params.powerKw));
   return get<CatalogueSearchResponse>(`/catalogue/search?${qs.toString()}`);
 }

@@ -28,6 +28,7 @@ is the thin async DB layer that fetches brand-filtered candidates and delegates
 to it.
 """
 
+import re
 import unicodedata
 from dataclasses import dataclass
 from datetime import date
@@ -49,7 +50,11 @@ MAX_CANDIDATES = 5
 
 # power_kw disambiguation. A small gap (rounding, trim variation) earns a nudge;
 # a large gap means a different engine and is penalised hard enough to keep a
-# wrong-engine fuzzy hit out of auto-accept. The mid band is left untouched.
+# wrong-engine fuzzy hit out of auto-accept. Between the two, the adjustment
+# ramps linearly rather than sitting at zero — a flat "untouched" mid band let
+# same-model-different-engine rows (e.g. a 131kW 120i vs a 115kW 120, 16kW
+# apart) land within a point of the correct candidate on fuzzy text alone,
+# since the sparse brand+model+variant text barely distinguishes them either.
 POWER_TOLERANCE_KW = 7.0
 POWER_BONUS = 4.0
 POWER_PENALTY_GAP_KW = 25.0
@@ -91,9 +96,26 @@ def _strip_diacritics(text: str) -> str:
     return "".join(ch for ch in decomposed if not unicodedata.combining(ch))
 
 
+# Splits a digit run from a *following* multi-letter run ("40TDI" -> "40 TDI",
+# "45TFSI" -> "45 TFSI"), but deliberately requires 2+ letters so genuine
+# fused model/engine codes with a single trailing letter ("320d", "530i")
+# are left alone — those aren't trim-naming shorthand, splitting them would
+# just discard a real identifier.
+_DIGIT_LETTER_BOUNDARY = re.compile(r"(?<=[0-9])(?=[a-zA-Z]{2,})")
+
+
 def normalize_text(text: str | None) -> str:
-    """Lowercase, strip diacritics, replace every non-alphanumeric run with a
-    single space, canonicalise known synonym tokens, collapse whitespace.
+    """Lowercase, strip diacritics, split digit+trim-code runs apart, replace
+    every remaining non-alphanumeric run with a single space, canonicalise
+    known synonym tokens, collapse whitespace.
+
+    The digit/trim-code split matters: engine-code trims are written with no
+    separator on one side and a period on the other depending on the naming
+    era ("40TDI" post-2019 vs "2.0 TDI" pre-2019), and without it "40TDI"
+    fuses into one opaque token that can't token-match a query's "40" + "tdi"
+    — while "2.0 TDI" splits on its period and keeps a clean "tdi" token, so
+    an unrelated old-naming variant would outscore the correct new-naming one
+    purely from that accidental tokenization difference.
 
     Deterministic and side-effect free — the same function normalizes both the
     stored match_key (at ingestion) and the query (at lookup), so the two sides
@@ -101,7 +123,8 @@ def normalize_text(text: str | None) -> str:
     if not text:
         return ""
     lowered = _strip_diacritics(text.lower())
-    cleaned = "".join(ch if ch.isalnum() else " " for ch in lowered)
+    spaced = _DIGIT_LETTER_BOUNDARY.sub(" ", lowered)
+    cleaned = "".join(ch if ch.isalnum() else " " for ch in spaced)
     tokens = (_TOKEN_SYNONYMS.get(tok, tok) for tok in cleaned.split())
     return " ".join(tokens)
 
@@ -177,6 +200,13 @@ def _score_one(
             return min(100.0, base + POWER_BONUS)
         if diff >= POWER_PENALTY_GAP_KW:
             return max(0.0, base - POWER_PENALTY)
+        # Linear ramp from +POWER_BONUS (at the tolerance edge) down to
+        # -POWER_PENALTY (at the penalty-gap edge) — see the tuning-knob
+        # comment above for why the mid band can't just be left flat.
+        span = POWER_PENALTY_GAP_KW - POWER_TOLERANCE_KW
+        frac = (diff - POWER_TOLERANCE_KW) / span
+        adjustment = POWER_BONUS - frac * (POWER_BONUS + POWER_PENALTY)
+        return max(0.0, min(100.0, base + adjustment))
     return base
 
 
@@ -186,10 +216,25 @@ def rank_candidates(
     listing_power_kw: float | None = None,
     limit: int = MAX_CANDIDATES,
     query_model: str | None = None,
+    year: int | None = None,
 ) -> MatchResult:
-    """Pure scoring + decision. Sorts candidates by adjusted score (most recent
-    valid_from breaks ties, so the freshest price wins among equals), then
-    applies the confirm-unless-certain policy.
+    """Pure scoring + decision. Sorts candidates by adjusted score, then applies
+    the confirm-unless-certain policy.
+
+    Same brand+model+variant text commonly repeats across several catalogue
+    validity periods (price/CO2 change year to year), so those periods always
+    tie on score and need a tiebreak: when a target `year` is known (the
+    listing's first registration, or what the user typed in the search form),
+    the period actually in effect that year wins — i.e. the latest valid_from
+    that is still <= year (a validity period runs from valid_from until
+    superseded, so "closest by raw date distance" is wrong: a period starting
+    after the target year was never in effect for it, no matter how close).
+    If no period had started yet by that year, the soonest future period is
+    the least-wrong fallback. With no year signal, the most recent valid_from
+    wins (best guess). This must happen here, before `limit` truncates the
+    list — reordering only the already-truncated top N (as a post-hoc step)
+    can drop the actually-correct period before it ever gets a chance to win
+    the tiebreak.
 
     Auto-accept requires the top score ≥ ACCEPT_SCORE and that every candidate
     within ACCEPT_MARGIN of the top shares the top's price_eur — i.e. the only
@@ -207,10 +252,20 @@ def rank_candidates(
     scored = [
         ScoredCandidate(c, _score_one(query_key, c, listing_power_kw, query_model)) for c in candidates
     ]
-    scored.sort(
-        key=lambda s: (s.score, s.row.valid_from or date.min),
-        reverse=True,
-    )
+
+    if year is not None:
+        def _sort_key(s: ScoredCandidate) -> tuple[float, int, int]:
+            vf = s.row.valid_from
+            vf_year = vf.year if vf else year
+            ordinal = vf.toordinal() if vf else 0
+            if vf_year <= year:
+                return (s.score, 1, ordinal)  # already in effect: prefer most recent update
+            return (s.score, 0, -ordinal)  # not yet in effect: prefer soonest
+    else:
+        def _sort_key(s: ScoredCandidate) -> tuple[float, date]:
+            return (s.score, s.row.valid_from or date.min)
+
+    scored.sort(key=_sort_key, reverse=True)
 
     top = scored[0]
     if top.score < CANDIDATE_FLOOR:
@@ -268,13 +323,17 @@ async def find_match(
     fuel_type: str | None = None,
     power_kw: float | None = None,
     limit: int = MAX_CANDIDATES,
+    year: int | None = None,
 ) -> MatchResult:
     """Fetch this brand's catalogue rows and rank them against the listing.
 
     Brand is a hard filter (case-insensitive); at O(thousands) total rows a
     per-brand fetch is a handful to a few hundred rows — trivial for the
     human-paced, one-listing-at-a-time PPMV flow. Fuel narrows further only when
-    it maps cleanly and doesn't wipe out every candidate."""
+    it maps cleanly and doesn't wipe out every candidate. `year` (first
+    registration year, or the year the user typed in a manual search) picks
+    which validity period wins among otherwise-identical rows — see
+    rank_candidates()."""
     query_key = build_match_key(brand, model, variant)
 
     stmt = select(Catalogue).where(func.lower(Catalogue.brand) == brand.strip().lower())
@@ -287,4 +346,6 @@ async def find_match(
         if narrowed:  # don't let an over-strict fuel filter erase a real match
             candidates = narrowed
 
-    return rank_candidates(query_key, candidates, listing_power_kw=power_kw, limit=limit, query_model=model)
+    return rank_candidates(
+        query_key, candidates, listing_power_kw=power_kw, limit=limit, query_model=model, year=year
+    )

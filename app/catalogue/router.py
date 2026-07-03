@@ -61,10 +61,12 @@ async def search_catalogue(
     Reuses the same matcher the /calculate flow uses for scraped listings,
     so a manual search and a scraped listing resolve to candidates the same
     way. Fuzzy match quality (`score`) always ranks first — `year`, when
-    given, only breaks ties *within* a score band (rows the matcher already
+    given, only breaks ties *within* the same score (rows the matcher already
     considers equally good), to prefer the catalogue period closest to that
     year. It never lets a low-quality match with the "right" year outrank a
-    genuinely better match.
+    genuinely better match. The tiebreak happens inside find_match/rank_candidates
+    (before candidates are truncated to `limit`), so a correct-year row can't
+    get cut before it has a chance to win the tiebreak.
     """
     result = await find_match(
         session,
@@ -74,6 +76,7 @@ async def search_catalogue(
         fuel_type=fuel_type,
         power_kw=power_kw,
         limit=max(_SEARCH_CANDIDATE_LIMIT, MAX_CANDIDATES),
+        year=year,
     )
 
     def to_candidate(row, score: float) -> CatalogueCandidate:
@@ -92,18 +95,6 @@ async def search_catalogue(
         )
 
     matched = to_candidate(result.matched, 100.0) if result.matched else None
-
-    scored = list(result.candidates)
-    if year is not None:
-        score_band_width = 5.0
-
-        def year_tiebreak_key(s):
-            band = -round(s.score / score_band_width)
-            year_distance = abs((s.row.valid_from.year if s.row.valid_from else year) - year)
-            return (band, year_distance, -s.score)
-
-        scored.sort(key=year_tiebreak_key)
-
-    candidates = [to_candidate(c.row, c.score) for c in scored]
+    candidates = [to_candidate(c.row, c.score) for c in result.candidates]
 
     return CatalogueSearchResponse(status=result.status.value, matched=matched, candidates=candidates)
