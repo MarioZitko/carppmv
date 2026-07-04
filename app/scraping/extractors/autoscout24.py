@@ -203,13 +203,47 @@ def _parse_brand(listing: dict) -> str | None:
     return None
 
 
+_ENGINE_SUFFIX_RE = re.compile(r"^[a-zA-Z]{1,3}$")
+
+
+def _parse_model_suffix(listing: dict) -> str | None:
+    """AutoScout24's `model` field is a bare number ("120"); the engine-code
+    suffix that actually distinguishes trims ("i"/"d"/"e"/"xd"...) only shows
+    up as the first whitespace-separated token of modelVersionInput, e.g.
+    "i Advantage|NAV|SHZG|LED|PDC|Lenkradhzg|LWS" for a 120i — the rest of that
+    string is a trim name plus a pipe-separated equipment list. Without this,
+    the catalogue's model field ("120i") never matches the listing's ("120").
+
+    A leading "x" is xDrive (all-wheel drive), not part of the engine code, so
+    "xd"/"xi"/"xe" are folded to the bare fuel letter "d"/"i"/"e" — otherwise
+    the model becomes "420xd", which no catalogue "420d"/"420i" row matches (and
+    the stray "x" even trips the model-mismatch penalty). Drivetrain is captured
+    elsewhere; the model badge only needs the series number + fuel letter."""
+    val = listing.get("modelVersionInput")
+    if isinstance(val, str) and val.strip():
+        first_token = val.strip().split(maxsplit=1)[0]
+        if _ENGINE_SUFFIX_RE.match(first_token):
+            suffix = first_token.lower()
+            if len(suffix) == 2 and suffix[0] == "x" and suffix[1] in "die":
+                suffix = suffix[1]
+            return suffix
+    return None
+
+
 def _parse_model_name(listing: dict) -> str | None:
     model = listing.get("model")
     if isinstance(model, dict):
-        return model.get("name") or model.get("label") or None
-    if isinstance(model, str) and model.strip():
-        return model.strip()
-    return None
+        base = model.get("name") or model.get("label") or None
+    elif isinstance(model, str) and model.strip():
+        base = model.strip()
+    else:
+        base = None
+    if base is None:
+        return None
+    suffix = _parse_model_suffix(listing)
+    if suffix and not base.lower().endswith(suffix):
+        return f"{base}{suffix}"
+    return base
 
 
 def _parse_title(listing: dict) -> str | None:

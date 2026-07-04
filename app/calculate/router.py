@@ -92,7 +92,7 @@ def _parse_date(raw: str | None) -> date | None:
     # Normalize whitespace around separators ("17. 05. 2021." -> "17.05.2021.")
     normalized = re.sub(r"\s*([./])\s*", r"\1", text)
 
-    for fmt in ("%d.%m.%Y.", "%d.%m.%Y", "%d/%m/%Y", "%m/%Y", "%Y-%m", "%Y"):
+    for fmt in ("%d.%m.%Y.", "%d.%m.%Y", "%d/%m/%Y", "%m.%Y", "%m/%Y", "%Y-%m", "%Y"):
         try:
             return datetime.strptime(normalized, fmt).date()
         except ValueError:
@@ -179,6 +179,7 @@ async def calculate(
             power_kw=listing.power_kw,
             limit=_CALCULATE_CANDIDATE_LIMIT,
             year=reg_date.year if reg_date else None,
+            co2_g_km=co2_g_km,
         )
         match_status = match_result.status.value
         candidates = [_to_candidate(c.row, c.score) for c in match_result.candidates]

@@ -1,0 +1,7 @@
+yourdomain.com {
+    reverse_proxy frontend:3000
+}
+
+api.yourdomain.com {
+    reverse_proxy backend:8000
+}

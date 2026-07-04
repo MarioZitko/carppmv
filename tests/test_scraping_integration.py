@@ -15,11 +15,30 @@ import pytest
 import pytest_asyncio
 
 from app.scraping.extractors.autobid_de import AutobidDeExtractor
-from app.scraping.extractors.autoscout24 import AutoScout24Extractor
+from app.scraping.extractors.autoscout24 import AutoScout24Extractor, _parse_model_name
 from app.scraping.extractors.mobile_de import MobileDeExtractor
 from app.scraping.extractors.njuskalo import NjuskaloExtractor
 from app.scraping.schemas import ListingData
 from app.core.exceptions import ScrapingError
+
+
+# ---------------------------------------------------------------------------
+# autoscout24 model-badge assembly (pure — no network)
+# ---------------------------------------------------------------------------
+
+def test_autoscout24_model_suffix_appends_engine_letter():
+    # AS24 gives a bare model number + the engine letter as the first token of
+    # modelVersionInput; the two must combine into the catalogue-style badge.
+    listing = {"model": "120", "modelVersionInput": "i Advantage|NAV|SHZG|LED"}
+    assert _parse_model_name(listing) == "120i"
+
+
+def test_autoscout24_model_suffix_folds_xdrive_prefix_to_fuel_letter():
+    # A leading 'x' is xDrive (AWD), not the engine code: "xd" must fold to "d"
+    # so the model is "420d" (a real catalogue badge), not "420xd" (which no row
+    # matches and which trips the model-mismatch penalty).
+    listing = {"model": "420", "modelVersionInput": "xd Luxury Line|HUD|HIFI"}
+    assert _parse_model_name(listing) == "420d"
 
 # ---------------------------------------------------------------------------
 # Hardcoded listing URLs — replace when listings expire.

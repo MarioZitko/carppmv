@@ -45,7 +45,7 @@ export function CandidatesList({ candidates, selectedCatalogueId, onSelect, titl
                   <p className="text-xs text-[var(--text-soft)] truncate">{c.variant}</p>
                   <p className="text-xs text-[var(--text-soft)] mt-0.5">
                     {c.fuel_type ?? "—"} · {c.power_kw ? `${c.power_kw} kW` : "—"} ·{" "}
-                    {c.co2_standard ?? "—"} · vrijedi od {formatDateHr(c.valid_from)}
+                    {c.co2_standard ?? "—"} · {formatDateHr(c.valid_from)}
                   </p>
                 </div>
                 <div className="text-right shrink-0">

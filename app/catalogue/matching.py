@@ -60,6 +60,39 @@ POWER_BONUS = 4.0
 POWER_PENALTY_GAP_KW = 25.0
 POWER_PENALTY = 25.0
 
+# CO2 disambiguation, same shape as the power ramp above. Only engaged when the
+# listing itself already carries a scraped CO2 value (most don't — that's the
+# common case this matcher exists to fill in), in which case it's a real signal
+# that two rows sharing brand/model/variant/power text are actually different
+# engine tunes or model years.
+CO2_TOLERANCE_G_KM = 8.0
+CO2_BONUS = 3.0
+CO2_PENALTY_GAP_G_KM = 40.0
+CO2_PENALTY = 15.0
+
+# Year disambiguation — same ramp shape, applied to the gap between the
+# listing's first-registration year and a candidate's validity-period start
+# year. Needs real weight, not a token nudge: the catalogue holds the same
+# model across a decade of validity periods, and early-ingestion periods
+# (2013-2015) often carry only a bare "120i"-style variant with no spec detail
+# at all, while later periods spell out transmission/doors/displacement. That
+# spec detail is real information the listing can't provide, so it can never
+# appear on the query side — token_set_ratio then scores the sparse old
+# period's near-empty variant as a near-perfect subset match while the
+# accurate current-period row, diluted by all that unmatched detail, scores
+# markedly lower on text alone. A small year nudge can't overcome a ~25-point
+# text gap like that; the bonus/penalty below are sized so a same-year period
+# reliably outranks a decade-old one even when the old period's thin text
+# otherwise looks like a "better" match. This also keeps the shown percentage
+# consistent with the year-aware sort tiebreak rank_candidates performs
+# separately for the exact period pick (see its docstring) — that tiebreak
+# remains the authority when scores end up tied, this makes them not tie in
+# the first place when the years clearly disagree.
+YEAR_TOLERANCE_YEARS = 1.0
+YEAR_BONUS = 8.0
+YEAR_PENALTY_GAP_YEARS = 6.0
+YEAR_PENALTY = 27.0
+
 # Model disambiguation. token_set_ratio on the full brand+model+variant blob is
 # fooled by shared trim/engine tokens (e.g. "Audi A3 Sportback 35 TDI S tronic"
 # vs "Audi Q3 35 TDI S tronic" scores ~93 on the blob alone — nearly every token
@@ -70,6 +103,42 @@ POWER_PENALTY = 25.0
 # usually, out of CANDIDATE_FLOOR entirely.
 MODEL_MATCH_THRESHOLD = 70.0
 MODEL_MISMATCH_PENALTY = 40.0
+
+# Fuel/engine-family mismatch. The engine badge (TDI/TFSI, or a numeric badge's
+# trailing d/i) is the single most reliable cross-source signal after
+# brand+model: it appears in the free-text variant on BOTH sides and it *defines*
+# the fuel. This penalty is belt-and-suspenders behind the hard fuel filter in
+# find_match — if that filter's anti-wipeout guard ever keeps a wrong-fuel row
+# (because filtering would empty the set), this still shoves it out of
+# auto-accept. Sized like a wrong model: a diesel listing must never silently
+# take a petrol row's as-new price, since 40 TDI and 40 TFSI routinely share
+# every other token AND the same power_kw (both 150 kW), so no other signal
+# separates them.
+FUEL_MISMATCH_PENALTY = 35.0
+
+# Gearbox (manual vs automatic) and body-style disagreements, applied only when
+# the two sides genuinely contradict — a listing that states "automatik" against
+# a manual-only trim, or a plain-model listing against a distinctively-bodied
+# candidate (Avant/Allroad/Sportback/Cabrio) it never mentioned. Softer than
+# fuel: neither side always spells gearbox/body out, so these must demote a
+# mismatch without hard-dropping the many rows that simply stay silent about it.
+GEARBOX_MISMATCH_PENALTY = 12.0
+BODY_MISMATCH_PENALTY = 12.0
+
+# Character-level fuzz ratio breaks down for BMW/Mercedes/Audi-style numeric
+# model codes: "120i" vs "520i" is a single-digit edit on a 4-char string, so
+# token_set_ratio scores it ~75 — above MODEL_MATCH_THRESHOLD — even though the
+# leading digits are the actual series/class identifier (1er vs 5er) and a
+# single-digit difference there is never a rounding/trim variation, unlike the
+# same difference in a word like "a3"/"q3". So the leading digit run is checked
+# as a hard override: when both models have one and they differ, that's always
+# a mismatch regardless of how similar the surrounding text scores.
+_LEADING_DIGITS_RE = re.compile(r"^(\d+)")
+
+
+def _leading_digits(text: str) -> str | None:
+    match = _LEADING_DIGITS_RE.match(text.strip())
+    return match.group(1) if match else None
 
 # Token-level canonicalisation for the few body-style synonyms that genuinely
 # differ between listing sites and customs sheets. Kept tiny and conservative on
@@ -84,6 +153,14 @@ _TOKEN_SYNONYMS: dict[str, str] = {
     "avant": "wagon",
     "karavan": "wagon",
     "kombi": "wagon",
+    # Catalogue rows ingested from 2023-07 onward abbreviate "S tronic" to
+    # "S tr" (Audi's dual-clutch transmission), while older rows and listing
+    # sites spell it out — confirmed every standalone "tr" token in the
+    # catalogue immediately follows "s". Without this, the abbreviated-name
+    # 2023+ row for a still-current model loses enough score to "S tronic" ->
+    # "S tr" tokenizing as unrelated words that a stale pre-2023 row (same
+    # model, wrong generation's kW) outranks it.
+    "tr": "tronic",
 }
 
 
@@ -144,6 +221,120 @@ def build_match_key(brand: str | None, model: str | None, variant: str | None) -
     return " ".join(unique)
 
 
+# --- engine / fuel-family derivation ---------------------------------------
+# Engine *words* are definitional: their presence fixes the fuel with no
+# ambiguity. Kept multi-brand so the same derivation works whether the source is
+# an Audi (TDI/TFSI), a VW/Skoda/Seat (TDI/TSI), a PSA (HDi/PureTech), a Renault
+# (dCi/TCe), a Ford (TDCi/EcoBoost), a Hyundai/Kia (CRDi/GDi) or a Mercedes
+# (CDI). "diesel"/"dizel"/"benzin" also appear verbatim in the catalogue's own
+# variant text (e.g. "... / Diesel/Hybrid / 2l ..."), so listing them here makes
+# candidate-side derivation rock-solid too.
+_DIESEL_ENGINE_WORDS = frozenset({
+    "tdi", "tdci", "dci", "cdi", "cdti", "hdi", "bluehdi", "crdi", "bluetec",
+    "multijet", "jtd", "d4d", "ddis", "diesel", "dizel",
+})
+_PETROL_ENGINE_WORDS = frozenset({
+    "tfsi", "tsi", "fsi", "tce", "thp", "puretech", "vti", "ecoboost",
+    "gdi", "tgdi", "mpi", "benzin", "benzina", "gasoline",
+})
+# BMW/Mercedes/Audi numeric badge whose trailing letter is the fuel code:
+# 320d/420d/120d → diesel, 320i/120i → petrol. Anchored to a digit run so it
+# never fires on a stray word. The AWD 'xd'/'xi' that _parse_model_suffix can
+# fuse onto a badge ("420xd") is deliberately NOT matched — that trailing letter
+# is drivetrain noise, not a reliable fuel code — so the badge path stays a
+# weaker fallback consulted only when no engine word and no site fuel exist.
+_BADGE_DIESEL_RE = re.compile(r"\b\d{2,3}d\b")
+_BADGE_PETROL_RE = re.compile(r"\b\d{2,3}i\b")
+
+
+def _fuel_from_engine_words(text: str) -> str | None:
+    """diesel / petrol from engine words (tdi/tfsi/...), or None when the text
+    carries neither or — self-contradictorily — both."""
+    tokens = set(normalize_text(text).split())
+    diesel = bool(tokens & _DIESEL_ENGINE_WORDS)
+    petrol = bool(tokens & _PETROL_ENGINE_WORDS)
+    if diesel == petrol:  # neither, or contradictory → don't guess
+        return None
+    return "diesel" if diesel else "petrol"
+
+
+def _fuel_from_badge(text: str) -> str | None:
+    """diesel / petrol from a numeric badge suffix (320d/320i), or None."""
+    blob = normalize_text(text)
+    diesel = bool(_BADGE_DIESEL_RE.search(blob))
+    petrol = bool(_BADGE_PETROL_RE.search(blob))
+    if diesel == petrol:
+        return None
+    return "diesel" if diesel else "petrol"
+
+
+def _derive_fuel_family(*texts: str | None) -> str | None:
+    """Best fuel guess from brand/model/variant free text: an engine word wins
+    (definitional), else the numeric badge suffix. Used for candidate-side
+    scoring; the query side goes through _resolve_query_fuel, which also folds in
+    the site's own fuel field."""
+    joined = " ".join(t for t in texts if t)
+    return _fuel_from_engine_words(joined) or _fuel_from_badge(joined)
+
+
+def _resolve_query_fuel(
+    site_fuel: str | None, model: str | None, variant: str | None
+) -> str | None:
+    """The listing's fuel, most trustworthy source first:
+
+    1. Engine word in model/variant (TDI/TFSI/...) — definitional, so it wins
+       even over the site's stated fuel, which is occasionally mislabelled.
+    2. The site's own fuel field, when it maps cleanly.
+    3. The numeric badge suffix (320d/320i) — last, because model parsing can
+       fuse an AWD 'xd'/'xi' onto the badge and muddy the trailing letter.
+
+    Returning None (unknown) is safe: find_match simply skips the fuel filter,
+    matching the pre-existing "no fuel → no filter" behaviour."""
+    text = f"{model or ''} {variant or ''}"
+    return (
+        _fuel_from_engine_words(text)
+        or _map_listing_fuel(site_fuel)
+        or _fuel_from_badge(text)
+    )
+
+
+# --- gearbox / body-style derivation ----------------------------------------
+# Manual vs automatic. normalize_text folds "tr" -> "tronic", so an Audi
+# "S tr"/"S tronic" and a listing "S-tronic" both surface a "tronic" token here.
+_GEARBOX_MANUAL_TOKENS = frozenset({
+    "rucni", "manuell", "manual", "schaltgetriebe", "schalt",
+})
+_GEARBOX_AUTO_TOKENS = frozenset({
+    "automatik", "automatski", "automatic", "tiptronic", "tip", "tronic",
+    "stronic", "dsg", "pdk", "steptronic", "dct", "multitronic", "edc",
+    "powershift",
+})
+
+
+def _gearbox_class(text: str) -> str | None:
+    """'manual' / 'auto' / None from transmission tokens. Only a clean signal
+    when exactly one class is present. Note "s tronic" tokenizes to "s" +
+    "tronic" — the "tronic" token carries the automatic signal, and the stray
+    "s" (which also appears in the "s line" trim) is deliberately ignored."""
+    tokens = set(normalize_text(text).split())
+    manual = bool(tokens & _GEARBOX_MANUAL_TOKENS)
+    auto = bool(tokens & _GEARBOX_AUTO_TOKENS)
+    if manual == auto:
+        return None
+    return "manual" if manual else "auto"
+
+
+# Distinctive (non-sedan) body styles. A sedan is the assumed default, so its
+# presence on a candidate is never penalised when the listing stays silent;
+# a wagon/coupe/cabrio/allroad/sportback/gran-coupe the listing never named is.
+# normalize_text already folds avant/touring/estate/kombi/karavan -> "wagon" and
+# limousine/berline -> "sedan", so only the canonical tokens need listing here.
+_DISTINCTIVE_BODY_TOKENS = frozenset({
+    "wagon", "sportback", "coupe", "cabrio", "cabriolet", "roadster",
+    "allroad", "gran", "fastback", "liftback", "suv",
+})
+
+
 @dataclass(frozen=True)
 class CandidateRow:
     """DB-free view of a Catalogue row, so the ranker can be unit-tested without
@@ -181,33 +372,98 @@ class MatchResult:
     candidates: list[ScoredCandidate]  # ranked best-first; empty when NO_MATCH
 
 
+def _ramp_adjustment(diff: float, tolerance: float, penalty_gap: float, bonus: float, penalty: float) -> float:
+    """Shared shape for the power/CO2/year disambiguators: +bonus within
+    tolerance, -penalty beyond penalty_gap, linear ramp between the two so the
+    mid band isn't left flat (see POWER_* tuning-knob comment for why a flat
+    mid band lets a wrong-engine row hide within a point of the right one)."""
+    if diff <= tolerance:
+        return bonus
+    if diff >= penalty_gap:
+        return -penalty
+    span = penalty_gap - tolerance
+    frac = (diff - tolerance) / span
+    return bonus - frac * (bonus + penalty)
+
+
 def _score_one(
     query_key: str,
     cand: CandidateRow,
     listing_power_kw: float | None,
     query_model: str | None = None,
+    listing_co2_g_km: float | None = None,
+    year: int | None = None,
+    query_fuel: str | None = None,
+    query_gearbox: str | None = None,
+    query_tokens: frozenset[str] | None = None,
 ) -> float:
     base = float(fuzz.token_set_ratio(query_key, cand.match_key))
 
     if query_model and cand.model:
         model_score = fuzz.token_set_ratio(normalize_text(query_model), normalize_text(cand.model))
-        if model_score < MODEL_MATCH_THRESHOLD:
+        q_digits = _leading_digits(query_model)
+        c_digits = _leading_digits(cand.model)
+        digits_mismatch = q_digits is not None and c_digits is not None and q_digits != c_digits
+        if model_score < MODEL_MATCH_THRESHOLD or digits_mismatch:
             base = max(0.0, base - MODEL_MISMATCH_PENALTY)
+
+    # Positive (bonus) and negative (penalty) adjustments are kept apart on
+    # purpose: bonuses are capped so they can't push the score past 100, but
+    # penalties always subtract afterwards. token_set_ratio already saturates at
+    # 100 for any candidate whose text is a superset of the sparse query (a plain
+    # "A4 40 TDI" is a subset of both the sedan AND the Allroad row), so the
+    # whole job of the body/gearbox/fuel penalties is to break exactly those
+    # saturated ties — if a +8 year bonus and +4 power bonus were allowed to lift
+    # the base over 100 first, the clamp would silently swallow a -12 body
+    # penalty and the tie would never break. Capping bonuses at 100 keeps them
+    # useful for separating sub-100 rows (the stale-old-period case) while
+    # letting penalties bite at saturation.
+    bonus = 0.0
+    penalty = 0.0
+
+    # Fuel/engine family — the candidate's stored fuel_type is authoritative
+    # (ingested from the source Excel). A contradiction with the listing's
+    # derived fuel is a wrong-engine match; penalise it hard.
+    if query_fuel is not None and cand.fuel_type is not None and query_fuel != cand.fuel_type:
+        penalty += FUEL_MISMATCH_PENALTY
+
+    # Gearbox — demote a manual/automatic contradiction, but only when both
+    # sides actually state a gearbox (either is None → no signal → no penalty).
+    if query_gearbox is not None:
+        cand_gearbox = _gearbox_class(cand.match_key)
+        if cand_gearbox is not None and cand_gearbox != query_gearbox:
+            penalty += GEARBOX_MISMATCH_PENALTY
+
+    # Body style — demote a candidate carrying a distinctive body (Avant/Allroad/
+    # Sportback/Coupe/Cabrio...) the listing never mentioned. Sedan is the
+    # assumed default and is never in _DISTINCTIVE_BODY_TOKENS, so a plain-sedan
+    # candidate is never penalised against a body-silent listing.
+    if query_tokens is not None:
+        cand_tokens = set(cand.match_key.split())
+        extra_bodies = (cand_tokens & _DISTINCTIVE_BODY_TOKENS) - query_tokens
+        if extra_bodies:
+            penalty += BODY_MISMATCH_PENALTY
+
+    def _accumulate(signed: float) -> None:
+        nonlocal bonus, penalty
+        if signed >= 0:
+            bonus += signed
+        else:
+            penalty += -signed
 
     if listing_power_kw is not None and cand.power_kw is not None:
         diff = abs(listing_power_kw - cand.power_kw)
-        if diff <= POWER_TOLERANCE_KW:
-            return min(100.0, base + POWER_BONUS)
-        if diff >= POWER_PENALTY_GAP_KW:
-            return max(0.0, base - POWER_PENALTY)
-        # Linear ramp from +POWER_BONUS (at the tolerance edge) down to
-        # -POWER_PENALTY (at the penalty-gap edge) — see the tuning-knob
-        # comment above for why the mid band can't just be left flat.
-        span = POWER_PENALTY_GAP_KW - POWER_TOLERANCE_KW
-        frac = (diff - POWER_TOLERANCE_KW) / span
-        adjustment = POWER_BONUS - frac * (POWER_BONUS + POWER_PENALTY)
-        return max(0.0, min(100.0, base + adjustment))
-    return base
+        _accumulate(_ramp_adjustment(diff, POWER_TOLERANCE_KW, POWER_PENALTY_GAP_KW, POWER_BONUS, POWER_PENALTY))
+
+    if listing_co2_g_km is not None and cand.co2_g_km is not None:
+        diff = abs(listing_co2_g_km - cand.co2_g_km)
+        _accumulate(_ramp_adjustment(diff, CO2_TOLERANCE_G_KM, CO2_PENALTY_GAP_G_KM, CO2_BONUS, CO2_PENALTY))
+
+    if year is not None and cand.valid_from is not None:
+        diff = abs(year - cand.valid_from.year)
+        _accumulate(_ramp_adjustment(diff, YEAR_TOLERANCE_YEARS, YEAR_PENALTY_GAP_YEARS, YEAR_BONUS, YEAR_PENALTY))
+
+    return max(0.0, min(100.0, base + bonus) - penalty)
 
 
 def rank_candidates(
@@ -217,6 +473,8 @@ def rank_candidates(
     limit: int = MAX_CANDIDATES,
     query_model: str | None = None,
     year: int | None = None,
+    listing_co2_g_km: float | None = None,
+    query_fuel: str | None = None,
 ) -> MatchResult:
     """Pure scoring + decision. Sorts candidates by adjusted score, then applies
     the confirm-unless-certain policy.
@@ -249,8 +507,20 @@ def rank_candidates(
     if not candidates:
         return MatchResult(MatchStatus.NO_MATCH, None, [])
 
+    # Query-side gearbox/body derived once from the (normalized) query_key, then
+    # reused for every candidate — the listing side never changes across the set.
+    query_gearbox = _gearbox_class(query_key)
+    query_tokens = frozenset(query_key.split())
+
     scored = [
-        ScoredCandidate(c, _score_one(query_key, c, listing_power_kw, query_model)) for c in candidates
+        ScoredCandidate(
+            c,
+            _score_one(
+                query_key, c, listing_power_kw, query_model, listing_co2_g_km,
+                year, query_fuel, query_gearbox, query_tokens,
+            ),
+        )
+        for c in candidates
     ]
 
     if year is not None:
@@ -298,12 +568,32 @@ def _map_listing_fuel(fuel_type: str | None) -> str | None:
     return _LISTING_FUEL_MAP.get(fuel_type.strip().lower())
 
 
+_VARIANT_KW_SUFFIX_RE = re.compile(r"(\d+)(kw)$", re.IGNORECASE)
+
+
+def _correct_variant_kw_suffix(variant: str | None, power_kw: float | None) -> str | None:
+    """Some BMW source spreadsheets freeze a "...140kW" figure into the
+    free-text variant description that never gets updated when the numeric
+    SNAGA (kW) column is later revised (confirmed: ~145 BMW rows carry this
+    mismatch, always disagreeing with the row's own power_kw, which matches
+    BMW's published spec sheets — the frozen text is what's wrong). The UI
+    shows the description and power_kw side by side, so a stale suffix reads
+    as a contradiction; this is display-only, match_key/scoring never touch
+    this field."""
+    if not variant or power_kw is None:
+        return variant
+    match = _VARIANT_KW_SUFFIX_RE.search(variant)
+    if not match or int(match.group(1)) == round(power_kw):
+        return variant
+    return variant[: match.start(1)] + str(round(power_kw)) + variant[match.end(1):]
+
+
 def _to_candidate(row: Catalogue) -> CandidateRow:
     return CandidateRow(
         catalogue_id=row.id,
         brand=row.brand,
         model=row.model,
-        variant=row.variant,
+        variant=_correct_variant_kw_suffix(row.variant, row.power_kw),
         match_key=row.match_key,
         price_eur=row.price_eur,
         co2_g_km=row.co2_g_km,
@@ -324,6 +614,7 @@ async def find_match(
     power_kw: float | None = None,
     limit: int = MAX_CANDIDATES,
     year: int | None = None,
+    co2_g_km: float | None = None,
 ) -> MatchResult:
     """Fetch this brand's catalogue rows and rank them against the listing.
 
@@ -332,20 +623,33 @@ async def find_match(
     human-paced, one-listing-at-a-time PPMV flow. Fuel narrows further only when
     it maps cleanly and doesn't wipe out every candidate. `year` (first
     registration year, or the year the user typed in a manual search) picks
-    which validity period wins among otherwise-identical rows — see
-    rank_candidates()."""
+    which validity period wins among otherwise-identical rows, and also nudges
+    the score toward that period so the shown percentage agrees with the pick.
+    `co2_g_km` (only when the listing itself already states one) is an extra
+    disambiguator alongside power_kw — see rank_candidates()."""
     query_key = build_match_key(brand, model, variant)
 
     stmt = select(Catalogue).where(func.lower(Catalogue.brand) == brand.strip().lower())
     rows = (await session.execute(stmt)).scalars().all()
     candidates = [_to_candidate(r) for r in rows]
 
-    fuel = _map_listing_fuel(fuel_type)
-    if fuel is not None:
-        narrowed = [c for c in candidates if c.fuel_type == fuel]
+    # Resolve the listing's fuel from the engine badge first, the site's fuel
+    # field second — so a diesel "A4 40 TDI" from autobid.de (which never exposes
+    # a fuel field) still hard-filters out the petrol "A4 40 TFSI" rows it would
+    # otherwise tie with at 100 (same tokens, same 150 kW). See _resolve_query_fuel.
+    query_fuel = _resolve_query_fuel(fuel_type, model, variant)
+    if query_fuel is not None:
+        narrowed = [c for c in candidates if c.fuel_type == query_fuel]
         if narrowed:  # don't let an over-strict fuel filter erase a real match
             candidates = narrowed
 
     return rank_candidates(
-        query_key, candidates, listing_power_kw=power_kw, limit=limit, query_model=model, year=year
+        query_key,
+        candidates,
+        listing_power_kw=power_kw,
+        limit=limit,
+        query_model=model,
+        year=year,
+        listing_co2_g_km=co2_g_km,
+        query_fuel=query_fuel,
     )

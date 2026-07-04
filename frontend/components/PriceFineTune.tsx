@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { formatEur } from "@/lib/format";
 
 interface Props {
@@ -9,12 +10,35 @@ interface Props {
 
 const STEPS = [-1000, -100, 100, 1000];
 
+// The slider window is anchored to a base price and only spans a fraction of
+// it, so each drag step is a meaningful fine-tune instead of jumping over
+// thousands of euros. The anchor is re-centered when a new vehicle/candidate
+// sets a price outside the current window (rather than on every own change),
+// otherwise dragging the slider would keep widening its own range.
+const RANGE_FRACTION = 0.5;
+const MIN_RANGE = 50000;
+const STEP = 50;
+
+function roundToStep(value: number) {
+  return Math.round(value / STEP) * STEP;
+}
+
 /** Sidebar control for nudging the as-new price up/down and watching the
  * PPMV recompute live — useful when the catalogue/scrape price is only an
  * approximation of the actual listing price. */
 export function PriceFineTune({ priceEur, onChange }: Props) {
-  const min = 0;
-  const max = Math.max(priceEur * 2, priceEur + 20000, 20000);
+  const [base, setBase] = useState(priceEur);
+
+  const rangeWidth = Math.max(base * RANGE_FRACTION, MIN_RANGE);
+  const min = Math.max(0, roundToStep(base - rangeWidth));
+  const max = roundToStep(base + rangeWidth);
+
+  useEffect(() => {
+    if (priceEur < min || priceEur > max) {
+      setBase(priceEur);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [priceEur]);
 
   return (
     <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] shadow-sm p-5 space-y-4">
@@ -37,7 +61,7 @@ export function PriceFineTune({ priceEur, onChange }: Props) {
         type="range"
         min={min}
         max={max}
-        step={50}
+        step={STEP}
         value={Math.min(Math.max(priceEur, min), max)}
         onChange={(e) => onChange(Number(e.target.value))}
         className="w-full accent-[var(--primary)]"
@@ -60,7 +84,7 @@ export function PriceFineTune({ priceEur, onChange }: Props) {
         type="number"
         value={priceEur}
         min={0}
-        step={50}
+        step={STEP}
         onChange={(e) => onChange(Number(e.target.value) || 0)}
         className="w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3.5 py-2 text-sm text-[var(--text)] focus:border-[var(--primary)] transition-colors"
       />

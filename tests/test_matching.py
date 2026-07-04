@@ -17,6 +17,9 @@ from app.catalogue.matching import (
     ACCEPT_SCORE,
     CandidateRow,
     MatchStatus,
+    _derive_fuel_family,
+    _gearbox_class,
+    _resolve_query_fuel,
     build_match_key,
     normalize_text,
     rank_candidates,
@@ -261,6 +264,82 @@ def test_year_tiebreak_survives_truncation_by_limit():
     ]
     result = rank_candidates(query, rows, listing_power_kw=140.0, year=2001, limit=3)
     assert result.candidates[0].row.catalogue_id == 1
+
+
+# ---------------------------------------------------------------------------
+# Fuel / engine-family derivation (the A4 40 TDI vs 40 TFSI fix)
+# ---------------------------------------------------------------------------
+
+def test_derive_fuel_family_from_engine_words():
+    assert _derive_fuel_family("Audi A4 40 TDI S-tronic") == "diesel"
+    assert _derive_fuel_family("Audi A4 40 TFSI S-tronic") == "petrol"
+    assert _derive_fuel_family("A5 Sportback 2.0 TFSI quattro") == "petrol"
+    # Multi-brand engine words resolve too.
+    assert _derive_fuel_family("Renault Megane dCi") == "diesel"
+    assert _derive_fuel_family("Peugeot 308 PureTech") == "petrol"
+
+
+def test_derive_fuel_family_from_numeric_badge():
+    # No engine word — fall back to the trailing d/i of the numeric badge.
+    assert _derive_fuel_family("BMW 320d xDrive") == "diesel"
+    assert _derive_fuel_family("BMW 120i") == "petrol"
+
+
+def test_derive_fuel_family_none_when_unknown_or_contradictory():
+    assert _derive_fuel_family("BMW 1er Advantage") is None
+    # A fused AWD 'xd' badge is NOT read as diesel — the trailing letter there is
+    # drivetrain noise, so nothing is claimed (the site's fuel field decides).
+    assert _derive_fuel_family("BMW 420xd Gran Coupe") is None
+
+
+def test_resolve_query_fuel_prefers_engine_word_over_site_field():
+    # A "TDI" in the text is definitional and overrides a mislabelled site fuel.
+    assert _resolve_query_fuel("petrol", "A4", "A4 40 TDI") == "diesel"
+    # With no engine word, the site's own fuel field is used (autoscout24 case).
+    assert _resolve_query_fuel("petrol", "120i", "Limousine") == "petrol"
+    # No engine word and no site fuel (autobid.de) — badge suffix is the last resort.
+    assert _resolve_query_fuel(None, "320d", "Gran Coupe") == "diesel"
+
+
+def test_gearbox_class():
+    assert _gearbox_class("Audi A4 40 TDI S tronic") == "auto"
+    assert _gearbox_class("BMW 116i ručni 6 stupnjeva") == "manual"
+    assert _gearbox_class("Audi A4 40 TDI S line") is None  # 's line' is a trim, not a gearbox
+
+
+def test_diesel_listing_never_matches_petrol_sibling_at_saturation():
+    # The headline A4 regression: an autobid.de "A4 40 TDI" (no site fuel) must
+    # not tie with the petrol "40 TFSI" rows. Same tokens, same 150 kW — only the
+    # engine family separates them, and it must win decisively even though the
+    # fuzzy blob saturates both at 100.
+    query = build_match_key("Audi", "A4", "40 TDI S tronic")
+    rows = [
+        _cand(brand="Audi", model="A4 Limousine", variant="A4 40TDI S tr Select / Diesel/Hybrid",
+              price_eur=43445.0, fuel="diesel", power_kw=150.0, catalogue_id=1),
+        _cand(brand="Audi", model="A4 Limousine", variant="A4 40TFSI S tr Select / Benzin/Hybrid",
+              price_eur=41000.0, fuel="petrol", power_kw=150.0, catalogue_id=2),
+    ]
+    result = rank_candidates(query, rows, listing_power_kw=150.0, query_model="A4", query_fuel="diesel")
+    assert result.candidates[0].row.catalogue_id == 1
+    top, second = result.candidates[0].score, result.candidates[1].score
+    assert top - second >= 20.0
+
+
+def test_distinctive_body_demoted_below_plain_sibling_at_saturation():
+    # A body-silent "A4 40 TDI" listing must rank the plain sedan above the
+    # Allroad it never mentioned, even though both saturate the fuzzy blob at 100.
+    query = build_match_key("Audi", "A4", "40 TDI S tronic")
+    rows = [
+        _cand(brand="Audi", model="A4 Limousine", variant="A4 40TDI S tr Advanced+ / Diesel",
+              price_eur=45650.0, fuel="diesel", power_kw=150.0, catalogue_id=1),
+        _cand(brand="Audi", model="A4 allroad quattro", variant="A4 Allroad 40TDI quattro S tr Advanced+ / Diesel",
+              price_eur=52228.0, fuel="diesel", power_kw=150.0, catalogue_id=2),
+    ]
+    result = rank_candidates(
+        query, rows, listing_power_kw=150.0, query_model="A4", query_fuel="diesel", year=2023,
+    )
+    assert result.candidates[0].row.catalogue_id == 1
+    assert result.candidates[0].score > result.candidates[1].score
 
 
 # ---------------------------------------------------------------------------

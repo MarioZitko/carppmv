@@ -158,3 +158,26 @@ Python ≥ 3.12 required. Dependencies managed with [uv](https://docs.astral.sh/
 Designed for a Hetzner CAX11 ARM VPS (2 vCPU / 4 GB / €6 per month). One
 browser session at a time, sequential scraping. Swap file recommended as an
 OOM guard when running Playwright.
+
+---
+
+## Deployment
+
+The full stack (Postgres, backend, frontend, Caddy reverse proxy) ships as a
+single `docker-compose.yml` for a self-hosted VPS:
+
+```bash
+cp .env.example .env   # fill in real values, see below
+docker compose up -d --build
+```
+
+- [`Dockerfile`](Dockerfile) — FastAPI backend with Playwright/Chromium.
+- [`frontend/Dockerfile`](frontend/Dockerfile) — Next.js standalone build.
+- [`Caddyfile`](Caddyfile) — reverse proxy with automatic HTTPS; requires a
+  domain pointed at the VPS (Let's Encrypt can't issue certs for bare IPs).
+- [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml) — SSHes into
+  the VPS and redeploys on every push to `main`.
+
+See **[DEPLOYMENT.md](DEPLOYMENT.md)** for the full step-by-step guide:
+buying a domain, provisioning the VPS, environment configuration, and setting
+up automatic deploys.
