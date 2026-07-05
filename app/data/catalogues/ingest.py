@@ -14,13 +14,18 @@ Usage:
 import argparse
 import asyncio
 import json
+import re
 import sys
 import unicodedata
 from pathlib import Path
 
+import httpx
+from sqlalchemy import text
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.pool import NullPool
 
+from app.catalogue import mapping_store
+from app.catalogue.brands import FOLDER_BRANDS, snap_brand
 from app.catalogue.canonical_schema import CanonicalRow, FuelCategory, apply_mapping
 from app.catalogue.llm_mapper import map_sheet_columns
 from app.catalogue.matching import build_match_key
@@ -43,6 +48,12 @@ def _short_error(exc: Exception) -> str:
 # Sheets below this confidence are skipped entirely — the LLM could not
 # reliably identify required fields and ingesting would produce garbage.
 SHEET_CONFIDENCE_THRESHOLD = 0.6
+
+# Per-mapping-call LLM budget. The mapper retries once internally on a stalled
+# connection, so worst-case network time is ~2x this; the outer wait_for caps
+# it. Kept tight (was 90s) so the one-time build doesn't crawl on doomed calls —
+# a real layout answers well within this.
+LLM_TIMEOUT_SECONDS = 20.0
 
 _FUEL_CATEGORY_TO_DB: dict[FuelCategory, FuelType | None] = {
     FuelCategory.DIESEL: FuelType.DIESEL,
@@ -85,7 +96,11 @@ def _override_fuel_from_variant(
 def _co2_standard_from_year(year: int) -> CO2Standard:
     return CO2Standard.WLTP if year >= 2021 else CO2Standard.NEDC
 
-def _to_catalogue_dict(row: CanonicalRow, co2_standard: CO2Standard) -> dict | None:
+def _to_catalogue_dict(
+    row: CanonicalRow,
+    co2_standard: CO2Standard,
+    allowed_brands: tuple[str, ...] | None = None,
+) -> dict | None:
     mapped_fuel = _FUEL_CATEGORY_TO_DB.get(row.fuel_category)
     fuel_type = _override_fuel_from_variant(
         brand=row.brand,
@@ -103,11 +118,24 @@ def _to_catalogue_dict(row: CanonicalRow, co2_standard: CO2Standard) -> dict | N
     model = row.model_name or row.type_code or "unknown"
     variant = row.full_name or row.type_code or row.model_name or "unknown"
 
+    # Snap the row's brand to the canonical spelling allowed for this file's
+    # folder-group. Fixes source typos ("Marcedes-Benz") and stray cell values
+    # (a type code in the brand column) that would otherwise become phantom
+    # brands invisible to any correctly-spelled search. Skip the row if the
+    # brand can't be resolved rather than inventing one. When the folder isn't
+    # in the vocabulary (allowed_brands is None), keep the value as-is.
+    if allowed_brands is not None:
+        brand = snap_brand(row.brand, allowed_brands, variant, model)
+        if brand is None:
+            return None
+    else:
+        brand = row.brand
+
     return {
-        "brand": row.brand,
+        "brand": brand,
         "model": model,
         "variant": variant,
-        "match_key": build_match_key(row.brand, model, variant),
+        "match_key": build_match_key(brand, model, variant),
         "price_eur": row.price_eur,
         "co2_g_km": row.co2_g_km,
         "co2_standard": co2_standard,
@@ -118,34 +146,107 @@ def _to_catalogue_dict(row: CanonicalRow, co2_standard: CO2Standard) -> dict | N
         "source_currency": row.price_source_currency,
     }
 
-def _read_xlsx(path: Path) -> tuple[list[str], list[tuple]]:
-    import openpyxl
-    wb = openpyxl.load_workbook(path, data_only=True, read_only=True)
-    ws = wb.active
-    all_rows = list(ws.iter_rows(values_only=True))
-    wb.close()
+def _looks_numeric(value) -> bool:
+    """True if a cell holds a number (int/float) or a purely numeric string
+    such as a type code, price or CO2 figure. Used to tell header rows (all
+    text) apart from data rows (which carry numbers)."""
+    if isinstance(value, bool):
+        return False
+    if isinstance(value, (int, float)):
+        return True
+    if isinstance(value, str):
+        s = value.strip().replace(".", "").replace(",", "").replace(" ", "")
+        return s.isdigit()
+    return False
+
+
+def _populated_cols(row: tuple) -> set[int]:
+    return {j for j, c in enumerate(row) if c is not None and str(c).strip()}
+
+
+def _pick_header_index(all_rows: list[tuple], max_scan: int = 20) -> int:
+    """Locate the real column-header row.
+
+    The header is a predominantly-text row sitting directly ABOVE the data
+    table, so its populated columns line up with the columns the data rows
+    fill. Picking the *first* text row (the old behaviour) breaks on sheets
+    that stack a title/date/paint-name banner above the header — e.g. Mazda's
+    36 per-colour sheets, each with a different 'METALIK Soul crvena' banner:
+    each banner was mistaken for the header, producing 36 distinct AND
+    unmappable layouts instead of the one real header ('NAZIV MODELA, MSC,
+    CO2 …') they all share. Scoring candidates by how many of their columns
+    align with the data table below picks the true header in every one of
+    them, collapsing 36 doomed LLM calls into a single good mapping.
+
+    Score = (columns aligned with the data below, then width, then earliest).
+    Falls back to 0 when nothing qualifies."""
+    best_idx: int | None = None
+    best_key = (-1, -1, 1)
+    for i, row in enumerate(all_rows[:max_scan]):
+        cols = _populated_cols(row)
+        if len(cols) < 3:
+            continue
+        numeric = sum(1 for j in cols if _looks_numeric(row[j]))
+        if numeric / len(cols) >= 0.3:  # a data row, not a header
+            continue
+        below = all_rows[i + 1 : i + 21]
+        if not below:
+            continue
+        col_hits: dict[int, int] = {}
+        for r in below:
+            for j in _populated_cols(r):
+                col_hits[j] = col_hits.get(j, 0) + 1
+        threshold = max(2, int(0.4 * len(below)))
+        data_cols = {j for j, n in col_hits.items() if n >= threshold}
+        align = len(cols & data_cols)
+        key = (align, len(cols), -i)
+        if key > best_key:
+            best_key = key
+            best_idx = i
+    return best_idx if best_idx is not None else 0
+
+
+def _split_header_and_data(all_rows: list[tuple]) -> tuple[list[str], list[tuple]]:
     if not all_rows:
         return [], []
-    header = [str(c) if c is not None else "" for c in all_rows[0]]
-    return header, all_rows[1:]
+    idx = _pick_header_index(all_rows)
+    header = [str(c) if c is not None else "" for c in all_rows[idx]]
+    return header, all_rows[idx + 1:]
 
-def _read_xls(path: Path) -> tuple[list[str], list[tuple]]:
+
+# A file yields one entry per worksheet: (sheet_name, header_row, data_rows).
+# Reading every sheet (not just the active one) matters for split price lists —
+# Mercedes commercial vehicles put Vito/Viano/Sprinter on separate sheets and
+# smart lives on its own sheet, all of which were silently dropped when only
+# wb.active was read.
+Sheet = tuple[str, list[str], list[tuple]]
+
+
+def _read_xlsx(path: Path) -> list[Sheet]:
+    import openpyxl
+    wb = openpyxl.load_workbook(path, data_only=True, read_only=True)
+    sheets: list[Sheet] = []
+    for ws in wb.worksheets:
+        all_rows = list(ws.iter_rows(values_only=True))
+        header, data = _split_header_and_data(all_rows)
+        sheets.append((ws.title, header, data))
+    wb.close()
+    return sheets
+
+def _read_xls(path: Path) -> list[Sheet]:
     import xlrd
     wb = xlrd.open_workbook(str(path))
-    ws = wb.sheet_by_index(0)
-    if ws.nrows == 0:
-        return [], []
-    header = [str(c) if c is not None else "" for c in ws.row_values(0)]
-    data = [tuple(ws.row_values(r)) for r in range(1, ws.nrows)]
-    return header, data
+    sheets: list[Sheet] = []
+    for ws in wb.sheets():
+        all_rows = [tuple(ws.row_values(r)) for r in range(ws.nrows)]
+        header, data = _split_header_and_data(all_rows)
+        sheets.append((ws.name, header, data))
+    return sheets
 
-def _read_file(path: Path) -> tuple[list[str], list[tuple]]:
+def _read_file(path: Path) -> list[Sheet]:
     if path.suffix.lower() == ".xls":
         return _read_xls(path)
     return _read_xlsx(path)
-
-def _header_fingerprint(header_row: list[str]) -> frozenset[str]:
-    return frozenset(c for c in header_row if c.strip())
 
 def _ascii_slug(s: str) -> str:
     normalized = unicodedata.normalize("NFD", s)
@@ -154,6 +255,26 @@ def _ascii_slug(s: str) -> str:
     while "--" in slug:
         slug = slug.replace("--", "-")
     return slug.strip("-")
+
+async def _reset_catalogue() -> None:
+    """Wipe every catalogue row so the run repopulates from a clean slate.
+
+    Ingest is upsert-only (on_conflict_do_update) — it can update or add rows
+    but never deletes. So rows from an earlier, pre-fix ingestion (phantom
+    brands from source typos, stray type-code brand cells, anything the current
+    snap_brand logic would now skip) survive every re-run untouched, because
+    their (brand, model, variant, valid_from) key never conflicts with a
+    correctly-snapped row. This makes the cleanup reproducible: with --fresh,
+    a single `python -m app.data.catalogues.ingest --fresh` gives a VPS the
+    exact same clean table the manifest describes, no manual SQL required.
+
+    Safe because nothing references catalogue by foreign key (only
+    listings -> scrape_runs). TRUNCATE ... RESTART IDENTITY resets the id
+    sequence too, so ids stay stable across full rebuilds."""
+    async with AsyncSessionLocal() as session:
+        await session.execute(text("TRUNCATE TABLE catalogue RESTART IDENTITY"))
+        await session.commit()
+
 
 async def _upsert_rows(rows: list[dict]) -> int:
     if not rows:
@@ -202,66 +323,92 @@ async def _upsert_rows(rows: list[dict]) -> int:
 async def _resolve_mapping(
     header_row: list[str],
     sample_rows: list[tuple],
-    fingerprint: frozenset,
-    mapping_cache: dict[frozenset, object],
-    mapping_locks: dict[frozenset, asyncio.Lock],
+    key: str,
+    mapping_cache: dict[str, object],
+    store: dict,
+    mapping_locks: dict[str, asyncio.Lock],
     label: str,
     verbose: bool,
 ) -> object | None:
-    if fingerprint in mapping_cache:
-        cached = mapping_cache[fingerprint]
+    """Return the ColumnMapping for this header layout, or None if it can't be
+    mapped. Resolution order: in-memory cache → persistent store (both loaded
+    up front) → one LLM call, whose verdict is written straight back to the
+    store so it's never paid for again (here or on the VPS)."""
+    if key in mapping_cache:
+        cached = mapping_cache[key]
         if cached is None:
-            print(f"[FAIL] {label} — header layout already failed mapping, skipping")
+            if verbose:
+                print(f"[skip] {label} — known-unmappable layout")
         elif verbose:
             print(f"[cache] {label}")
         return cached
 
-    lock = mapping_locks.setdefault(fingerprint, asyncio.Lock())
+    lock = mapping_locks.setdefault(key, asyncio.Lock())
     async with lock:
-        # Re-check: another task may have resolved this fingerprint while we waited.
-        if fingerprint in mapping_cache:
-            cached = mapping_cache[fingerprint]
-            if cached is None:
-                print(f"[FAIL] {label} — header layout already failed mapping, skipping")
-            elif verbose:
-                print(f"[cache] {label}")
-            return cached
+        # Re-check: another task may have resolved this layout while we waited.
+        if key in mapping_cache:
+            return mapping_cache[key]
         try:
             mapping = await asyncio.wait_for(
-                map_sheet_columns(header_row, sample_rows),
-                timeout=90,
+                map_sheet_columns(header_row, sample_rows, timeout_seconds=LLM_TIMEOUT_SECONDS),
+                timeout=LLM_TIMEOUT_SECONDS * 2 + 5,
             )
+        except (asyncio.TimeoutError, httpx.HTTPError) as exc:
+            # Transient — a property of the network, not the layout. Skip it for
+            # this run but DON'T persist, so the next run retries it for free.
+            print(f"[WARN] {label} — transient mapping error, will retry next run: {_short_error(exc)}")
+            mapping_cache[key] = None
+            return None
         except Exception as exc:
-            print(f"[FAIL] {label} — mapping failed: {exc}")
-            # Cache the failure too — this exact header layout will fail the
-            # same way for every other file that shares it, so don't spend
-            # another LLM call re-discovering that.
-            mapping_cache[fingerprint] = None
+            # Deterministic rejection (hallucinated column / malformed response):
+            # this layout always fails the same way, so persist the verdict and
+            # never spend another call on it.
+            print(f"[FAIL] {label} — mapping rejected: {exc}")
+            mapping_cache[key] = None
+            store[key] = mapping_store.fail_entry(str(exc)[:300], header_row)
+            mapping_store.save(store)
             return None
         if mapping.confidence < SHEET_CONFIDENCE_THRESHOLD:
             print(
                 f"[FAIL] {label} — confidence {mapping.confidence:.2f} "
                 f"< {SHEET_CONFIDENCE_THRESHOLD:.2f}: {mapping.notes}"
             )
-            mapping_cache[fingerprint] = None
+            mapping_cache[key] = None
+            store[key] = mapping_store.fail_entry(
+                f"confidence {mapping.confidence:.2f}: {mapping.notes[:200]}", header_row
+            )
+            mapping_store.save(store)
             return None
-        mapping_cache[fingerprint] = mapping
+        mapping_cache[key] = mapping
+        store[key] = mapping_store.ok_entry(mapping, header_row)
+        mapping_store.save(store)
+        if verbose:
+            print(f"[map] {label} — confidence {mapping.confidence:.2f}")
         return mapping
 
 async def _ingest_entry(
     entry: dict,
-    mapping_cache: dict[frozenset, object],
-    mapping_locks: dict[frozenset, asyncio.Lock],
+    mapping_cache: dict[str, object],
+    store: dict,
+    mapping_locks: dict[str, asyncio.Lock],
     semaphore: asyncio.Semaphore,
     dry_run: bool,
     verbose: bool,
 ) -> bool:
-    brand = entry["brand"]
+    folder_slug = entry["brand"]
+    allowed_brands = FOLDER_BRANDS.get(folder_slug)
     filename = entry["filename"]
     path = Path(entry["path"])
-    label = f"{brand}/{filename}"
+    label = f"{folder_slug}/{filename}"
 
-    valid_from_file = parse_valid_from(filename)
+    # A file's parent folders often carry the year (…/opel/2013/Opel_01.07.xlsx)
+    # when the filename itself only has a day+month. Pass the nearest /YYYY/
+    # ancestor as a fallback for parse_valid_from.
+    folder_year = next(
+        (int(p.name) for p in path.parents if re.fullmatch(r"20[12]\d", p.name)),
+        None,
+    )
+    valid_from_file = parse_valid_from(filename, folder_year)
     if valid_from_file is None:
         print(f"[WARN] {label} — cannot parse valid_from from filename, skipping")
         return False
@@ -272,54 +419,65 @@ async def _ingest_entry(
 
     async with semaphore:
         try:
-            header_row, data_rows = await asyncio.to_thread(_read_file, path)
+            sheets = await asyncio.to_thread(_read_file, path)
         except Exception as exc:
             print(f"[FAIL] {path} — read error: {exc}")
             return False
 
-        if not header_row or not data_rows:
-            print(f"[FAIL] {path} — empty file or no data rows")
-            return False
-
-        fingerprint = _header_fingerprint(header_row)
-        if not fingerprint:
-            # Blank header row — no column names exist to map, so an LLM
-            # call can never succeed here. Skip without spending the call.
-            print(f"[FAIL] {path} — blank header row, no columns to map")
-            return False
-        mapping = await _resolve_mapping(
-            header_row, list(data_rows[:5]), fingerprint,
-            mapping_cache, mapping_locks, label, verbose,
-        )
-        if mapping is None:
-            return False
-
         co2_standard = _co2_standard_from_year(valid_from_file.year)
-        skip_log: list[tuple[int, str]] = []
 
-        try:
-            canonical_rows = apply_mapping(
-                rows=list(data_rows),
-                header_row=header_row,
-                mapping=mapping,
-                source_file=str(path),
-                source_sheet=path.stem,
-                skip_log=skip_log,
-            )
-        except Exception as exc:
-            print(f"[FAIL] {path} — apply_mapping error: {exc}")
-            return False
-
+        # Each worksheet is mapped and applied independently — a split price list
+        # can carry a different column layout per sheet (passenger vs commercial),
+        # and the mapping cache is keyed by header fingerprint so this stays
+        # one LLM call per distinct layout regardless of sheet count.
         catalogue_dicts: list[dict] = []
-        skipped_fuel = 0
-        for row in canonical_rows:
-            d = _to_catalogue_dict(row, co2_standard)
-            if d is None:
-                skipped_fuel += 1
-            else:
-                catalogue_dicts.append(d)
+        total_skipped = 0
+        any_sheet_ok = False
 
-        total_skipped = len(skip_log) + skipped_fuel
+        for sheet_name, header_row, data_rows in sheets:
+            if not header_row or not data_rows:
+                continue
+            if not any(c and c.strip() for c in header_row):
+                # Blank header row — no column names to map; skip this sheet
+                # without spending an LLM call (a title-only cover sheet, etc.).
+                continue
+            key = mapping_store.fingerprint_key(header_row)
+
+            sheet_label = f"{label}#{sheet_name}"
+            mapping = await _resolve_mapping(
+                header_row, list(data_rows[:5]), key,
+                mapping_cache, store, mapping_locks, sheet_label, verbose,
+            )
+            if mapping is None:
+                continue
+
+            skip_log: list[tuple[int, str]] = []
+            try:
+                canonical_rows = apply_mapping(
+                    rows=list(data_rows),
+                    header_row=header_row,
+                    mapping=mapping,
+                    source_file=str(path),
+                    source_sheet=sheet_name,
+                    skip_log=skip_log,
+                )
+            except Exception as exc:
+                print(f"[FAIL] {sheet_label} — apply_mapping error: {exc}")
+                continue
+
+            any_sheet_ok = True
+            skipped = len(skip_log)
+            for row in canonical_rows:
+                d = _to_catalogue_dict(row, co2_standard, allowed_brands)
+                if d is None:
+                    skipped += 1
+                else:
+                    catalogue_dicts.append(d)
+            total_skipped += skipped
+
+        if not any_sheet_ok and not catalogue_dicts:
+            print(f"[FAIL] {path} — no usable sheet (empty/blank-header/mapping failed)")
+            return False
 
         if dry_run:
             if verbose:
@@ -337,7 +495,14 @@ async def _ingest_entry(
             print(f"[FAIL] {path} — DB write failed: {_short_error(exc)}")
             return False
 
-async def _main(brand_filter: str | None, dry_run: bool, verbose: bool, concurrency: int) -> None:
+async def _main(brand_filter: str | None, dry_run: bool, verbose: bool, concurrency: int, fresh: bool) -> None:
+    if fresh and brand_filter:
+        # --fresh truncates the whole table; scoping it to one brand would
+        # silently wipe every other brand's rows too. Refuse rather than
+        # surprise-delete data the user didn't mean to touch.
+        print("ERROR: --fresh cannot be combined with --brand (it wipes the whole table).", file=sys.stderr)
+        sys.exit(1)
+
     if not MANIFEST_PATH.exists():
         print(f"ERROR: manifest not found at {MANIFEST_PATH}", file=sys.stderr)
         sys.exit(1)
@@ -367,17 +532,37 @@ async def _main(brand_filter: str | None, dry_run: bool, verbose: bool, concurre
     suffix = f" for brand '{brand_filter}'" if brand_filter else ""
     print(f"Processing {len(entries)} file(s){suffix}...")
 
-    mapping_cache: dict[frozenset, object] = {}
-    mapping_locks: dict[frozenset, asyncio.Lock] = {}
+    if fresh and not dry_run:
+        print("Truncating catalogue table (--fresh)...")
+        await _reset_catalogue()
+
+    # Persistent, committed mapping store: LLM verdicts learned in earlier runs
+    # are reused here (and on the VPS) with zero new API calls. The in-memory
+    # cache is seeded from it so cache hits skip straight past the LLM.
+    store = mapping_store.load()
+    mapping_cache: dict[str, object] = {
+        key: mapping_store.entry_to_mapping(entry) for key, entry in store.items()
+    }
+    if store:
+        ok = sum(1 for e in store.values() if e.get("status") == "ok")
+        print(f"Loaded {len(store)} cached header layouts ({ok} mappable) — these cost no LLM calls.")
+    mapping_locks: dict[str, asyncio.Lock] = {}
     semaphore = asyncio.Semaphore(concurrency)
 
-    results = await asyncio.gather(
-        *(_ingest_entry(entry, mapping_cache, mapping_locks, semaphore, dry_run, verbose) for entry in entries)
-    )
+    try:
+        results = await asyncio.gather(
+            *(_ingest_entry(entry, mapping_cache, store, mapping_locks, semaphore, dry_run, verbose) for entry in entries)
+        )
+    finally:
+        # Persist whatever we learned even if the run is interrupted, so an
+        # abort never re-charges for mappings already resolved.
+        mapping_store.save(store)
+
     ok_count = sum(1 for r in results if r)
     fail_count = len(results) - ok_count
 
     print(f"Done. {ok_count} succeeded, {fail_count} failed.")
+    print(f"Mapping store now holds {len(store)} header layouts at {mapping_store.STORE_PATH}")
 
 def main() -> None:
     parser = argparse.ArgumentParser(
@@ -387,11 +572,18 @@ def main() -> None:
     parser.add_argument("--dry-run", action="store_true", help="Parse and map but don't write to DB")
     parser.add_argument("--verbose", action="store_true", help="Show cache hits and per-file details")
     parser.add_argument(
-        "--concurrency", type=int, default=24,
-        help="Max files processed in parallel (default: 24)",
+        "--concurrency", type=int, default=32,
+        help="Max files processed in parallel (default: 32)",
+    )
+    parser.add_argument(
+        "--fresh", action="store_true",
+        help="Truncate the catalogue table before ingesting, so a re-run "
+             "removes stale/phantom rows from earlier ingestions instead of "
+             "leaving them (ingest is otherwise upsert-only). Cannot be used "
+             "with --brand.",
     )
     args = parser.parse_args()
-    asyncio.run(_main(args.brand, args.dry_run, args.verbose, args.concurrency))
+    asyncio.run(_main(args.brand, args.dry_run, args.verbose, args.concurrency, args.fresh))
 
 if __name__ == "__main__":
     main()

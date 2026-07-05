@@ -17,6 +17,7 @@ from decimal import Decimal, InvalidOperation
 import httpx
 from bs4 import BeautifulSoup
 
+from app.catalogue.brands import brand_from_slug_tokens
 from app.core.exceptions import ScrapingError
 from app.scraping.schemas import ListingData
 
@@ -181,16 +182,33 @@ def _brand_model_from_url_slug(url: str) -> tuple[str | None, str | None]:
 
     URL format: /…/artikal/audi-a5-sportback-…-{numeric-id}
     The slug is the reliable source when the page title is the auction center name.
-    """
+
+    The brand can span several slug tokens ("mercedes-benz", "land-rover",
+    "alfa-romeo"), so it's resolved via the canonical brand vocabulary rather
+    than assumed to be the first token — otherwise "mercedes-benz-a-200" yields
+    brand "Mercedes" / model "BENZ" and matches nothing. After the brand, the
+    model is the next token plus a following numeric badge if present
+    ("a" + "200" -> "A 200", "120" -> "120", "x5" -> "X5")."""
     path = urllib.parse.urlparse(url).path
     slug = path.rstrip("/").rsplit("/", 1)[-1]
     # Strip trailing numeric ID
     slug = re.sub(r"-\d+$", "", slug)
-    parts = slug.split("-")
-    if not parts or not parts[0]:
+    parts = [p for p in slug.split("-") if p]
+    if not parts:
         return None, None
-    brand = parts[0].capitalize()
-    model = parts[1].upper() if len(parts) > 1 else None
+
+    brand, consumed = brand_from_slug_tokens(parts)
+    if brand is None:
+        # Unknown brand — fall back to the old single-token guess.
+        brand = parts[0].capitalize()
+        consumed = 1
+
+    rest = parts[consumed:]
+    if not rest:
+        return brand, None
+    model = rest[0].upper()
+    if len(rest) > 1 and rest[1].isdigit():
+        model = f"{model} {rest[1]}"
     return brand, model
 
 

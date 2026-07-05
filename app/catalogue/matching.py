@@ -38,6 +38,7 @@ from rapidfuzz import fuzz
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.catalogue.brands import canonical_brand
 from app.db.models import Catalogue
 
 # --- tuning knobs -----------------------------------------------------------
@@ -627,6 +628,11 @@ async def find_match(
     the score toward that period so the shown percentage agrees with the pick.
     `co2_g_km` (only when the listing itself already states one) is an extra
     disambiguator alongside power_kw — see rank_candidates()."""
+    # Normalize the listing's brand to the catalogue's canonical spelling before
+    # the hard filter, so a site that says "Mercedes" (or "VW") still hits the
+    # stored "Mercedes-Benz" ("Volkswagen") rows. Same vocabulary the catalogue
+    # is ingested against, so the two sides are guaranteed comparable.
+    brand = canonical_brand(brand) or brand
     query_key = build_match_key(brand, model, variant)
 
     stmt = select(Catalogue).where(func.lower(Catalogue.brand) == brand.strip().lower())
