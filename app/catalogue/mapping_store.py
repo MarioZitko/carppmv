@@ -24,7 +24,7 @@ import json
 from dataclasses import asdict
 from pathlib import Path
 
-from app.catalogue.canonical_schema import ColumnMapping
+from app.catalogue.canonical_schema import ColumnMapping, normalize_cell
 
 STORE_PATH = Path(__file__).parent.parent / "data" / "catalogues" / "column_mappings.json"
 
@@ -38,8 +38,11 @@ def fingerprint_key(header_row: list[str]) -> str:
 
     Two sheets with the same set of column labels map identically, so they must
     share a key regardless of column order or which machine computes it. sha1 of
-    the sorted, stripped cells gives a short, deterministic, JSON-safe key."""
-    cells = sorted(c.strip() for c in header_row if c and c.strip())
+    the sorted, NORMALIZED cells gives a short, deterministic, JSON-safe key —
+    normalization (normalize_cell) folds cosmetic differences (case, stray
+    newlines/spaces, trailing punctuation) so near-duplicate headers collapse to
+    one key instead of each costing its own LLM call."""
+    cells = sorted({normalize_cell(c) for c in header_row if c and normalize_cell(c)})
     blob = "".join(cells)
     return hashlib.sha1(blob.encode("utf-8")).hexdigest()
 

@@ -1,5 +1,26 @@
 # Catalogue Ingestion Rework — Implementation Plan (handoff)
 
+> **STATUS (2026-07-05): code implemented.** All §5 changes below are in the
+> tree (nullable brand/fuel/valid_from source columns + fallbacks; per-sheet
+> enum schema `llm_mapper.USE_ENUM_SCHEMA`; normalized fingerprint +
+> `_resolve_columns` pre-pass; timeout 20→60, concurrency 32→48). Plus two bug
+> fixes found while doing it: `_parse_date` 2-digit-year handling (fixed the
+> BAIC year-`0026` trash) and a non-positive-price drop (fixed a €0 Mercedes
+> row); both trash rows were deleted from the live DB. New tooling:
+> `scripts/verify_enum_schema.py` (pre-flight, ~$0) and
+> `scripts/migrate_mapping_cache.py` (re-key OK, drop stale fails).
+>
+> **Remaining = the one paid build, run by the user:**
+> 1. `.venv/bin/python -m scripts.verify_enum_schema` → expect PASS (if it
+>    400s on enum, set `llm_mapper.USE_ENUM_SCHEMA = False` and re-run).
+> 2. `.venv/bin/python -m scripts.migrate_mapping_cache`.
+> 3. `.venv/bin/python -m app.data.catalogues.ingest --fresh`.
+> 4. Validate (§6), then commit `column_mappings.json`.
+>
+> Refinement to §3's diagnosis: of the 646 cached rejections, **399 were
+> `low_confidence`**, not hallucination — likely the same forced-invention
+> hedging, so §5.1 should recover much of it too. Confirm post-build.
+
 This is a self-contained brief for a fresh session. It describes the catalogue
 ingestion pipeline, its current state, and the concrete changes to make. You do
 not need prior chat context — everything needed is here.

@@ -19,46 +19,75 @@ from app.core.config import get_settings
 
 OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 
-# JSON schema OpenRouter enforces on the response. Field names mirror
-# ColumnMapping exactly, so the response can be unpacked directly into it.
-# All fields are nullable strings (a source column name) except
-# confidence (float) and notes (string) — "null" means "this canonical
-# field has no corresponding column in this sheet", which is a valid and
-# expected answer (e.g. Porsche files have no PLUG-IN (DOSEG) column).
+# When True (recommended), the JSON schema sent per sheet constrains every
+# *_column field to an ENUM of that sheet's actual header cells (+ null where
+# the field is optional), so the model literally cannot emit a column name that
+# isn't in the header — hallucination is eliminated at generation time, not
+# caught after. If a provider/model ever rejects enum-constrained structured
+# output, flip this to False to fall back to the static string schema below;
+# the post-hoc hallucination guard still protects correctness either way.
+# Verify with scripts/verify_enum_schema.py before the one paid full build.
+USE_ENUM_SCHEMA = True
+
+# Source-column fields the model maps. price_column is the only one that must
+# be non-null (a priced catalogue row without a price is useless); every other
+# field may legitimately be null when the sheet has no such column — brand,
+# fuel and valid_from especially are OFTEN absent as columns (the value comes
+# from the file's folder, the model text, or the filename respectively).
+_NON_NULL_COLUMN_FIELDS = ("price_column",)
+_NULLABLE_COLUMN_FIELDS = (
+    "brand_column", "model_name_column", "type_code_column", "full_name_column",
+    "fuel_column", "valid_from_column", "co2_column", "co2_min_column",
+    "co2_max_column", "power_kw_column", "plug_in_range_column",
+    "seats_7plus1_column", "seats_8plus1_column", "camper_column",
+    "pickup_8704_column", "euro_norm_column",
+)
+_ALL_COLUMN_FIELDS = _NON_NULL_COLUMN_FIELDS + _NULLABLE_COLUMN_FIELDS
+
+# Static fallback schema (used when USE_ENUM_SCHEMA is False). Field names
+# mirror ColumnMapping exactly. brand/fuel/valid_from are nullable strings —
+# null means "this sheet has no such column", a valid and expected answer.
 _COLUMN_MAPPING_SCHEMA = {
     "type": "object",
     "properties": {
-        "brand_column": {"type": "string"},
-        "model_name_column": {"type": ["string", "null"]},
-        "type_code_column": {"type": ["string", "null"]},
-        "full_name_column": {"type": ["string", "null"]},
-        "fuel_column": {"type": "string"},
+        **{f: {"type": ["string", "null"]} for f in _NULLABLE_COLUMN_FIELDS},
         "price_column": {"type": "string"},
         "price_currency": {"type": "string", "enum": ["EUR", "HRK"]},
-        "valid_from_column": {"type": "string"},
-        "co2_column": {"type": ["string", "null"]},
-        "co2_min_column": {"type": ["string", "null"]},
-        "co2_max_column": {"type": ["string", "null"]},
-        "power_kw_column": {"type": ["string", "null"]},
-        "plug_in_range_column": {"type": ["string", "null"]},
-        "seats_7plus1_column": {"type": ["string", "null"]},
-        "seats_8plus1_column": {"type": ["string", "null"]},
-        "camper_column": {"type": ["string", "null"]},
-        "pickup_8704_column": {"type": ["string", "null"]},
-        "euro_norm_column": {"type": ["string", "null"]},
         "confidence": {"type": "number", "minimum": 0.0, "maximum": 1.0},
         "notes": {"type": "string"},
     },
     "required": [
-        "brand_column", "model_name_column", "type_code_column", "full_name_column",
-        "fuel_column", "price_column", "price_currency", "valid_from_column",
-        "co2_column", "co2_min_column", "co2_max_column", "power_kw_column",
-        "plug_in_range_column", "seats_7plus1_column", "seats_8plus1_column",
-        "camper_column", "pickup_8704_column", "euro_norm_column",
-        "confidence", "notes",
+        *_ALL_COLUMN_FIELDS, "price_currency", "confidence", "notes",
     ],
     "additionalProperties": False,
 }
+
+
+def _build_enum_schema(header_row: list[str]) -> dict:
+    """Per-sheet schema whose every *_column field is an enum of this sheet's
+    real header cells. Nullable fields also allow null; price_column does not.
+    Deduplicated, order-preserving, blanks dropped — so the model can only ever
+    return a column that actually exists (or null)."""
+    cells: list[str] = []
+    seen: set[str] = set()
+    for c in header_row:
+        if c and c.strip() and c not in seen:
+            seen.add(c)
+            cells.append(c)
+    return {
+        "type": "object",
+        "properties": {
+            **{f: {"enum": [*cells, None]} for f in _NULLABLE_COLUMN_FIELDS},
+            "price_column": {"enum": list(cells)},
+            "price_currency": {"type": "string", "enum": ["EUR", "HRK"]},
+            "confidence": {"type": "number", "minimum": 0.0, "maximum": 1.0},
+            "notes": {"type": "string"},
+        },
+        "required": [
+            *_ALL_COLUMN_FIELDS, "price_currency", "confidence", "notes",
+        ],
+        "additionalProperties": False,
+    }
 
 _SYSTEM_PROMPT = """You map column headers from Croatian car-import customs \
 catalogue Excel files to a fixed canonical schema. These files come from \
@@ -67,11 +96,30 @@ use inconsistent column names, casing, and languages (Croatian/English mix).
 
 For each canonical field below, return the EXACT header string from the \
 provided header row that corresponds to it, or null if no column in this \
-sheet represents that field. Do not invent or guess column names that are \
-not literally present in the header row provided.
+sheet represents that field.
+
+CRITICAL RULES:
+- The provided header array is the ONLY allowed source for column names. Do \
+NOT use prior knowledge of what these files usually contain. Never emit a \
+Croatian label like "MARKA", "GORIVO" or "VRIJEDI OD" unless that exact \
+string is literally one of the header cells provided.
+- Returning null is CORRECT and EXPECTED whenever a field has no matching \
+column. In particular brand, fuel and valid_from are frequently ABSENT as \
+columns (the brand comes from the file's folder, the fuel from the model's \
+engine text, the date from the filename) — when you don't see such a column, \
+return null. Do NOT invent one, and do NOT return the literal string "null".
+- Only price_column is mandatory; a priced catalogue always has a price \
+column, so find it.
+
+Example — header ["OPREMA","MODEL","GORIVO","MOTOR","kW (KS)","CO2 (g/km)",\
+"CIJENA ZA KUPCA S PDV-OM"] has no brand column and no validity-date column, \
+so the correct answer sets brand_column=null and valid_from_column=null \
+(while fuel_column="GORIVO", price_column="CIJENA ZA KUPCA S PDV-OM", \
+model_name_column="MODEL", co2_column="CO2 (g/km)", power_kw_column="kW (KS)").
 
 Canonical fields and what they mean:
-- brand_column: vehicle brand/manufacturer (e.g. "MARKA", "marka")
+- brand_column: vehicle brand/manufacturer (e.g. "MARKA", "marka"), or null \
+  if the sheet has no brand column
 - model_name_column: model name (e.g. "TRGOVAČKI NAZIV", "MODEL")
 - type_code_column: any internal type/model code column, even if its \
   uniqueness or stability is unclear (e.g. "MODEL KOD", "KOD MODELA", \
@@ -79,13 +127,15 @@ Canonical fields and what they mean:
   appears most specific to a single priced variant, and explain your choice \
   in notes.
 - full_name_column: human-readable full descriptive name (e.g. "KOMPLETNO IME")
-- fuel_column: fuel type column, REQUIRED (e.g. "GORIVO")
+- fuel_column: fuel type column (e.g. "GORIVO"), or null if the sheet has no \
+  fuel column (fuel is then derived from the model's engine text)
 - price_column: as-new sale price column, REQUIRED. If both an HRK and a EUR \
   price column exist, prefer EUR.
 - price_currency: "EUR" or "HRK" — read this from the price_column's header \
   text itself (e.g. "(kn)" = HRK, "(EUR)" or "(€)" = EUR), not guessed.
-- valid_from_column: the date this price became valid, REQUIRED \
-  (e.g. "VRIJEDI OD")
+- valid_from_column: the date this price became valid (e.g. "VRIJEDI OD"), \
+  or null if the sheet has no such column (the date then comes from the \
+  filename)
 - co2_column: single CO2 g/km column, if the sheet has ONE such column
 - co2_min_column / co2_max_column: if the sheet splits CO2 into separate \
   min/max columns instead of one column, use these two and leave \
@@ -126,7 +176,7 @@ def _build_user_prompt(header_row: list[str], sample_data_rows: list[tuple]) -> 
 async def map_sheet_columns(
     header_row: list[str],
     sample_data_rows: list[tuple],
-    timeout_seconds: float = 30.0,
+    timeout_seconds: float = 60.0,
 ) -> ColumnMapping:
     """Calls OpenRouter (DeepSeek V4 Flash by default) with strict JSON-schema
     structured output and returns a validated ColumnMapping.
@@ -143,6 +193,7 @@ async def map_sheet_columns(
             "OPENROUTER_API_KEY is not set. Add it to .env before running catalogue ingestion."
         )
 
+    schema = _build_enum_schema(header_row) if USE_ENUM_SCHEMA else _COLUMN_MAPPING_SCHEMA
     payload = {
         "model": settings.openrouter_model,
         "messages": [
@@ -154,7 +205,7 @@ async def map_sheet_columns(
             "json_schema": {
                 "name": "column_mapping",
                 "strict": True,
-                "schema": _COLUMN_MAPPING_SCHEMA,
+                "schema": schema,
             },
         },
         "plugins": [{"id": "response-healing"}],

@@ -28,7 +28,7 @@ from app.catalogue import mapping_store
 from app.catalogue.brands import FOLDER_BRANDS, snap_brand
 from app.catalogue.canonical_schema import CanonicalRow, FuelCategory, apply_mapping
 from app.catalogue.llm_mapper import map_sheet_columns
-from app.catalogue.matching import build_match_key
+from app.catalogue.matching import build_match_key, _derive_fuel_family
 from app.data.catalogues.parse_date import parse_valid_from
 from app.db.models import CO2Standard, Catalogue, FuelType
 from app.db.session import engine, AsyncSessionLocal, create_async_engine
@@ -51,9 +51,11 @@ SHEET_CONFIDENCE_THRESHOLD = 0.6
 
 # Per-mapping-call LLM budget. The mapper retries once internally on a stalled
 # connection, so worst-case network time is ~2x this; the outer wait_for caps
-# it. Kept tight (was 90s) so the one-time build doesn't crawl on doomed calls —
-# a real layout answers well within this.
-LLM_TIMEOUT_SECONDS = 20.0
+# it. Raised from 20s: the last build's 131 transient failures were ALL
+# TimeoutError (zero HTTP 429 — we are timeout-bound, not rate-limited), i.e.
+# the 20s cutoff was killing valid-but-slow responses and forcing them to be
+# re-attempted next run. 60s lets them complete and get cached once.
+LLM_TIMEOUT_SECONDS = 60.0
 
 _FUEL_CATEGORY_TO_DB: dict[FuelCategory, FuelType | None] = {
     FuelCategory.DIESEL: FuelType.DIESEL,
@@ -64,19 +66,10 @@ _FUEL_CATEGORY_TO_DB: dict[FuelCategory, FuelType | None] = {
     FuelCategory.UNKNOWN: None,    # needs_review already set; don't insert bad data
 }
 
-_FUEL_OVERRIDE_PATTERNS: list[tuple[list[str], FuelType | None]] = [
-    # Brand-agnostic patterns (lowest priority)
-    ([".*tdi.*", ".*diesel.*"], FuelType.DIESEL),
-    ([".*tfsi.*", ".*tsi.*", ".*benzin.*"], FuelType.PETROL),
-
-    # BMW specific: "d" suffix after digits => Diesel, "i" suffix => Petrol
-    (["^.*[0-9]+d[^a-z]*$"], FuelType.DIESEL),
-    (["^.*[0-9]+i[^a-z]*$"], FuelType.PETROL),
-
-    # Mercedes: "d" suffix => Diesel, "e" => Petrol hybrid
-    (["^.*[0-9]+d[^a-z]*$"], FuelType.DIESEL),
-    (["^.*[0-9]+e[^a-z]*$"], FuelType.PETROL),
-]
+_DERIVED_FUEL_TO_DB: dict[str, FuelType] = {
+    "diesel": FuelType.DIESEL,
+    "petrol": FuelType.PETROL,
+}
 
 def _override_fuel_from_variant(
     brand: str,
@@ -84,13 +77,17 @@ def _override_fuel_from_variant(
     variant: str,
     mapped_fuel: FuelType | None,
 ) -> FuelType | None:
-    """Check variant text against known patterns. If a pattern matches and
-    conflicts with the LLM's guess, trust the pattern (they're deterministic)."""
-    text_to_check = f"{brand} {model} {variant}".lower()
-    import re
-    for patterns, correct_fuel in _FUEL_OVERRIDE_PATTERNS:
-        if any(re.search(p, text_to_check) for p in patterns):
-            return correct_fuel
+    """Derive fuel from the brand/model/variant engine text and let it win over
+    the mapped value. Engine words are definitional (TDI/CDI/dCi/HDi/CRDi →
+    diesel; TFSI/TSI/TCe/PureTech → petrol) and the numeric badge suffix
+    (320d/320i) is a reliable fallback, so a text hit is more trustworthy than
+    a source cell — and, crucially, this is the sole fuel signal when a sheet
+    has NO fuel column at all (mapped_fuel is None). Reuses matching's
+    _derive_fuel_family so ingest and lookup share one multi-brand vocabulary.
+    When the text yields nothing, keep whatever the mapping produced."""
+    derived = _derive_fuel_family(brand, model, variant)
+    if derived is not None:
+        return _DERIVED_FUEL_TO_DB[derived]
     return mapped_fuel
 
 def _co2_standard_from_year(year: int) -> CO2Standard:
@@ -460,6 +457,7 @@ async def _ingest_entry(
                     source_file=str(path),
                     source_sheet=sheet_name,
                     skip_log=skip_log,
+                    default_valid_from=valid_from_file,
                 )
             except Exception as exc:
                 print(f"[FAIL] {sheet_label} — apply_mapping error: {exc}")
@@ -572,8 +570,10 @@ def main() -> None:
     parser.add_argument("--dry-run", action="store_true", help="Parse and map but don't write to DB")
     parser.add_argument("--verbose", action="store_true", help="Show cache hits and per-file details")
     parser.add_argument(
-        "--concurrency", type=int, default=32,
-        help="Max files processed in parallel (default: 32)",
+        "--concurrency", type=int, default=48,
+        help="Max files processed in parallel (default: 48). Raised from 32: "
+             "the pipeline is timeout-bound, not rate-limited (no 429s seen), "
+             "so more in-flight calls shorten the one-time build.",
     )
     parser.add_argument(
         "--fresh", action="store_true",

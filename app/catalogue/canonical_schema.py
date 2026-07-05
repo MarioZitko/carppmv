@@ -21,7 +21,7 @@ Two-stage pipeline:
 """
 
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import date, datetime
 from enum import Enum
 
@@ -66,14 +66,14 @@ class ColumnMapping:
     co2_min_max_policy on CanonicalRow for how this gets resolved).
     """
 
-    brand_column: str
+    brand_column: str | None  # None when the sheet has no brand column — the brand then comes from the file's folder-group (snap_brand) or the model/variant text, never guessed by the LLM
     model_name_column: str | None
     type_code_column: str | None  # whatever this sheet uses as its closest thing to a stable code (MODEL KOD / KOD MODELA / model / etc — name varies per family)
     full_name_column: str | None  # KOMPLETNO IME / kompletno ime — human-readable, used as fallback display/dedup aid, NOT the lookup key
-    fuel_column: str
+    fuel_column: str | None  # None when the sheet has no fuel column — fuel is then derived from the model/variant engine text (TDI/TFSI/dCi/...), see ingest._override_fuel_from_variant
     price_column: str
     price_currency: str  # "EUR" or "HRK" — read from the column header text itself (e.g. "(kn)" vs "(EUR)"), not guessed from date
-    valid_from_column: str
+    valid_from_column: str | None  # None when the sheet has no validity-date column — the date then comes from the filename (default_valid_from), never guessed
     co2_column: str | None  # single CO2 column, if this format has one
     co2_min_column: str | None  # Mercedes-style split
     co2_max_column: str | None
@@ -211,6 +211,55 @@ _WORD_FUEL_MAP: dict[str, FuelCategory] = {
 _EUR_HEADER_PATTERN = re.compile(r"eur|€", re.IGNORECASE)
 _HEADER_WORD_PATTERN = re.compile(r"[a-zčćžšđ]+", re.IGNORECASE)
 
+_WHITESPACE_RE = re.compile(r"\s+")
+
+# The 17 columns of a ColumnMapping that name a source header cell (everything
+# except price_currency/confidence/notes). Used by the fingerprint key, the
+# per-sheet LLM enum schema, and the header-resolution pre-pass so all three
+# stay in lockstep.
+COLUMN_FIELDS: tuple[str, ...] = (
+    "brand_column", "model_name_column", "type_code_column", "full_name_column",
+    "fuel_column", "price_column", "valid_from_column", "co2_column",
+    "co2_min_column", "co2_max_column", "power_kw_column", "plug_in_range_column",
+    "seats_7plus1_column", "seats_8plus1_column", "camper_column",
+    "pickup_8704_column", "euro_norm_column",
+)
+
+
+def normalize_cell(cell: str) -> str:
+    """Canonical form of a header cell for fingerprinting and fuzzy column
+    lookup: newlines→space, whitespace collapsed, lowercased, surrounding
+    punctuation stripped. Collapses the trivially-different spellings that
+    otherwise fork a header into distinct layouts (`'CO2\\n(g/km)'` vs
+    `'CO2 (g/km)'`) and would each cost their own LLM call. Internal
+    punctuation is preserved, so Porsche's `osnovna_cijena_kn` stays intact."""
+    s = cell.replace("\n", " ").strip().lower()
+    s = _WHITESPACE_RE.sub(" ", s)
+    return s.strip(" .:-")
+
+
+def _resolve_columns(mapping: "ColumnMapping", header_row: list[str]) -> "ColumnMapping":
+    """Snap each of a mapping's source-column names to the exact header string
+    present in THIS sheet. A cached mapping may have been learned from a
+    near-identical header (`'CO2 (g/km)'`) and now be applied to a sheet whose
+    header differs only cosmetically (`'CO2\\n(g/km)'`); without this, the exact
+    lookup in `_cell` misses and every affected column silently drops. Values
+    that already match exactly, or match nothing at all, are left untouched
+    (the latter then resolve to None in `_cell`, as before)."""
+    exact = set(header_row)
+    norm_to_exact: dict[str, str] = {}
+    for name in header_row:
+        n = normalize_cell(name)
+        if n and n not in norm_to_exact:
+            norm_to_exact[n] = name
+
+    def fix(value: str | None) -> str | None:
+        if value is None or value in exact:
+            return value
+        return norm_to_exact.get(normalize_cell(value), value)
+
+    return replace(mapping, **{f: fix(getattr(mapping, f)) for f in COLUMN_FIELDS})
+
 
 def _is_blank(value: object) -> bool:
     return value is None or (isinstance(value, str) and not value.strip())
@@ -286,6 +335,19 @@ def _parse_date(value: object) -> date | None:
             return None
         try:
             day, month, year = (int(part) for part in parts)
+        except ValueError:
+            return None
+        # 2-digit day-first years ("01.06.26" → 2026): confirmed in real BAIC
+        # files, where the naive parse produced year 26 (date 0026-06-01) and
+        # leaked into the DB. Interpret as 20YY.
+        if year < 100:
+            year += 2000
+        # Reject implausible years rather than store a garbage date — mirrors
+        # parse_date._valid's guard so a mis-split cell fails cleanly (and then
+        # falls back to the filename date) instead of poisoning the table.
+        if not (2000 <= year <= 2035 and 1 <= month <= 12 and 1 <= day <= 31):
+            return None
+        try:
             return date(year, month, day)
         except ValueError:
             return None
@@ -409,6 +471,7 @@ def apply_mapping(
     source_sheet: str,
     co2_min_max_policy: str = "max",
     skip_log: list[tuple[int, str]] | None = None,
+    default_valid_from: date | None = None,
 ) -> list[CanonicalRow]:
     """Deterministic, pure — applies an already-computed ColumnMapping to
     every data row in a sheet. No LLM calls happen here; this is plain
@@ -432,7 +495,15 @@ def apply_mapping(
     skip_log: if provided, every dropped row appends an
     (source_row_index, reason) tuple — used by scripts/ingest_catalogue.py
     to print a reason breakdown without re-walking the rows.
+
+    default_valid_from: the validity date parsed from the filename. Used as the
+    row's valid_from whenever the sheet has no valid_from column (mapping.
+    valid_from_column is None) or its cell is blank/unparseable — the customs
+    file is named for the date its prices take effect, so this is the correct
+    value, not a guess. When None (e.g. isolated unit tests), the old
+    "drop rows without a parseable date" behaviour is preserved.
     """
+    mapping = _resolve_columns(mapping, header_row)
     column_index = {name: i for i, name in enumerate(header_row)}
     settings = get_settings()
     results: list[CanonicalRow] = []
@@ -452,14 +523,27 @@ def apply_mapping(
             skip("junk_row")
             continue
 
-        brand = _to_str(_cell(row, column_index, mapping.brand_column))
-        if brand is None:
-            skip("missing_brand")
-            continue
+        # No brand column at all → leave brand empty and let the ingest layer
+        # snap it from the file's folder-group (single-marque folders) or the
+        # model/variant text. When the sheet DOES have a brand column but this
+        # row's cell is blank, that's a section-header/junk row, so still skip.
+        if mapping.brand_column is None:
+            brand = ""
+        else:
+            brand = _to_str(_cell(row, column_index, mapping.brand_column))
+            if brand is None:
+                skip("missing_brand")
+                continue
 
         price_value = _parse_numeric(price_raw)
         if price_value is None:
             skip("missing_price")
+            continue
+        if price_value <= 0:
+            # A €0 (or negative) as-new price is never a real catalogue entry —
+            # it's a stray/placeholder cell (confirmed: one Mercedes S 450 row).
+            # Ingesting it would silently zero out a PPMV calculation.
+            skip("nonpositive_price")
             continue
 
         currency = _detect_currency_from_header(mapping.price_column) or mapping.price_currency
@@ -471,7 +555,14 @@ def apply_mapping(
             skip("unrecognized_currency")
             continue
 
-        valid_from = _parse_date(_cell(row, column_index, mapping.valid_from_column))
+        # Prefer the sheet's own date column; fall back to the filename date
+        # (default_valid_from) when the sheet has no such column or the cell is
+        # blank/unparseable — the file is named for its effective date.
+        valid_from = None
+        if mapping.valid_from_column is not None:
+            valid_from = _parse_date(_cell(row, column_index, mapping.valid_from_column))
+        if valid_from is None:
+            valid_from = default_valid_from
         if valid_from is None:
             skip("missing_or_unparseable_valid_from")
             continue
