@@ -10,6 +10,17 @@ interface Props {
   title?: string;
 }
 
+// Mirrors app/catalogue/matching.py ACCEPT_SCORE / CANDIDATE_FLOOR — frontend-only
+// color tiering, the underlying score itself is never rescaled.
+const SCORE_TIER_GOOD = 88; // matches backend ACCEPT_SCORE
+const SCORE_TIER_OK = 75; // frontend-only midpoint toward CANDIDATE_FLOOR (62)
+
+function scoreTierClassName(score: number): string {
+  if (score >= SCORE_TIER_GOOD) return "bg-[var(--ok-bg)] text-[var(--ok)] border border-[var(--ok)]/30";
+  if (score >= SCORE_TIER_OK) return "bg-[var(--warn-bg)] text-[var(--warn)] border border-[var(--warn)]/30";
+  return "bg-[var(--err-bg)] text-[var(--err)] border border-[var(--err)]/30";
+}
+
 /** Ranked catalogue rows the fuzzy matcher found — brand/model/variant, price
  * and CO2 for each, so the user can pick the row that actually matches their
  * car instead of trusting a single auto-guess. */
@@ -57,9 +68,7 @@ export function CandidatesList({ candidates, selectedCatalogueId, onSelect, titl
                   </p>
                   <span
                     className={`inline-block mt-1 text-[10px] px-2 py-0.5 rounded-full ${
-                      active
-                        ? "bg-[var(--primary)] text-white"
-                        : "bg-[var(--surface-alt)] text-[var(--text-soft)] border border-[var(--border)]"
+                      active ? "bg-[var(--primary)] text-white" : scoreTierClassName(c.score)
                     }`}
                   >
                     {active ? "odabrano" : `podudarnost ${Math.round(c.score)}%`}

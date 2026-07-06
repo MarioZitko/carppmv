@@ -27,6 +27,10 @@ export default function Home() {
 
   const [selectedCatalogueId, setSelectedCatalogueId] = useState<number | null>(null);
   const [form, setForm] = useState<VehicleFormValues>(() => emptyVehicleForm(todayIso()));
+  // Bumped whenever priceEur is set from a new authoritative source (a parsed
+  // listing URL or a picked catalogue candidate) so PriceFineTune's extras
+  // anchor force-resets instead of only recentering when out of its old range.
+  const [priceAnchorToken, setPriceAnchorToken] = useState(0);
 
   const [ppmvResult, setPpmvResult] = useState<PPMVResponse | null>(null);
   const [ppmvLoading, setPpmvLoading] = useState(false);
@@ -47,6 +51,7 @@ export default function Home() {
       co2: candidate.co2_g_km !== null ? String(candidate.co2_g_km) : form.co2,
       fuelType: candidate.fuel_type === "diesel" || candidate.fuel_type === "petrol" ? candidate.fuel_type : form.fuelType,
     });
+    setPriceAnchorToken((t) => t + 1);
   }
 
   async function handleUrlSubmit(rawUrl: string) {
@@ -67,6 +72,7 @@ export default function Home() {
         seatCount: data.parsed.seat_count !== null ? String(data.parsed.seat_count) : "",
         isNew: data.parsed.is_new,
       });
+      setPriceAnchorToken((t) => t + 1);
 
       if (data.match_status === "auto_matched" && data.candidates.length > 0) {
         setSelectedCatalogueId(data.candidates[0].catalogue_id);
@@ -180,6 +186,7 @@ export default function Home() {
           <PriceFineTune
             priceEur={Number(form.priceEur) || 0}
             onChange={(price) => patchForm({ priceEur: String(price) })}
+            anchorToken={priceAnchorToken}
           />
 
           {ppmvResult ? (
