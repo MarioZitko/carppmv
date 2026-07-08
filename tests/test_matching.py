@@ -342,6 +342,24 @@ def test_distinctive_body_demoted_below_plain_sibling_at_saturation():
     assert result.candidates[0].score > result.candidates[1].score
 
 
+def test_distinctive_drivetrain_demoted_below_plain_sibling_at_saturation():
+    # A drivetrain-silent "A4 40 TDI" listing (autobid.de title-only variant,
+    # no "Version"/"Ausstattung" field) must rank the plain-FWD row above the
+    # quattro (AWD) row it never mentioned, even though both saturate at 100.
+    query = build_match_key("Audi", "A4", "40 TDI S tronic")
+    rows = [
+        _cand(brand="Audi", model="A4 Limousine", variant="A4 40TDI S tr Advanced+ / Diesel",
+              price_eur=45650.0, fuel="diesel", power_kw=150.0, catalogue_id=1),
+        _cand(brand="Audi", model="A4 Limousine", variant="A4 40TDI quattro S tr Advanced+ / Diesel",
+              price_eur=48503.75, fuel="diesel", power_kw=150.0, catalogue_id=2),
+    ]
+    result = rank_candidates(
+        query, rows, listing_power_kw=150.0, query_model="A4", query_fuel="diesel", year=2023,
+    )
+    assert result.candidates[0].row.catalogue_id == 1
+    assert result.candidates[0].score > result.candidates[1].score
+
+
 # ---------------------------------------------------------------------------
 # Sanity: thresholds wired as expected
 # ---------------------------------------------------------------------------

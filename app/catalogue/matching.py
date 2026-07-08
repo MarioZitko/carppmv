@@ -335,6 +335,13 @@ _DISTINCTIVE_BODY_TOKENS = frozenset({
     "allroad", "gran", "fastback", "liftback", "suv",
 })
 
+# AWD/4WD drivetrain markers — same asymmetric treatment as body style: a
+# candidate stating quattro/xDrive/4MATIC etc. that the listing never
+# mentioned is a real, price-relevant spec difference, not silence-as-absence.
+_DISTINCTIVE_DRIVETRAIN_TOKENS = frozenset({
+    "quattro", "xdrive", "4matic", "allrad", "4motion", "awd", "4x4",
+})
+
 
 @dataclass(frozen=True)
 class CandidateRow:
@@ -443,6 +450,10 @@ def _score_one(
         cand_tokens = set(cand.match_key.split())
         extra_bodies = (cand_tokens & _DISTINCTIVE_BODY_TOKENS) - query_tokens
         if extra_bodies:
+            penalty += BODY_MISMATCH_PENALTY
+
+        extra_drivetrain = (cand_tokens & _DISTINCTIVE_DRIVETRAIN_TOKENS) - query_tokens
+        if extra_drivetrain:
             penalty += BODY_MISMATCH_PENALTY
 
     def _accumulate(signed: float) -> None:

@@ -188,7 +188,14 @@ def _brand_model_from_url_slug(url: str) -> tuple[str | None, str | None]:
     than assumed to be the first token — otherwise "mercedes-benz-a-200" yields
     brand "Mercedes" / model "BENZ" and matches nothing. After the brand, the
     model is the next token plus a following numeric badge if present
-    ("a" + "200" -> "A 200", "120" -> "120", "x5" -> "X5")."""
+    ("a" + "200" -> "A 200", "120" -> "120", "x5" -> "X5") — but only when that
+    model token is bare letters. When it already contains a digit of its own
+    ("a4", "q7", "x5"), the model name is already complete and a following
+    digit is an engine-displacement badge, not part of the model — e.g. Audi's
+    "a4-40-tdi" is model "A4" + engine badge "40 TDI", and wrongly reading it
+    as model "A4 40" makes every genuine A4 catalogue row fail the model-match
+    check (confirmed regression: an autobid.de A4 40 TDI listing scored 72%
+    against its own correct catalogue rows, all via a bogus model mismatch)."""
     path = urllib.parse.urlparse(url).path
     slug = path.rstrip("/").rsplit("/", 1)[-1]
     # Strip trailing numeric ID
@@ -207,7 +214,7 @@ def _brand_model_from_url_slug(url: str) -> tuple[str | None, str | None]:
     if not rest:
         return brand, None
     model = rest[0].upper()
-    if len(rest) > 1 and rest[1].isdigit():
+    if len(rest) > 1 and rest[1].isdigit() and not any(ch.isdigit() for ch in rest[0]):
         model = f"{model} {rest[1]}"
     return brand, model
 

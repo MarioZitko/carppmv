@@ -7,6 +7,7 @@ import { CandidatesList } from "@/components/CandidatesList";
 import { VehicleForm } from "@/components/VehicleForm";
 import { PriceFineTune } from "@/components/PriceFineTune";
 import { PPMVBreakdownCard } from "@/components/PPMVBreakdownCard";
+import { CarVerticalCard } from "@/components/CarVerticalCard";
 import { ParsedFieldsCard } from "@/components/ParsedFieldsCard";
 import { calculateFromUrl, calculateFromSpecs } from "@/lib/api";
 import { normalizeUrl } from "@/lib/format";
@@ -123,8 +124,10 @@ export default function Home() {
   const showCandidates = candidates.length > 0;
 
   return (
-    <div className="mx-auto max-w-6xl px-6 py-8">
-      <h1 className="text-2xl font-bold tracking-tight text-[var(--text)] mb-1">Izračun PPMV-a</h1>
+    <div className="mx-auto max-w-6xl px-4 sm:px-6 py-6 sm:py-8">
+      <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-[var(--text)] mb-1">
+        Izračun PPMV-a
+      </h1>
       <p className="text-sm text-[var(--text-soft)] mb-5 max-w-2xl">
         Procijenite hrvatski posebni porez na motorna vozila (PPMV) — zalijepite link oglasa ili odaberite
         vozilo izravno iz baze podataka, a cijenu i CO2 uvijek možete naknadno fino podesiti.
@@ -133,7 +136,7 @@ export default function Home() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 items-start">
         <div className="lg:col-span-2 space-y-4">
           <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] shadow-sm p-4">
-            <div className="flex gap-1 mb-3 rounded-xl bg-[var(--surface-alt)] p-1 w-fit">
+            <div className="flex gap-1 mb-3 rounded-xl bg-[var(--surface-alt)] p-1 w-fit overflow-x-auto">
               <button
                 type="button"
                 onClick={() => setMode("link")}
@@ -190,7 +193,10 @@ export default function Home() {
           />
 
           {ppmvResult ? (
-            <PPMVBreakdownCard result={ppmvResult} updating={ppmvLoading} />
+            <>
+              <PPMVBreakdownCard result={ppmvResult} updating={ppmvLoading} />
+              <CarVerticalCard />
+            </>
           ) : (
             <div className="rounded-2xl border border-dashed border-[var(--border)] bg-[var(--surface-alt)] px-5 py-6 text-sm text-[var(--text-soft)]">
               {ppmvHint ?? "Popunite podatke o vozilu za izračun PPMV-a."}
