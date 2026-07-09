@@ -18,6 +18,7 @@ export interface ParsedFields {
   price_eur: number | null;
   seat_count: number | null;
   is_new: boolean;
+  vin: string | null;
 }
 
 export interface CatalogueCandidate {

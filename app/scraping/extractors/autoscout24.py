@@ -246,6 +246,19 @@ def _parse_model_name(listing: dict) -> str | None:
     return base
 
 
+_VIN_RE = re.compile(r"^[A-HJ-NPR-Z0-9]{11,17}$")  # excludes I/O/Q, standard VIN charset
+
+
+def _parse_vin(listing: dict) -> str | None:
+    for key in ("vin", "vehicleIdentificationNumber"):
+        val = listing.get(key)
+        if isinstance(val, str) and val.strip():
+            candidate = val.strip().upper()
+            if _VIN_RE.match(candidate):
+                return candidate
+    return None
+
+
 def _parse_title(listing: dict) -> str | None:
     for key in ("imgAltText", "title", "name", "shortTitle"):
         val = listing.get(key)
@@ -325,4 +338,5 @@ class AutoScout24Extractor:
             seat_count=_parse_seat_count(listing),
             brand=_parse_brand(listing),
             model=_parse_model_name(listing),
+            vin=_parse_vin(listing),
         )

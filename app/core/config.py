@@ -23,6 +23,14 @@ class Settings(BaseSettings):
     openrouter_api_key: str = ""
     openrouter_model: str = "deepseek/deepseek-v4-flash"
 
+    # mobile.de on-demand scraping via Apify actor (mobile.de is behind Akamai
+    # Bot Manager — direct scraping fails, see docs/MOBILE_DE_APIFY_SPEC.md).
+    apify_api_token: str = ""
+    apify_mobile_de_actor_id: str = "ivanvs/mobile-de-scraper"
+    apify_call_timeout_seconds: int = 60
+    listing_cache_ttl_hours: int = 24
+    daily_apify_budget_calls: int = 200  # safety ceiling, degrade gracefully above
+
 
 @lru_cache
 def get_settings() -> Settings:

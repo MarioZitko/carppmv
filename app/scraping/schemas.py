@@ -20,3 +20,6 @@ class ListingData(BaseModel):
     seat_count: int | None = None
     brand: str | None = None
     model: str | None = None
+    scraper: str | None = None  # which extractor/fetcher produced this
+    emission_class: str | None = None  # e.g. "Euro6d-TEMP"
+    vin: str | None = None  # chassis/VIN number, when the source site exposes it

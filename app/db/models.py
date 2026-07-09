@@ -16,6 +16,7 @@ from datetime import date, datetime
 from enum import Enum
 
 from sqlalchemy import (
+    JSON,
     Date,
     DateTime,
     Enum as SAEnum,
@@ -194,3 +195,35 @@ class Listing(Base):
 
     def __repr__(self) -> str:
         return f"<Listing {self.site} {self.brand} {self.model} {self.price_eur} EUR>"
+
+
+class ListingCache(Base):
+    """Cached Apify result for a single listing, keyed by "{site}:{id}"
+    (e.g. "mobile.de:459632333"). Avoids paying for a fresh Apify call on
+    every /calculate request for the same listing within the TTL window —
+    see app/core/limits.py and the mobile.de branch in calculate/router.py.
+    """
+
+    __tablename__ = "listing_cache"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    cache_key: Mapped[str] = mapped_column(String(256), unique=True, index=True)
+    payload: Mapped[dict] = mapped_column(JSON)  # serialized ListingData
+    fetched_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+
+
+class ApifyEvent(Base):
+    """One /calculate request served via the Apify on-demand path — cache
+    hit, paid Apify call, or budget-cap degrade — for cost/observability
+    tracking (per-day spend, success rate).
+    """
+
+    __tablename__ = "apify_events"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    site: Mapped[str] = mapped_column(String(64))  # "mobile.de"
+    listing_id: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    source: Mapped[str] = mapped_column(String(16))  # "cache" | "apify"
+    status: Mapped[str] = mapped_column(String(16))  # "success" | "failed" | "cap_reached"
+    cost_usd: Mapped[float] = mapped_column(Float, default=0.0)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)

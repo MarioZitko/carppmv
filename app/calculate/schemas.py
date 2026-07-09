@@ -23,6 +23,7 @@ class ParsedFields(BaseModel):
     price_eur: float | None = None
     seat_count: int | None = None
     is_new: bool = False
+    vin: str | None = None
 
 
 class CalculateResponse(BaseModel):

@@ -28,6 +28,7 @@ from app.scraping.engines import SITE_ENGINE_MAP
 from app.scraping.extractors.autobid_de import AutobidDeExtractor
 from app.scraping.extractors.autoscout24 import AutoScout24Extractor
 from app.scraping.extractors.njuskalo import NjuskaloExtractor
+from app.scraping.mobile_de_service import MOBILE_DE_SITE, ApifyBudgetExceeded, get_mobile_de_listing
 
 log = logging.getLogger(__name__)
 
@@ -38,8 +39,6 @@ _EXTRACTORS = {
     "autoscout24": AutoScout24Extractor(),
     "njuskalo": NjuskaloExtractor(),
 }
-
-_UNSUPPORTED_SITES = {"mobile.de"}
 
 # A scraped listing already carries a strong brand/model/variant/power signal,
 # so it's worth surfacing more alternatives than the catalogue-search default —
@@ -126,17 +125,28 @@ async def calculate(
 
     site = _detect_site(url)
 
-    if site in _UNSUPPORTED_SITES:
-        raise HTTPException(status_code=400, detail=f"{site} is not supported")
-
-    if not site or site not in _EXTRACTORS:
+    if site == MOBILE_DE_SITE:
+        try:
+            listing = await get_mobile_de_listing(url, session)
+        except ApifyBudgetExceeded:
+            # Daily Apify budget exhausted — degrade gracefully instead of erroring.
+            return CalculateResponse(
+                ppmv_eur=None,
+                parsed=ParsedFields(),
+                co2_source="manual_required",
+                confidence="low",
+                warnings=["Dnevni limit automatskog dohvata je dostignut. Unesite podatke ručno."],
+                match_status="not_attempted",
+                candidates=[],
+            )
+    elif not site or site not in _EXTRACTORS:
         raise HTTPException(
             status_code=422,
             detail=[{"loc": ["body", "url"], "msg": f"Unrecognized domain: {url}", "type": "value_error"}],
         )
-
-    extractor = _EXTRACTORS[site]
-    listing = await extractor.extract(url)
+    else:
+        extractor = _EXTRACTORS[site]
+        listing = await extractor.extract(url)
 
     # Build ParsedFields from listing.
     # first_registration: ListingData uses first_registration_date (raw string)
@@ -151,6 +161,7 @@ async def calculate(
         price_eur=listing.price_eur,
         seat_count=listing.seat_count,
         is_new=False,
+        vin=listing.vin,
     )
 
     warnings: list[str] = []

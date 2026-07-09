@@ -156,6 +156,10 @@ _LABEL_MAP: dict[str, str] = {
     "marka": "brand",
     "proizvođač": "brand",
     "model": "model",
+    "broj šasije": "vin",
+    "broj sasije": "vin",
+    "vin broj": "vin",
+    "vin": "vin",
     # English fallbacks (some listings are bilingual)
     "fuel": "fuel_type",
     "mileage": "mileage_km",
@@ -165,7 +169,16 @@ _LABEL_MAP: dict[str, str] = {
     "make": "brand",
     "brand": "brand",
     "first registration": "first_registration",
+    "chassis number": "vin",
+    "vin number": "vin",
 }
+
+_VIN_RE = re.compile(r"^[A-HJ-NPR-Z0-9]{11,17}$")  # excludes I/O/Q, standard VIN charset
+
+
+def _normalise_vin(text: str) -> str | None:
+    candidate = text.strip().upper()
+    return candidate if _VIN_RE.match(candidate) else None
 
 
 class NjuskaloExtractor:
@@ -237,6 +250,7 @@ class NjuskaloExtractor:
         brand: str | None = None
         model: str | None = None
         year: str | None = None
+        vin: str | None = None
 
         for raw_label, raw_value in specs.items():
             canonical = _LABEL_MAP.get(raw_label)
@@ -268,6 +282,8 @@ class NjuskaloExtractor:
                 brand = raw_value.strip() or None
             elif canonical == "model":
                 model = raw_value.strip() or None
+            elif canonical == "vin":
+                vin = _normalise_vin(raw_value)
 
         # Use year as first_registration_date if more specific date not found
         if first_registration_date is None and year:
@@ -290,4 +306,5 @@ class NjuskaloExtractor:
             seat_count=seat_count,
             brand=brand,
             model=model,
+            vin=vin,
         )

@@ -15,8 +15,7 @@ import pytest
 import pytest_asyncio
 
 from app.scraping.extractors.autobid_de import AutobidDeExtractor
-from app.scraping.extractors.autoscout24 import AutoScout24Extractor, _parse_model_name
-from app.scraping.extractors.mobile_de import MobileDeExtractor
+from app.scraping.extractors.autoscout24 import AutoScout24Extractor, _parse_model_name, _parse_vin
 from app.scraping.extractors.njuskalo import NjuskaloExtractor
 from app.scraping.schemas import ListingData
 from app.core.exceptions import ScrapingError
@@ -40,6 +39,13 @@ def test_autoscout24_model_suffix_folds_xdrive_prefix_to_fuel_letter():
     listing = {"model": "420", "modelVersionInput": "xd Luxury Line|HUD|HIFI"}
     assert _parse_model_name(listing) == "420d"
 
+
+def test_autoscout24_vin_parsed_and_validated():
+    assert _parse_vin({"vin": "wauzzz8k5na012345"}) == "WAUZZZ8K5NA012345"
+    assert _parse_vin({"vehicleIdentificationNumber": "WAUZZZ8K5NA012345"}) == "WAUZZZ8K5NA012345"
+    assert _parse_vin({"vin": "not-a-vin"}) is None
+    assert _parse_vin({}) is None
+
 # ---------------------------------------------------------------------------
 # Hardcoded listing URLs — replace when listings expire.
 # Format reminder:
@@ -59,11 +65,6 @@ _AUTOSCOUT24_URL = (
     "https://www.autoscout24.de/angebote/audi-a4-35-tfsi-navi-pdc-sihz-s-tronic-benzin-schwarz-cat_ma9mo1626-4e26643e-0e3f-48f3-8ab4-3d4640516761"
     "?source=autocatalog_carousel&position=3"
 )
-_MOBILE_DE_URL = (
-    "https://suchen.mobile.de/auto-inserat/"
-    "audi-a5-coupe-3-0d-sport-s-line-18-b-o-standhz-nav-x-bebra/456779908.html"
-)
-
 
 def _skip_if_gone(exc: ScrapingError) -> None:
     """If the site returned 4xx (listing gone/expired), skip instead of fail."""
@@ -166,26 +167,6 @@ async def test_autoscout24_extractor() -> None:
         assert result.co2_g_km > 0
 
 
-# ---------------------------------------------------------------------------
-# mobile.de
-# ---------------------------------------------------------------------------
-
-@pytest.mark.integration
-@pytest.mark.asyncio
-async def test_mobile_de_extractor() -> None:
-    extractor = MobileDeExtractor()
-    try:
-        result = await extractor.extract(_MOBILE_DE_URL)
-    except ScrapingError as exc:
-        _skip_if_gone(exc)
-        raise
-
-    assert isinstance(result, ListingData)
-    assert result.source_site == "mobile.de"
-    assert result.source_url == _MOBILE_DE_URL
-    assert result.price_eur is not None, "Expected price_eur from mobile.de listing"
-    assert result.price_eur > 0
-    if result.power_kw is not None:
-        assert result.power_kw > 0
-    if result.seat_count is not None:
-        assert 1 <= result.seat_count <= 20
+# mobile.de is no longer scraped directly (Akamai Bot Manager blocks it —
+# see docs/MOBILE_DE_APIFY_SPEC.md); it now goes through the Apify actor.
+# See tests/test_apify_mobile_de.py for its unit tests.
