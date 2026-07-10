@@ -1,7 +1,7 @@
-yourdomain.com {
+kalkulatoruvoza.com, www.kalkulatoruvoza.com {
     reverse_proxy frontend:3000
 }
 
-api.yourdomain.com {
+api.kalkulatoruvoza.com {
     reverse_proxy backend:8000
 }
