@@ -31,6 +31,13 @@ class Settings(BaseSettings):
     listing_cache_ttl_hours: int = 24
     daily_apify_budget_calls: int = 200  # safety ceiling, degrade gracefully above
 
+    # Abuse protection for the mobile.de/Apify on-demand path — Cloudflare Turnstile
+    # bot-check, per-IP rate limiting, and IP hashing (never store raw client IPs).
+    turnstile_secret_key: str = ""  # empty ⇒ verification disabled (dev)
+    ip_hash_salt: str = "change-me"
+    rate_limit_per_ip_hour: int = 10
+    rate_limit_per_ip_day: int = 30
+
 
 @lru_cache
 def get_settings() -> Settings:

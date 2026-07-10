@@ -10,6 +10,10 @@ from app.catalogue.schemas import CatalogueCandidate
 
 class CalculateRequest(BaseModel):
     url: HttpUrl
+    # Cloudflare Turnstile token from the frontend widget — verified only for
+    # the mobile.de/Apify path (app/scraping/mobile_de_guard.py). None when
+    # Turnstile is unconfigured (dev) or the request isn't mobile.de.
+    turnstile_token: str | None = None
 
 
 class ParsedFields(BaseModel):

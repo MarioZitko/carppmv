@@ -26,11 +26,12 @@ class ApifyBudgetExceeded(Exception):
     should degrade to a manual-entry response instead of erroring."""
 
 
-async def _log_apify_event(
-    db: AsyncSession, listing_id: str | None, source: str, status: str, cost_usd: float
+async def log_apify_event(
+    db: AsyncSession, ip_hash: str, listing_id: str | None, source: str, status: str, cost_usd: float
 ) -> None:
     db.add(
         ApifyEvent(
+            ip_hash=ip_hash,
             site=MOBILE_DE_SITE,
             listing_id=listing_id,
             source=source,
@@ -42,11 +43,14 @@ async def _log_apify_event(
     await db.commit()
 
 
-async def get_mobile_de_listing(url: str, db: AsyncSession) -> ListingData:
+async def get_mobile_de_listing(url: str, db: AsyncSession, ip_hash: str = "") -> ListingData:
     """Cache-first, budget-guarded fetch of a mobile.de listing via Apify.
 
     Raises ApifyBudgetExceeded when the daily budget is exhausted, and
     ScrapingError (bubbled from the fetcher) on an actual fetch failure.
+    ip_hash is attached to every logged ApifyEvent row for rate-limit
+    accounting — pass "" when the caller has no per-request IP (e.g. a
+    background job).
     """
     settings = get_settings()
     listing_id = apify_mobile_de.extract_mobile_de_id(url)
@@ -59,17 +63,17 @@ async def get_mobile_de_listing(url: str, db: AsyncSession) -> ListingData:
         if cached is not None:
             ttl = timedelta(hours=settings.listing_cache_ttl_hours)
             if datetime.now(timezone.utc) - cached.fetched_at < ttl:
-                await _log_apify_event(db, listing_id, "cache", "success", 0.0)
+                await log_apify_event(db, ip_hash, listing_id, "cache", "success", 0.0)
                 return ListingData(**cached.payload)
 
     if not await apify_budget_remaining(db):
-        await _log_apify_event(db, listing_id, "apify", "cap_reached", 0.0)
+        await log_apify_event(db, ip_hash, listing_id, "apify", "cap_reached", 0.0)
         raise ApifyBudgetExceeded(f"Daily Apify budget reached ({settings.daily_apify_budget_calls} calls)")
 
     try:
         listing = await apify_mobile_de.fetch_listing(url)
     except ScrapingError:
-        await _log_apify_event(db, listing_id, "apify", "failed", 0.0)
+        await log_apify_event(db, ip_hash, listing_id, "apify", "failed", 0.0)
         raise
 
     if cache_key:
@@ -86,5 +90,5 @@ async def get_mobile_de_listing(url: str, db: AsyncSession) -> ListingData:
             )
         await db.commit()
 
-    await _log_apify_event(db, listing_id, "apify", "success", 0.0015)
+    await log_apify_event(db, ip_hash, listing_id, "apify", "success", 0.0015)
     return listing

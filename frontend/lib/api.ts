@@ -30,9 +30,11 @@ async function get<TResponse>(path: string): Promise<TResponse> {
   return res.json() as Promise<TResponse>;
 }
 
-/** POST /calculate — url in, PPMV out (scrape + catalogue fallback + tax calc). */
-export function calculateFromUrl(url: string): Promise<CalculateResponse> {
-  return post<CalculateResponse>("/calculate", { url });
+/** POST /calculate — url in, PPMV out (scrape + catalogue fallback + tax calc).
+ * turnstileToken is only enforced by the backend for the mobile.de path, and
+ * only when TURNSTILE_SECRET_KEY is configured there. */
+export function calculateFromUrl(url: string, turnstileToken?: string | null): Promise<CalculateResponse> {
+  return post<CalculateResponse>("/calculate", { url, turnstile_token: turnstileToken ?? null });
 }
 
 /** POST /ppmv/calculate — specs in, tax breakdown out. Manual-entry path. */

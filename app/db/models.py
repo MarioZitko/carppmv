@@ -221,9 +221,11 @@ class ApifyEvent(Base):
     __tablename__ = "apify_events"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    ip_hash: Mapped[str] = mapped_column(String(64), index=True, default="")
     site: Mapped[str] = mapped_column(String(64))  # "mobile.de"
     listing_id: Mapped[str | None] = mapped_column(String(128), nullable=True)
     source: Mapped[str] = mapped_column(String(16))  # "cache" | "apify"
-    status: Mapped[str] = mapped_column(String(16))  # "success" | "failed" | "cap_reached"
+    # "success" | "failed" | "cap_reached" | "rate_limited" | "bot_rejected"
+    status: Mapped[str] = mapped_column(String(16))
     cost_usd: Mapped[float] = mapped_column(Float, default=0.0)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)

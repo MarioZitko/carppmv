@@ -14,7 +14,7 @@ import logging
 import re
 from datetime import date, datetime
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.calculate.schemas import CalculateRequest, CalculateResponse, ParsedFields
@@ -28,7 +28,8 @@ from app.scraping.engines import SITE_ENGINE_MAP
 from app.scraping.extractors.autobid_de import AutobidDeExtractor
 from app.scraping.extractors.autoscout24 import AutoScout24Extractor
 from app.scraping.extractors.njuskalo import NjuskaloExtractor
-from app.scraping.mobile_de_service import MOBILE_DE_SITE, ApifyBudgetExceeded, get_mobile_de_listing
+from app.scraping.mobile_de_guard import guarded_mobile_de_listing
+from app.scraping.mobile_de_service import MOBILE_DE_SITE, ApifyBudgetExceeded
 
 log = logging.getLogger(__name__)
 
@@ -118,6 +119,7 @@ def _to_candidate(row, score: float) -> CatalogueCandidate:
 @router.post("/calculate", response_model=CalculateResponse)
 async def calculate(
     body: CalculateRequest,
+    request: Request,
     session: AsyncSession = Depends(get_db_session),
 ) -> CalculateResponse:
     url = str(body.url)
@@ -127,7 +129,7 @@ async def calculate(
 
     if site == MOBILE_DE_SITE:
         try:
-            listing = await get_mobile_de_listing(url, session)
+            listing = await guarded_mobile_de_listing(url, session, request, body.turnstile_token)
         except ApifyBudgetExceeded:
             # Daily Apify budget exhausted — degrade gracefully instead of erroring.
             return CalculateResponse(

@@ -55,14 +55,14 @@ export default function Home() {
     setPriceAnchorToken((t) => t + 1);
   }
 
-  async function handleUrlSubmit(rawUrl: string) {
+  async function handleUrlSubmit(rawUrl: string, turnstileToken: string | null) {
     setUrlLoading(true);
     setUrlError(null);
     setUrlResult(null);
     setSearchResult(null);
     setSelectedCatalogueId(null);
     try {
-      const data = await calculateFromUrl(normalizeUrl(rawUrl));
+      const data = await calculateFromUrl(normalizeUrl(rawUrl), turnstileToken);
       setUrlResult(data);
 
       patchForm({
@@ -79,8 +79,12 @@ export default function Home() {
         setSelectedCatalogueId(data.candidates[0].catalogue_id);
       }
     } catch (err) {
-      if (err instanceof ApiError && err.status === 400) {
-        setUrlError("mobile.de trenutno nije podržan u ovom načinu — koristite pretragu baze vozila ili unesite podatke ručno.");
+      if (err instanceof ApiError && err.status === 429) {
+        setUrlError("Previše zahtjeva s ove adrese — pokušajte ponovno kasnije.");
+      } else if (err instanceof ApiError && err.status === 403) {
+        setUrlError("Provjera nije uspjela — pokušajte ponovno.");
+      } else if (err instanceof ApiError && err.status === 503) {
+        setUrlError("Dnevni limit automatskog dohvata je dostignut — unesite podatke ručno.");
       } else if (err instanceof ApiError) {
         setUrlError(err.message);
       } else {
