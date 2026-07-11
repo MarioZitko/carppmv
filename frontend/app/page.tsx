@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { UrlInputForm } from "@/components/UrlInputForm";
 import { CatalogueSearchForm } from "@/components/CatalogueSearchForm";
 import { CandidatesList } from "@/components/CandidatesList";
 import { VehicleForm } from "@/components/VehicleForm";
 import { PriceFineTune } from "@/components/PriceFineTune";
+import { MobilePriceBar } from "@/components/MobilePriceBar";
 import { PPMVBreakdownCard } from "@/components/PPMVBreakdownCard";
 import { CarVerticalCard } from "@/components/CarVerticalCard";
 import { ParsedFieldsCard } from "@/components/ParsedFieldsCard";
@@ -37,6 +38,9 @@ export default function Home() {
   const [ppmvLoading, setPpmvLoading] = useState(false);
   const [ppmvApiError, setPpmvApiError] = useState<string | null>(null);
 
+  const candidatesRef = useRef<HTMLDivElement>(null);
+  const pricePanelRef = useRef<HTMLDivElement>(null);
+
   const validationOutcome = buildPpmvRequest(form);
   const validationError = typeof validationOutcome === "string" ? validationOutcome : null;
   const ppmvHint = validationError ?? ppmvApiError;
@@ -53,6 +57,10 @@ export default function Home() {
       fuelType: candidate.fuel_type === "diesel" || candidate.fuel_type === "petrol" ? candidate.fuel_type : form.fuelType,
     });
     setPriceAnchorToken((t) => t + 1);
+    // Picking a candidate is the last step before the price/PPMV becomes
+    // meaningful, so jump straight to it instead of leaving the user to
+    // scroll past the rest of the form.
+    pricePanelRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
   async function handleUrlSubmit(rawUrl: string, turnstileToken: string | null) {
@@ -101,6 +109,18 @@ export default function Home() {
     setSelectedCatalogueId(null);
   }
 
+  // Once a listing has been parsed, guide the user down the page: first to
+  // the candidate picker so they can confirm/correct the catalogue match, or
+  // straight to the price panel if there's nothing to pick.
+  useEffect(() => {
+    if (!urlResult) return;
+    const target = urlResult.candidates.length > 0 ? candidatesRef.current : pricePanelRef.current;
+    const frame = requestAnimationFrame(() => {
+      target?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [urlResult]);
+
   // Live recalculation — every change to the vehicle form debounces into a
   // fresh PPMV calculation, so the price fine-tune sidebar and candidate
   // picker both feel instant without needing an explicit "submit".
@@ -128,7 +148,7 @@ export default function Home() {
   const showCandidates = candidates.length > 0;
 
   return (
-    <div className="mx-auto max-w-6xl px-4 sm:px-6 py-6 sm:py-8">
+    <div className="mx-auto max-w-6xl px-4 sm:px-6 py-6 sm:py-8 pb-20 lg:pb-8">
       <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-[var(--text)] mb-1">
         Izračun PPMV-a
       </h1>
@@ -179,17 +199,19 @@ export default function Home() {
           {urlResult && <ParsedFieldsCard parsed={urlResult.parsed} warnings={urlResult.warnings} />}
 
           {showCandidates && (
-            <CandidatesList
-              candidates={candidates}
-              selectedCatalogueId={selectedCatalogueId}
-              onSelect={applyCandidate}
-            />
+            <div ref={candidatesRef} className="scroll-mt-20">
+              <CandidatesList
+                candidates={candidates}
+                selectedCatalogueId={selectedCatalogueId}
+                onSelect={applyCandidate}
+              />
+            </div>
           )}
 
           <VehicleForm values={form} onChange={patchForm} />
         </div>
 
-        <div className="lg:sticky lg:top-24 space-y-4">
+        <div id="price-panel" ref={pricePanelRef} className="lg:sticky lg:top-24 space-y-4 scroll-mt-20">
           <PriceFineTune
             priceEur={Number(form.priceEur) || 0}
             onChange={(price) => patchForm({ priceEur: String(price) })}
@@ -208,6 +230,8 @@ export default function Home() {
           )}
         </div>
       </div>
+
+      <MobilePriceBar result={ppmvResult} updating={ppmvLoading} hint={ppmvHint} />
     </div>
   );
 }

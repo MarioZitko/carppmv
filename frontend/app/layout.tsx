@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Image from "next/image";
 import Link from "next/link";
 import "./globals.css";
 
@@ -19,9 +20,14 @@ export default function RootLayout({
 				<header className="sticky top-0 z-10 border-b border-[var(--border)] bg-white/80 backdrop-blur-sm">
 					<div className="mx-auto max-w-6xl px-6 py-4 flex items-center justify-between">
 						<Link href="/" className="flex items-center gap-2.5 text-lg">
-							<span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--primary)] text-white text-sm font-bold">
-								€
-							</span>
+							<Image
+								src="/logo.svg"
+								alt="carPPMV logo"
+								width={32}
+								height={32}
+								className="h-8 w-8 rounded-lg"
+								priority
+							/>
 							<span>
 								<span className="font-semibold text-[var(--text)]">
 									carPPMV
