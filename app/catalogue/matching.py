@@ -181,6 +181,30 @@ def _strip_diacritics(text: str) -> str:
 # just discard a real identifier.
 _DIGIT_LETTER_BOUNDARY = re.compile(r"(?<=[0-9])(?=[a-zA-Z]{2,})")
 
+# Splits BMW's drivetrain badge from a *following* fused engine badge
+# ("xDrive20d" -> "xDrive 20d", "sDrive18i" -> "sDrive 18i"). Sites commonly
+# write the two badges with no separator, and the catalogue itself is
+# inconsistent about it (confirmed in the DB: "X1 sDrive23d" fused alongside
+# "X3 sDrive 18d" spaced, same drivetrain, same source), so without this a
+# fused query is one opaque token that shares nothing with a spaced
+# catalogue row and can drop below CANDIDATE_FLOOR entirely even though
+# every other field matches.
+#
+# Deliberately an allowlist of the specific known drivetrain words rather
+# than a generic "2+ letters then digit" rule: a generic rule also fires on
+# unrelated fused codes elsewhere in the catalogue (gearbox speed counts
+# like "DSG7"/"EAT6"/"MT6", factory chassis codes like "0JZ68MXK1") and,
+# worse, can make an unrelated digit collide with one already emitted by the
+# split and get silently dropped by build_match_key's dedup — regressing
+# non-BMW brands to fix a BMW-only problem. Keep this list narrow; extend
+# only with badges confirmed to appear fused this way.
+#
+# Uses a negative lookbehind for a letter rather than \b: the catalogue's raw
+# variant text separates fields with underscores ("BMW_X6_xDrive40i_SAV_..."),
+# and \b does not treat "_" as a boundary (it's a \w character), so \b would
+# silently miss badges embedded mid-string like that one.
+_FUSED_DRIVETRAIN_BADGE_RE = re.compile(r"(?<![a-z])(xdrive|sdrive)(?=\d)")
+
 
 def normalize_text(text: str | None) -> str:
     """Lowercase, strip diacritics, split digit+trim-code runs apart, replace
@@ -202,6 +226,7 @@ def normalize_text(text: str | None) -> str:
         return ""
     lowered = _strip_diacritics(text.lower())
     spaced = _DIGIT_LETTER_BOUNDARY.sub(" ", lowered)
+    spaced = _FUSED_DRIVETRAIN_BADGE_RE.sub(r"\1 ", spaced)
     cleaned = "".join(ch if ch.isalnum() else " " for ch in spaced)
     tokens = (_TOKEN_SYNONYMS.get(tok, tok) for tok in cleaned.split())
     return " ".join(tokens)

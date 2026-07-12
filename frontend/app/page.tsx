@@ -120,11 +120,24 @@ export default function Home() {
 		setPriceAnchorToken((t) => t + 1);
 		// Picking a candidate is the last step before the price/PPMV becomes
 		// meaningful, so jump straight to it instead of leaving the user to
-		// scroll past the rest of the form.
-		pricePanelRef.current?.scrollIntoView({
-			behavior: "smooth",
-			block: "start",
-		});
+		// scroll past the rest of the form — but only when it isn't already on
+		// screen. On desktop the price panel is a `lg:sticky` sidebar that's
+		// pinned near the top of the viewport as soon as you've scrolled past
+		// it once; calling scrollIntoView unconditionally there is actively
+		// harmful, not a no-op — confirmed in testing that a sticky element's
+		// scrollIntoView target is computed from its unstuck in-flow position,
+		// not its current stuck position, so it yanks the whole page back up
+		// to roughly where the panel would sit if it weren't sticky. On mobile
+		// (not sticky, stacked below the form) it's genuinely off-screen and
+		// still needs the scroll.
+		const panel = pricePanelRef.current;
+		if (panel) {
+			const rect = panel.getBoundingClientRect();
+			const alreadyVisible = rect.top < window.innerHeight && rect.bottom > 0;
+			if (!alreadyVisible) {
+				panel.scrollIntoView({ behavior: "smooth", block: "start" });
+			}
+		}
 	}
 
 	async function handleUrlSubmit(
