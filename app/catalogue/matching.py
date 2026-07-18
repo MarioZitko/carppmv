@@ -432,12 +432,27 @@ def _score_one(
 ) -> float:
     base = float(fuzz.token_set_ratio(query_key, cand.match_key))
 
-    if query_model and cand.model:
-        model_score = fuzz.token_set_ratio(normalize_text(query_model), normalize_text(cand.model))
+    if query_model and (cand.model or cand.variant):
+        # A listing's stated "model" is usually the trim/badge text (a site says
+        # "320d", not "3 Series"), and for most brands cand.model already IS
+        # that short identifier, so scoring query_model against it alone is
+        # enough. BMW/MINI are the exception: cand.model holds the recovered
+        # series name (e.g. "Serija 3 (F30)", see canonical_schema's banner-row
+        # / iteration-3 legacy-.xls series recovery), and a query like "320d"
+        # scores low against that even though the row is a perfect match — the
+        # real trim text lives in cand.variant instead. Scoring against both and
+        # taking the best avoids re-penalising exactly the rows iteration 2/3
+        # fixed, while staying safe for every other brand: a genuinely
+        # wrong-model candidate's variant text (spec/trim detail) doesn't carry
+        # the other model's letter/number either, so the guard still fires.
+        model_score = fuzz.token_set_ratio(normalize_text(query_model), normalize_text(cand.model)) if cand.model else 0.0
+        variant_score = fuzz.token_set_ratio(normalize_text(query_model), normalize_text(cand.variant)) if cand.variant else 0.0
+        combined_score = max(model_score, variant_score)
+
         q_digits = _leading_digits(query_model)
-        c_digits = _leading_digits(cand.model)
+        c_digits = _leading_digits(cand.model) or _leading_digits(cand.variant)
         digits_mismatch = q_digits is not None and c_digits is not None and q_digits != c_digits
-        if model_score < MODEL_MATCH_THRESHOLD or digits_mismatch:
+        if combined_score < MODEL_MATCH_THRESHOLD or digits_mismatch:
             base = max(0.0, base - MODEL_MISMATCH_PENALTY)
 
     # Positive (bonus) and negative (penalty) adjustments are kept apart on

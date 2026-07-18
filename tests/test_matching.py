@@ -342,6 +342,27 @@ def test_distinctive_body_demoted_below_plain_sibling_at_saturation():
     assert result.candidates[0].score > result.candidates[1].score
 
 
+def test_bmw_series_name_model_does_not_penalise_trim_query():
+    # Regression: BMW/MINI catalogue rows store the recovered series name in
+    # `model` ("Serija 3 (F30)"), not the trim (see canonical_schema's banner
+    # / legacy-.xls series recovery). A listing or manual search stating just
+    # the trim ("320d") must still score this row highly — the model-mismatch
+    # guard has to fall back to `variant` (which holds the trim) rather than
+    # penalising every BMW/MINI row for not looking like its own model field.
+    query = build_match_key("BMW", "320d", "")
+    rows = [
+        _cand(brand="BMW", model="Serija 3 (F30)", variant="320d",
+              price_eur=25000.0, fuel="diesel", power_kw=140.0, catalogue_id=1),
+        _cand(brand="BMW", model="Serija 5 (G30)", variant="520d",
+              price_eur=35000.0, fuel="diesel", power_kw=140.0, catalogue_id=2),
+    ]
+    result = rank_candidates(query, rows, listing_power_kw=140.0, query_model="320d", query_fuel="diesel")
+    assert result.candidates[0].row.catalogue_id == 1
+    assert result.candidates[0].score >= ACCEPT_SCORE
+    # The wrong series (520d) must still be penalised via variant's leading digits.
+    assert result.candidates[0].score - result.candidates[1].score >= 20.0
+
+
 def test_distinctive_drivetrain_demoted_below_plain_sibling_at_saturation():
     # A drivetrain-silent "A4 40 TDI" listing (autobid.de title-only variant,
     # no "Version"/"Ausstattung" field) must rank the plain-FWD row above the
