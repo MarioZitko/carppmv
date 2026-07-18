@@ -285,6 +285,26 @@ def _clean_series_text(text: str) -> str:
     return cleaned or text.strip()
 
 
+def _strip_leading_brand(text: str, brand_text: str | None) -> str:
+    """Strip a redundant leading brand-name token from banner series text.
+    Confirmed against real files: some source sheets bake the brand into the
+    banner cell ('BMW serije i3', 'BMW  serija X1 SAV (F48)'), others don't
+    ('Serija 1 (F20)') — inconsistent even within the same brand. Every
+    downstream consumer of the resulting model text (ingest.py's `model`
+    field, the frontend's `{brand} {model}` display) already prefixes the
+    brand itself, so a source-side repeat would otherwise show up as a
+    visible 'BMW BMW serije 3' duplicate. brand_text is already the sheet's
+    lowercased typical brand-cell text (see _typical_brand_cell_text), so a
+    straight lowercase-prefix check is enough — no need to re-derive it."""
+    if not brand_text:
+        return text
+    stripped = text.strip()
+    if stripped.lower().startswith(brand_text):
+        rest = stripped[len(brand_text):].lstrip()
+        return rest or stripped
+    return stripped
+
+
 def _is_numeric_like(value: object) -> bool:
     """True for a number or a purely numeric string — mirrors ingest.py's
     _looks_numeric (duplicated rather than imported: canonical_schema is the
@@ -330,30 +350,38 @@ def _detect_series_banner(
     model series name (e.g. 'BMW serije 1 (F40)', 'MINI CLUBMAN(F54)')
     between blocks of trim rows, with every other cell in the row blank —
     confirmed against real BMW/MINI files, always sitting in the brand
-    column. Requires ALL of: exactly one populated cell in the whole row;
-    that cell is the mapped brand column (not any arbitrary column — a
-    stray junk cell elsewhere isn't a banner); its text isn't purely
-    numeric (excludes the stray-conversion-rate junk shape this module
-    already handles); and its text differs from the sheet's normal brand
-    string (excludes an ordinary malformed row that merely repeats the
-    plain brand, e.g. a lone 'VW' with everything else blank — that's junk,
-    not a banner, and must NOT get forward-filled as a fake series). No
-    brand_col_idx (sheet has no brand column mapped) always returns None —
-    conservative default, since banner text has nowhere reliable to live."""
+    column. Requires ALL of: exactly one populated NON-NUMERIC cell in the
+    whole row; that cell is the mapped brand column (not any arbitrary
+    column — a stray junk cell elsewhere isn't a banner); and its text
+    differs from the sheet's normal brand string (excludes an ordinary
+    malformed row that merely repeats the plain brand, e.g. a lone 'VW'
+    with everything else blank — that's junk, not a banner, and must NOT
+    get forward-filled as a fake series). No brand_col_idx (sheet has no
+    brand column mapped) always returns None — conservative default, since
+    banner text has nowhere reliable to live.
+
+    Numeric cells elsewhere in the row are ignored rather than disqualifying
+    the row: confirmed against a real file (bmw-mini/2018), some vertically-
+    merged source columns (e.g. BROJ SJEDALA) leak their value into every row
+    of a block, including banner rows, via openpyxl's read of the merge — a
+    real banner row would otherwise be silently rejected (falling back to
+    the PREVIOUS series and forward-filling it onto the wrong section, e.g.
+    an X1 SAV block inheriting the prior '7 Series' banner). A genuine data
+    row always has more than one non-numeric cell (model name text, at
+    least), so this stays conservative — it can't newly misread a real data
+    row as a banner."""
     if brand_col_idx is None or typical_brand_text is None:
         return None
-    populated = [(j, c) for j, c in enumerate(row) if not _is_blank(c)]
-    if len(populated) != 1:
+    text_cells = [(j, c) for j, c in enumerate(row) if not _is_blank(c) and not _is_numeric_like(c)]
+    if len(text_cells) != 1:
         return None
-    idx, value = populated[0]
+    idx, value = text_cells[0]
     if idx != brand_col_idx:
-        return None
-    if _is_numeric_like(value):
         return None
     text = _to_str(value)
     if not text or text.strip().lower() == typical_brand_text:
         return None
-    return _clean_series_text(text)
+    return _strip_leading_brand(_clean_series_text(text), typical_brand_text)
 
 
 def _to_bool(value: object) -> bool:

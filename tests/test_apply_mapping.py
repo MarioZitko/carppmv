@@ -238,7 +238,10 @@ def test_bmw_section_header_filtered():
 
 def test_bmw_section_header_recovered_as_series_name():
     # The banner's series text is stripped of its trailing chassis code and
-    # carried forward onto every row until the next banner.
+    # its redundant leading brand token (downstream consumers, e.g. the
+    # frontend, already prefix the brand themselves — a source-side repeat
+    # would otherwise show up as "BMW BMW serije 1"), then carried forward
+    # onto every row until the next banner.
     rows = [
         ("BMW serije 1 (F40)", None, None, None, None, None, None),
         _bmw("BMW", "116d", "diesel", 43000.0, date(2020, 2, 17), 108.0, 110.0),
@@ -246,9 +249,9 @@ def test_bmw_section_header_recovered_as_series_name():
     ]
     result = apply_mapping(rows, BMW_HEADER, BMW_MAPPING, "bmw.xlsx", "Cjenik")
     assert len(result) == 2
-    assert result[0].series_name == "BMW serije 1"
+    assert result[0].series_name == "serije 1"
     assert result[0].model_name == "116d"
-    assert result[1].series_name == "BMW serije 1"
+    assert result[1].series_name == "serije 1"
 
 
 def test_no_section_header_leaves_series_name_none():
@@ -311,6 +314,29 @@ def test_bmw_power_boost_suffix_yields_mild_hybrid():
     assert r.co2_g_km == 81.0
 
 
+def test_bmw_banner_with_merged_cell_numeric_bleed_still_detected():
+    # Regression: confirmed against a real file (bmw-mini/2018/BMW 2018
+    # 1201.xlsx) — a vertically-merged source column (BROJ SJEDALA) leaks its
+    # numeric value into every row of a block, including banner rows. A
+    # banner row with that stray numeric cell must still be recognized as a
+    # banner (not silently rejected, which would forward-fill the PREVIOUS
+    # series onto the wrong section — e.g. an X1 SAV block inheriting the
+    # prior "7 Series" banner in production).
+    rows = [
+        ("BMW serije 3 (G20)", None, None, None, None, None, None),
+        _bmw("BMW", "BMW 318d", "diesel", 50000.0, date(2020, 2, 17), 116.0, 110.0),
+        ("BMW serije X1", None, None, None, None, None, 6),  # banner + stray numeric cell
+        _bmw("BMW", "X1 sDrive18d", "diesel", 45000.0, date(2020, 2, 17), 120.0, 110.0),
+    ]
+    skip_log: list[tuple[int, str]] = []
+    result = apply_mapping(rows, BMW_HEADER, BMW_MAPPING, "bmw.xlsx", "Cjenik", skip_log=skip_log)
+    assert len(result) == 2
+    assert len([r for _, r in skip_log if r == "series_banner"]) == 2
+    assert result[0].series_name == "serije 3"
+    assert result[1].series_name == "serije X1"
+    assert result[1].model_name == "X1 sDrive18d"
+
+
 def test_bmw_multiple_section_headers():
     rows = [
         ("BMW serije 1 (F40)", None, None, None, None, None, None),
@@ -323,9 +349,9 @@ def test_bmw_multiple_section_headers():
     assert len(result) == 2
     assert len([r for _, r in skip_log if r == "series_banner"]) == 2
     assert not any(r == "junk_row" for _, r in skip_log)
-    assert result[0].series_name == "BMW serije 1"
+    assert result[0].series_name == "serije 1"
     assert result[0].model_name == "BMW 118d"
-    assert result[1].series_name == "BMW serije 3"
+    assert result[1].series_name == "serije 3"
     assert result[1].model_name == "BMW 318d"
 
 
@@ -554,7 +580,9 @@ def test_series_name_wins_as_catalogue_model():
     assert len(canonical_rows) == 2
     d = _to_catalogue_dict(canonical_rows[0], _co2_standard_from_year(2020), allowed_brands=("BMW",))
     assert d is not None
-    assert d["model"] == "BMW serije 1"
+    # No redundant "BMW" prefix — the frontend/ingest layer already prefixes
+    # the brand itself when displaying/building the catalogue row.
+    assert d["model"] == "serije 1"
     assert d["variant"] == "116d"  # full_name/type_code absent here, so variant still falls back to the trim
 
 

@@ -554,3 +554,109 @@ the live DB:
   brands, no other brand's row count changed from this session's baseline.
 
 Next up per the suggested order: **10.3 (Mazda)**.
+
+## 11. Production regression from iteration 3 (found + fixed same day, 2026-07-18)
+
+10.1's fix was deployed (code push + `pg_dump`/restore to the VPS) and
+immediately broke the live "Pretraži bazu vozila" (search-the-database) UI
+for BMW/MINI: searching brand=BMW, model="320" returned "Nema podudaranja"
+(no match) for a listing that obviously exists in the catalogue. Two
+distinct bugs, found by actually using the deployed feature rather than
+just checking the DB — a reminder that a DB-level verification (§6/§10.1's
+SQL checks) doesn't exercise the matching/scoring code path at all.
+
+### 11.1 matching.py: model-mismatch guard never accounted for series-name models
+**Root cause**: iteration 2/3 moved the recovered series name into
+`catalogue.model` for BMW/MINI, leaving the trim in `variant`. But
+`app/catalogue/matching.py::_score_one`'s model-mismatch guard (existing,
+pre-dates this work — see its `MODEL_MATCH_THRESHOLD`/`MODEL_MISMATCH_PENALTY`
+comment block) only ever compared the query's stated model (what a scraped
+listing or a manual search states, e.g. "320d" — always trim-level text for
+every brand) against `cand.model`. For every other brand `cand.model` IS
+that short trim/model identifier already (confirmed: VW "PASSAT", Audi "A6
+Limousine", Mercedes "A 200 d"), so the guard's assumption held everywhere
+except BMW/MINI post-fix, where `cand.model` is now a series name ("Serija
+3 (F30)") that scores ~27 against a "320" query — triggering the -40
+mismatch penalty and dropping every real BMW/MINI candidate below
+`CANDIDATE_FLOOR`. This affected BOTH the manual search AND the primary
+`/calculate` scraped-listing flow (same `find_match`/`rank_candidates` code
+path, `query_model=listing.model`) — i.e. every BMW/MINI listing lookup in
+production, not just the search form.
+
+**Fix**: `_score_one` now scores `query_model` against whichever of
+`cand.model`/`cand.variant` matches better (and takes the leading-digit
+badge from whichever has one), instead of `cand.model` alone. Safe for
+every other brand — a genuinely wrong-model candidate's variant/spec text
+doesn't carry the other model's letter/number either, so the guard still
+fires correctly (verified: all pre-existing tests, including the A4-vs-Q3
+saturation-tie tests, still pass unchanged). Added
+`test_bmw_series_name_model_does_not_penalise_trim_query` to
+`tests/test_matching.py` covering the exact regression (a bare "320d" query
+must beat a "520d" candidate row despite both having non-trim `model` text).
+
+### 11.2 canonical_schema.py: two banner-detection bugs, found while root-causing 11.1's fix
+While spot-checking real search results after deploying 11.1's fix, found
+that some BMW rows' `model` was carrying an entirely WRONG series (e.g. an
+`X1 SAV` row tagged `"BMW serija 7 (G11, G12)"`, a plain sedan `320i` row
+tagged `"BMW serija 2 Gran Coupe"`). Root-caused via the real source file
+(`bmw-mini/2018/BMW 2018 1201.xlsx`): `_detect_series_banner`
+(`canonical_schema.py`) required the banner row to have **exactly one**
+populated cell in the whole row. Some source sheets have a vertically-merged
+column (`BROJ SJEDALA`, seat count) whose value leaks into every row of a
+block via openpyxl's read of the merge — including banner rows — giving the
+banner row 2 populated cells instead of 1. The strict check then silently
+rejected the real banner, and `current_series` kept carrying forward the
+PREVIOUS section's (wrong) series name onto the whole next block (e.g. X1
+SAV rows inheriting whatever series came right before them in that file).
+This is a pre-existing iteration-2 bug, not something introduced by 10.1 —
+it was invisible to iteration 2's validation because every affected row
+still had *a* series-shaped string (`model ILIKE '%serij%'`), just the
+*wrong* one, so it silently passed the "is this row series-named" check
+without anyone verifying it was the *correct* series.
+
+**Fix**: `_detect_series_banner` now only counts populated *non-numeric*
+cells toward the "exactly one" requirement — a real data row always has
+more than one non-numeric cell (model name text, at minimum), so this can't
+newly misread a genuine data row as a banner; it only rescues a real banner
+row from being disqualified by numeric merge-cell noise.
+
+Also found in the same file: some sheets bake the brand name into the
+banner cell itself (`"BMW serije i3"`, `"BMW  serija X1 SAV (F48)"`), others
+don't (`"Serija 1 (F20)"`) — inconsistent even within BMW. Since both
+`ingest.py`'s `model` field and the frontend's `{brand} {model}` display
+already prefix the brand themselves, the inconsistency showed up as a
+visible `"BMW BMW serije 3 Touring"` duplicate in the search UI. Added
+`_strip_leading_brand` (`canonical_schema.py`) to strip a redundant leading
+brand token from banner text before it becomes `series_name`.
+
+Added `test_bmw_banner_with_merged_cell_numeric_bleed_still_detected` to
+`tests/test_apply_mapping.py`, and updated the 3 existing banner tests whose
+assertions still expected the old brand-duplicated text.
+
+### Verified impact (local `--fresh` rebuild + diff against the pre-11.2 DB dump)
+Restored the pre-11.2 catalogue dump into a scratch Postgres container
+(`docker run ... postgres:16-alpine` on a spare port) to diff row-for-row
+against the fixed rebuild, rather than trusting aggregate counts alone.
+BMW/MINI row counts dropped (BMW 4,870→4,796, MINI 620→587) — confirmed
+this is correct deduplication, NOT data loss: several real vehicles were
+previously appearing as 2-3 near-duplicate DB rows (same variant/price/date)
+purely because different source files' banner text resolved to different —
+often wrong — series names before this fix (e.g. the `216d Active Tourer`
+example traced to 3 rows: one bare trim, one wrongly `"serije 1"`, one
+correctly `"serije 2 Active Tourer"`; all 3 now correctly collapse to the
+one true row). Spot-checked several of the ~110 collapsed
+(variant, valid_from, price) combos — every one followed this same
+"multiple wrong/inconsistent series names for the same real car" pattern,
+never a case of two genuinely different cars colliding. BMW is now
+**100% series-named** (4,796/4,796, up from 99.6%/4,850 pre-11.2). Every
+other brand's row count is byte-identical to the pre-11.2 baseline (banner
+detection only runs for BMW/MINI's header family).
+
+### Deploy status
+Code (both `matching.py` and `canonical_schema.py` fixes) committed
+locally; not yet pushed. Since 11.2 changes ingested DATA (not just search
+scoring like 11.1), shipping this to the VPS needs BOTH a code deploy (git
+push → autodeploy, or manual `docker compose up -d --build`) AND a fresh
+`pg_dump`/restore of the `catalogue` table (same procedure as 10.1's
+deploy) — a code-only deploy would fix the search-scoring bug (11.1) but
+leave the wrong-series data (11.2) live until the DB is re-synced.
