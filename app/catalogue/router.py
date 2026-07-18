@@ -8,6 +8,7 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy import distinct, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.catalogue.display import format_variant_display
 from app.catalogue.matching import MAX_CANDIDATES, find_match
 from app.catalogue.schemas import CatalogueCandidate, CatalogueSearchResponse
 from app.db.models import Catalogue
@@ -84,7 +85,7 @@ async def search_catalogue(
             catalogue_id=row.catalogue_id,
             brand=row.brand,
             model=row.model,
-            variant=row.variant,
+            variant=format_variant_display(row.brand, row.variant),
             price_eur=row.price_eur,
             co2_g_km=row.co2_g_km,
             co2_standard=row.co2_standard,

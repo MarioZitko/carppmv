@@ -119,6 +119,16 @@ def _to_catalogue_dict(
     # as the model itself. Sheets with no banner rows (Audi, etc.) always
     # have series_name None here, so this is a no-op for them.
     model = row.series_name or row.model_name or row.type_code or "unknown"
+    # variant keeps the full_name (KOMPLETNO IME) even for BMW/MINI's ugly
+    # underscore spec blob. It reads poorly in the UI, but its door/transmission/
+    # displacement tokens are load-bearing: they are the ONLY thing separating
+    # several same-badge, same-date BMW rows that carry genuinely different
+    # prices (e.g. a 3-door vs 5-door 116d, or a manual vs automatic 320d).
+    # Collapsing variant to the bare badge merged 740 such price-distinct groups
+    # (~14k rows) into one arbitrary price — silent price corruption. The
+    # listing-match problem those tokens caused is solved on the query side
+    # instead (see matching._strip_bmw_mini_query_noise): a cleaned query is a
+    # subset of this blob and still scores 100, so nothing here needs to change.
     variant = row.full_name or row.type_code or row.model_name or "unknown"
 
     # Snap the row's brand to the canonical spelling allowed for this file's

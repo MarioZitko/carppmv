@@ -20,6 +20,7 @@ from app.catalogue.matching import (
     _derive_fuel_family,
     _gearbox_class,
     _resolve_query_fuel,
+    _strip_bmw_mini_query_noise,
     build_match_key,
     normalize_text,
     rank_candidates,
@@ -388,3 +389,58 @@ def test_distinctive_drivetrain_demoted_below_plain_sibling_at_saturation():
 def test_accept_score_is_high_bar():
     # Guard against an accidental loosening of the auto-accept threshold.
     assert ACCEPT_SCORE >= 85.0
+
+
+# ---------------------------------------------------------------------------
+# BMW/MINI query-noise stripping (equipment-line / gearbox-brand words that
+# never appear in the BMW/MINI catalogue and only sink the score)
+# ---------------------------------------------------------------------------
+
+def test_strip_bmw_mini_query_noise_keeps_badge_body_and_real_trims():
+    # Catalogue-absent marketing words drop; badge + body (normalized to
+    # "wagon") + drivetrain stay.
+    q = build_match_key("BMW", "320e", "BMW 320e Touring Advantage Steptronic Pro")
+    assert _strip_bmw_mini_query_noise(q) == "bmw 320e wagon"
+    q2 = build_match_key("BMW", "118i", "118i Sportpaket Automatic")
+    assert _strip_bmw_mini_query_noise(q2) == "bmw 118i"
+    # "sport"/"line"/standalone "m" are REAL legacy priced trims — must be kept.
+    q3 = build_match_key("BMW", "318d", "318d Shadow Sport M Line")
+    assert _strip_bmw_mini_query_noise(q3) == "bmw 318d shadow sport m line"
+
+
+def test_strip_bmw_mini_query_noise_never_empties():
+    # If somehow every token is noise, keep the original rather than returning "".
+    assert _strip_bmw_mini_query_noise("advantage steptronic pro") == "advantage steptronic pro"
+
+
+def test_bmw_marketing_title_matches_lean_catalogue_after_strip():
+    # The reported bug: a "118i Steptronic Advantage" listing found nothing,
+    # because "steptronic"/"advantage" (absent from every BMW row) dragged the
+    # score below the floor. Against the lean post-ingest key it must auto-match.
+    lean = _cand(model="serije 1", variant="118i", fuel="petrol", power_kw=100.0,
+                 co2=129.0, price_eur=30000.0)
+    noisy = build_match_key("BMW", "118I", "BMW 118i Steptronic Advantage")
+    # Without stripping, the noise holds the score below the auto-accept bar
+    # (in production, against the old spec-bloated key, it fell under the floor
+    # entirely — "found nothing"; here the point is simply: no auto-match).
+    unstripped = rank_candidates(noisy, [lean], listing_power_kw=100.0, query_model="118I")
+    assert unstripped.status != MatchStatus.AUTO_MATCHED
+    assert unstripped.candidates[0].score < ACCEPT_SCORE
+    # With stripping (what find_match does for BMW/MINI), it auto-matches.
+    stripped = _strip_bmw_mini_query_noise(noisy)
+    result = rank_candidates(stripped, [lean], listing_power_kw=100.0, query_model="118I")
+    assert result.status == MatchStatus.AUTO_MATCHED
+    assert result.matched.variant == "118i"
+
+
+def test_bmw_touring_query_prefers_wagon_over_cheaper_sedan():
+    # Stripping must not flatten the body distinction: a "320i Touring" listing
+    # picks the wagon, not the cheaper sedan that shares the badge.
+    wagon = _cand(model="serije 3 Touring (G21) LCI", variant="320i", fuel="petrol",
+                  power_kw=135.0, co2=137.0, price_eur=48875.0, catalogue_id=1)
+    sedan = _cand(model="serije 3 Limuzina (G20) LCI", variant="320i", fuel="petrol",
+                  power_kw=135.0, co2=143.0, price_eur=47500.0, catalogue_id=2)
+    q = _strip_bmw_mini_query_noise(build_match_key("BMW", "320I", "BMW 320i Touring Advantage"))
+    result = rank_candidates(q, [wagon, sedan], listing_power_kw=135.0,
+                             query_model="320I", query_fuel="petrol", year=2020)
+    assert result.candidates[0].row.catalogue_id == 1  # wagon wins

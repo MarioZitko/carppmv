@@ -640,6 +640,44 @@ def _correct_variant_kw_suffix(variant: str | None, power_kw: float | None) -> s
     return variant[: match.start(1)] + str(round(power_kw)) + variant[match.end(1):]
 
 
+# BMW/MINI listing titles carry marketing words — "Advantage", "M Sportpaket",
+# "Steptronic", "Automatic", "Pro" — that never appear in a BMW/MINI catalogue
+# key. Those words match nothing on the catalogue side and only sink
+# token_set_ratio: an "advantage"/"steptronic" the candidate can never contain
+# caps the score below the accept/floor thresholds and makes a real listing look
+# like a weak or no match. Stripping them from the QUERY (not the scoring math)
+# restores it — a cleaned query is a subset of the catalogue's own spec blob and
+# scores 100.
+#
+# This set is deliberately limited to words CONFIRMED absent from every BMW/MINI
+# catalogue key (verified against the live table). That guarantee is what keeps
+# it safe: removing a token no candidate has can never drop a real match. The
+# tempting broader words are NOT here on purpose —
+#   * "sport", "line", "luxury", "urban", "edition", standalone "m": these ARE
+#     distinct priced trims in the legacy 2013-2017 rows ("318d 3UMPH Sport"
+#     37.5k vs "318d 3UMPH Luxury" 39.5k, "116d Shadow M"), so stripping them
+#     could weaken those matches / blur a real price difference;
+#   * "automatski": the Croatian transmission word the catalogue actually uses
+#     (listings say the international "Steptronic"/"Automatic" instead), so it's
+#     a legitimate matching token, not noise.
+# Scoped to BMW/MINI: for other brands the trim line is itself a distinct
+# priced/CO2 row (Audi "S line" vs "Select"), so their query must keep it.
+_BMW_MINI_QUERY_NOISE = frozenset({
+    "advantage", "sportpaket", "sportpaketa", "sportline",
+    "steptronic", "automatic", "automatik",
+    "paket", "packet", "package", "pro", "modern", "individual",
+})
+
+
+def _strip_bmw_mini_query_noise(query_key: str) -> str:
+    """Drop catalogue-absent BMW/MINI marketing tokens from a normalized query
+    key, keeping badge/body/drivetrain. Falls back to the original key if every
+    token is noise (never happens with a real badge present, but keeps the
+    function total)."""
+    kept = [t for t in query_key.split() if t not in _BMW_MINI_QUERY_NOISE]
+    return " ".join(kept) if kept else query_key
+
+
 def _to_candidate(row: Catalogue) -> CandidateRow:
     return CandidateRow(
         catalogue_id=row.id,
@@ -685,6 +723,8 @@ async def find_match(
     # is ingested against, so the two sides are guaranteed comparable.
     brand = canonical_brand(brand) or brand
     query_key = build_match_key(brand, model, variant)
+    if brand.strip().lower() in ("bmw", "mini"):
+        query_key = _strip_bmw_mini_query_noise(query_key)
 
     stmt = select(Catalogue).where(func.lower(Catalogue.brand) == brand.strip().lower())
     rows = (await session.execute(stmt)).scalars().all()

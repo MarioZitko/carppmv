@@ -597,6 +597,49 @@ def test_no_series_name_keeps_model_name_as_model():
     assert d["model"] == "Golf TDI"
 
 
+# BMW/MINI banner rows keep the KOMPLETNO IME full_name as variant even though
+# it is an ugly spec blob: its door/transmission/displacement tokens are the
+# ONLY separator between same-badge, same-date rows with different prices, so
+# collapsing variant to the bare badge would silently merge those distinct
+# prices. (The listing-match problem that blob causes is solved on the query
+# side, in test_matching's _strip_bmw_mini_query_noise cases, not here.)
+_BMW_FULLNAME_HEADER = [
+    "MARKA", "TRGOVAČKI NAZIV", "KOMPLETNO IME", "GORIVO",
+    "OSNOVNA CIJENA (EUR)", "VRIJEDI OD", "CO2 (g/km)", "kW",
+]
+_BMW_FULLNAME_MAPPING = _mapping(
+    model_name_column="TRGOVAČKI NAZIV",
+    full_name_column="KOMPLETNO IME",
+    price_column="OSNOVNA CIJENA (EUR)",
+    valid_from_column="VRIJEDI OD",
+    co2_column="CO2 (g/km)",
+    power_kw_column="kW",
+)
+
+
+def test_bmw_banner_variant_keeps_price_distinguishing_fullname():
+    from app.data.catalogues.ingest import _to_catalogue_dict, _co2_standard_from_year
+
+    # Two 116d rows, same series + badge + date, but different body (3- vs
+    # 5-door) and different price. The door token in full_name must survive into
+    # variant/match_key so the two do NOT collapse to one arbitrary price.
+    threedoor = "BMW 116d_rucni_6stupnjevaprijenosa_3vrata_diesel_1496ccm_85kW"
+    fivedoor = "BMW 116d_rucni_6stupnjevaprijenosa_5vrata_diesel_1496ccm_85kW"
+    rows = [
+        ("BMW serije 1 (F20)", None, None, None, None, None, None, None),  # banner
+        ("BMW", "116d", threedoor, "diesel", 24748.66, date(2013, 7, 1), 108.0, 85.0),
+        ("BMW", "116d", fivedoor, "diesel", 26995.07, date(2013, 7, 1), 108.0, 85.0),
+    ]
+    canonical = apply_mapping(rows, _BMW_FULLNAME_HEADER, _BMW_FULLNAME_MAPPING, "bmw.xlsx", "Cjenik")
+    assert len(canonical) == 2
+    dicts = [_to_catalogue_dict(c, _co2_standard_from_year(2013), allowed_brands=("BMW",)) for c in canonical]
+    dicts = [d for d in dicts if d]
+    assert len(dicts) == 2
+    # Distinct match_keys (the door token differentiates), so no price collapse.
+    assert dicts[0]["match_key"] != dicts[1]["match_key"]
+    assert {round(d["price_eur"], 2) for d in dicts} == {24748.66, 26995.07}
+
+
 # ===========================================================================
 # Integration test placeholder — skipped, requires real DB + API key
 # ===========================================================================
