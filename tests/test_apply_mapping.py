@@ -219,16 +219,45 @@ def _bmw(marka, naziv, gorivo, cijena, vrijedi_od, co2, kw) -> tuple:
 
 
 def test_bmw_section_header_filtered():
-    # Section-header rows have content only in the brand column; TRGOVAČKI NAZIV is blank
+    # Section-header rows have content only in the brand column; TRGOVAČKI NAZIV is blank.
+    # Two real data rows (both plain "BMW" in the brand cell) establish that sheet's normal
+    # brand text, so the banner's distinctively different text is recognized as such — the
+    # "typical brand cell" heuristic needs more than one real row to not tie against a lone banner.
     rows = [
         ("BMW serije 1 (F40)", None, None, None, None, None, None),  # section header
         _bmw("BMW", "BMW 320d xDrive", "diesel", 55000.0, date(2020, 2, 17), 130.0, 140.0),
+        _bmw("BMW", "BMW 116d", "diesel", 40000.0, date(2020, 2, 17), 108.0, 85.0),
     ]
     skip_log: list[tuple[int, str]] = []
     result = apply_mapping(rows, BMW_HEADER, BMW_MAPPING, "bmw.xlsx", "Cjenik", skip_log=skip_log)
-    assert len(result) == 1
+    assert len(result) == 2
     assert result[0].model_name == "BMW 320d xDrive"
-    assert any(reason == "junk_row" for _, reason in skip_log)
+    assert any(reason == "series_banner" for _, reason in skip_log)
+    assert not any(reason == "junk_row" for _, reason in skip_log)
+
+
+def test_bmw_section_header_recovered_as_series_name():
+    # The banner's series text is stripped of its trailing chassis code and
+    # carried forward onto every row until the next banner.
+    rows = [
+        ("BMW serije 1 (F40)", None, None, None, None, None, None),
+        _bmw("BMW", "116d", "diesel", 43000.0, date(2020, 2, 17), 108.0, 110.0),
+        _bmw("BMW", "118i", "benzin", 41000.0, date(2020, 2, 17), 145.0, 103.0),
+    ]
+    result = apply_mapping(rows, BMW_HEADER, BMW_MAPPING, "bmw.xlsx", "Cjenik")
+    assert len(result) == 2
+    assert result[0].series_name == "BMW serije 1"
+    assert result[0].model_name == "116d"
+    assert result[1].series_name == "BMW serije 1"
+
+
+def test_no_section_header_leaves_series_name_none():
+    # Families with no banner rows at all (VW, Audi, ...) get series_name=None
+    # for every row — apply_mapping never invents one.
+    rows = [_vw("VW", "VW001", "Golf TDI", "VW Golf 8 2.0 TDI", "D", 32000.0, date(2025, 1, 1), 130.0, 110.0)]
+    result = apply_mapping(rows, VW_HEADER, VW_MAPPING, "vw.xlsx", "Cjenik")
+    assert len(result) == 1
+    assert result[0].series_name is None
 
 
 def test_bmw_diesel_english_spelling():
@@ -292,7 +321,12 @@ def test_bmw_multiple_section_headers():
     skip_log: list[tuple[int, str]] = []
     result = apply_mapping(rows, BMW_HEADER, BMW_MAPPING, "bmw.xlsx", "Cjenik", skip_log=skip_log)
     assert len(result) == 2
-    assert len([r for _, r in skip_log if r == "junk_row"]) == 2
+    assert len([r for _, r in skip_log if r == "series_banner"]) == 2
+    assert not any(r == "junk_row" for _, r in skip_log)
+    assert result[0].series_name == "BMW serije 1"
+    assert result[0].model_name == "BMW 118d"
+    assert result[1].series_name == "BMW serije 3"
+    assert result[1].model_name == "BMW 318d"
 
 
 # ===========================================================================
@@ -502,6 +536,37 @@ def test_skip_log_all_reasons():
     assert "missing_price" in reasons
     assert "missing_co2" in reasons
     assert "missing_or_unparseable_valid_from" in reasons
+
+
+# ===========================================================================
+# Cross-module: series_name -> catalogue "model" at the ingest layer
+# ===========================================================================
+
+def test_series_name_wins_as_catalogue_model():
+    from app.data.catalogues.ingest import _to_catalogue_dict, _co2_standard_from_year
+
+    rows = [
+        ("BMW serije 1 (F40)", None, None, None, None, None, None),
+        _bmw("BMW", "116d", "diesel", 43000.0, date(2020, 2, 17), 108.0, 110.0),
+        _bmw("BMW", "118i", "benzin", 41000.0, date(2020, 2, 17), 145.0, 103.0),
+    ]
+    canonical_rows = apply_mapping(rows, BMW_HEADER, BMW_MAPPING, "bmw.xlsx", "Cjenik")
+    assert len(canonical_rows) == 2
+    d = _to_catalogue_dict(canonical_rows[0], _co2_standard_from_year(2020), allowed_brands=("BMW",))
+    assert d is not None
+    assert d["model"] == "BMW serije 1"
+    assert d["variant"] == "116d"  # full_name/type_code absent here, so variant still falls back to the trim
+
+
+def test_no_series_name_keeps_model_name_as_model():
+    from app.data.catalogues.ingest import _to_catalogue_dict, _co2_standard_from_year
+
+    rows = [_vw("VW", "VW001", "Golf TDI", "VW Golf 8 2.0 TDI", "D", 32000.0, date(2025, 1, 1), 130.0, 110.0)]
+    canonical_rows = apply_mapping(rows, VW_HEADER, VW_MAPPING, "vw.xlsx", "Cjenik")
+    assert len(canonical_rows) == 1
+    d = _to_catalogue_dict(canonical_rows[0], _co2_standard_from_year(2025), allowed_brands=("Volkswagen",))
+    assert d is not None
+    assert d["model"] == "Golf TDI"
 
 
 # ===========================================================================

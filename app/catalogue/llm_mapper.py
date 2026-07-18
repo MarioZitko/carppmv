@@ -257,4 +257,16 @@ async def map_sheet_columns(
                 f"mapping rather than ingesting against a hallucinated column."
             )
 
+    # ColumnMapping has no field defaults, so a nullable column the model
+    # legitimately omits from its JSON (rather than emitting an explicit
+    # null) crashes the constructor with "missing N required positional
+    # arguments" — caught upstream as a deterministic mapping failure and
+    # permanently blacklisting this header layout, silently dropping every
+    # row of every file that shares it. price_column/price_currency are the
+    # only genuinely required fields; every other column_fields entry is
+    # optional (str | None) and safe to default to None here.
+    for field in column_fields:
+        if field != "price_column":
+            parsed.setdefault(field, None)
+
     return ColumnMapping(**parsed)

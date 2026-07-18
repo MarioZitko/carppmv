@@ -2830,6 +2830,56 @@
   ],
   "status": "ok"
  },
+ "13572e78b4d200b642e38e094f9d5d4673881ec7": {
+  "confidence": 0.7,
+  "mapping": {
+   "brand_column": null,
+   "camper_column": null,
+   "co2_column": "Emisije CO2*\n(kombinirana vožnja u g/km)",
+   "co2_max_column": null,
+   "co2_min_column": null,
+   "confidence": 0.7,
+   "euro_norm_column": "EURO Norma",
+   "fuel_column": null,
+   "full_name_column": null,
+   "model_name_column": null,
+   "notes": "Sheet has two sets of columns for different engine/transmission types (automatic and manual). Mapped to the first set (columns 0-10) where possible. Model name and type code columns have no headers (empty strings), so set to null. Price currency inferred as HRK (no explicit indicator in header).",
+   "pickup_8704_column": null,
+   "plug_in_range_column": null,
+   "power_kw_column": "KW/KS",
+   "price_column": "Prodajna cijena za kupca s PDV-om",
+   "price_currency": "HRK",
+   "seats_7plus1_column": null,
+   "seats_8plus1_column": null,
+   "type_code_column": null,
+   "valid_from_column": null
+  },
+  "sample_header": [
+   "Benzinski motor / pogon 2WD / automatski mjenjač",
+   "Oprema",
+   "ccm",
+   "KW/KS",
+   "Mjenjač",
+   "EURO Norma",
+   "Emisije CO2*\n(kombinirana vožnja u g/km)",
+   "Prodajna cijena za kupca bez PDV-a",
+   "Prodajna cijena za kupca s PDV-om",
+   "CO2",
+   "PO",
+   "TROŠARINA",
+   "RETAIL PPMV",
+   "Pogon 2WD s benzinskim motorima i ručnim mjenjačem",
+   "ccm",
+   "KW/KS",
+   "EURO Norma",
+   "Emisije CO2\n (kombinirana vožnja u g/km)",
+   "Prodajna cijena za kupca bez PDV-a",
+   "Prodajna cijena za kupca s PDV-om",
+   "Poseban porez na motorna vozila",
+   "Prodajna cijena za kupca s PPMV-om i PDV-om"
+  ],
+  "status": "ok"
+ },
  "13646e79385780301bdfcb4047499d28c1e7bece": {
   "reason": "confidence 0.30: The provided header row does not contain recognizable column labels; it appears to be data values (model name, type code, power, CO2, prices) rather than a proper header. The only value that clearly r",
   "sample_header": [
@@ -5353,7 +5403,29 @@
   "status": "ok"
  },
  "279ebe1809b6a7bb4fed666636105bb8a7b47f4a": {
-  "reason": "ColumnMapping.__init__() missing 2 required positional arguments: 'co2_min_column' and 'co2_max_column'",
+  "confidence": 1.0,
+  "mapping": {
+   "brand_column": "MARKA",
+   "camper_column": "KAMPER",
+   "co2_column": "CO2* (g/km)",
+   "co2_max_column": null,
+   "co2_min_column": null,
+   "confidence": 1.0,
+   "euro_norm_column": "EURO NORMA",
+   "fuel_column": "GORIVO",
+   "full_name_column": "KOMPLETNO IME",
+   "model_name_column": "TRGOVAČKI NAZIV",
+   "notes": "All columns map directly and unambiguously from the header row. The price column contains '(kn)' indicating HRK. No min/max CO2 split exists; a single CO2 column is present. The sample data confirms the mapping (e.g., 'KOD MODELA' contains codes like '2H31', 'TRGOVAČKI NAZIV' contains model names like '218i').",
+   "pickup_8704_column": "PICK-UP 8704",
+   "plug_in_range_column": "PLUG-IN (DOSEG)",
+   "power_kw_column": "SNAGA  (kW)",
+   "price_column": "PRODAJNA CIJENA (kn s PDV-om)",
+   "price_currency": "HRK",
+   "seats_7plus1_column": "SJEDALA 7+1",
+   "seats_8plus1_column": "SJEDALA 8+1",
+   "type_code_column": "KOD MODELA",
+   "valid_from_column": "VRIJEDI OD"
+  },
   "sample_header": [
    "MARKA",
    "KOD MODELA",
@@ -5380,7 +5452,7 @@
    "MY - MODEL YEAR",
    "BROJ SJEDALA"
   ],
-  "status": "fail"
+  "status": "ok"
  },
  "27e420ee9aaa84eef7f9ac6428ddec60aeab9342": {
   "confidence": 0.6,
@@ -6133,6 +6205,25 @@
   ],
   "status": "ok"
  },
+ "2bda3522d0d211f963af1634c4d960bbe9e62111": {
+  "reason": "confidence 0.20: Header row has many empty strings and duplicate headers. Model name is in column with header 'Verzije s benzinskim motorom' (index 13). Type code and power are in columns with empty headers (indices 4",
+  "sample_header": [
+   "CO2",
+   "L/100",
+   "CO2",
+   "L/100",
+   "Verzije s benzinskim motorom",
+   "11",
+   "TROSARINO",
+   "% CO2",
+   "% VRED",
+   "% TROS",
+   "TROS",
+   "POPUST",
+   "ZA KUPCA"
+  ],
+  "status": "fail"
+ },
  "2c7499093b340c9bbd589a64ebf4a865c5de7982": {
   "reason": "confidence 0.20: Header row contains only category titles (production dates and emission standards) rather than typical column names. Actual data columns appear to be under empty headers or sub-headers. Mapped type_co",
   "sample_header": [
@@ -6667,7 +6758,7 @@
   "status": "ok"
  },
  "328bc721479d234405ab2933e463429f7bff0bea": {
-  "reason": "ColumnMapping.__init__() got an unexpected keyword argument ''",
+  "reason": "confidence 0.30: This appears to be an options/equipment price list, not a vehicle catalogue. The header row has no brand, model, fuel, power, or CO2 columns. The column with value '8500' is interpreted as the price c",
   "sample_header": [
    "Paket MULTIMEDIJA (NC)",
    "-",
@@ -9603,6 +9694,23 @@
   ],
   "status": "fail"
  },
+ "45fae881eba3fe78787a2d9a90bdb20284e340f6": {
+  "reason": "confidence 0.20: This header row does not contain any recognizable canonical field names. The values appear to be data values (package names, prices, flags) rather than column labels. The first cell is empty, and subs",
+  "sample_header": [
+   "Paket STYLE (SP)",
+   "-",
+   "-",
+   "-",
+   "-",
+   "1260",
+   "9493.470000000001",
+   "S",
+   "S",
+   "S",
+   "S"
+  ],
+  "status": "fail"
+ },
  "46fd3762b4d14a0004bacef4a0dbc6d316578c09": {
   "confidence": 0.95,
   "mapping": {
@@ -10085,6 +10193,36 @@
    "NA",
    "NA",
    "NA"
+  ],
+  "status": "fail"
+ },
+ "4ab59732d85fa19e9e0e3063ffc1905c92ba9e3f": {
+  "reason": "confidence 0.30: The header row consists almost entirely of cryptic codes (O_LIB, O_C1–C7, O_COD, BO, CG, MA, etc.) with no obvious Croatian or English labels for brand, model, fuel, power, CO2, or price. The sample d",
+  "sample_header": [
+   "O_LIB",
+   "O_C1",
+   "O_C2",
+   "O_C3",
+   "O_C4",
+   "O_C5",
+   "O_C6",
+   "O_C7",
+   "O_COD",
+   "BO",
+   "BO",
+   "BO",
+   "BO",
+   "BO",
+   "BO",
+   "BO",
+   "CG",
+   "CG",
+   "CG",
+   "CG",
+   "CG",
+   "CG",
+   "CG",
+   "MA"
   ],
   "status": "fail"
  },
@@ -13947,6 +14085,26 @@
   ],
   "status": "ok"
  },
+ "64038cad9215a35a5e1539020f476449a2578bd8": {
+  "reason": "confidence 0.30: Heavily inferred. V_LIB used for both model and full name. V_CRO assumed price in HRK, but multiple numeric columns exist. V_CO assumed CO2. V_KW assumed power. V_COD as type code. No brand, fuel, dat",
+  "sample_header": [
+   "V_LIB",
+   "V_COD",
+   "V_KW",
+   "V_CO",
+   "V_PO",
+   "V_CRO",
+   "V_FSO",
+   "V_FS",
+   "V_BO",
+   "V_CG",
+   "V_MA",
+   "V_TRAN",
+   "V_TRO",
+   "V_POP"
+  ],
+  "status": "fail"
+ },
  "64a290b026723591a64717a7a8b0b3f607d5e0fb": {
   "confidence": 0.85,
   "mapping": {
@@ -16340,6 +16498,36 @@
   ],
   "status": "ok"
  },
+ "734ac07d7d601cb63705756f1266757dcf2512e2": {
+  "reason": "confidence 0.30: The file appears to be a matrix of option prices for multiple brands/trims, with no single price column. 'MA' was selected as a representative column that contains numeric values (likely prices in HRK",
+  "sample_header": [
+   "O_LIB",
+   "O_C1",
+   "O_C2",
+   "O_C3",
+   "O_C4",
+   "O_COD",
+   "CRO",
+   "CRO",
+   "CRO",
+   "CRO",
+   "FSO",
+   "FSO",
+   "FSO",
+   "FSO",
+   "FS",
+   "FS",
+   "FS",
+   "FS",
+   "BO",
+   "BO",
+   "BO",
+   "BO",
+   "CG",
+   "CG"
+  ],
+  "status": "fail"
+ },
  "7364ae3a85ed3a5ddb34f332499577ba1cee1baf": {
   "confidence": 0.7,
   "mapping": {
@@ -18454,7 +18642,7 @@
   "status": "ok"
  },
  "83645fa55edfffe5c265b092b800246897759e80": {
-  "reason": "ColumnMapping.__init__() got an unexpected keyword argument ''",
+  "reason": "confidence 0.10: Header row contains no standard vehicle catalogue fields; it appears to be a list of alloy wheels/tires with no price column. All canonical fields are null.",
   "sample_header": [
    "Alu naplatak Topaze diamant 16\"",
    "205/55R16 ",
@@ -18789,14 +18977,36 @@
   "status": "ok"
  },
  "855ffbb19dd28287d526e46150e93169cf6f8598": {
-  "reason": "ColumnMapping.__init__() missing 14 required positional arguments: 'brand_column', 'type_code_column', 'full_name_column', 'fuel_column', 'valid_from_column', 'co2_column', 'co2_min_column', 'co2_max_column', 'plug_in_range_column', 'seats_7plus1_column', 'seats_8plus1_column', 'camper_column', 'pic",
+  "confidence": 0.95,
+  "mapping": {
+   "brand_column": null,
+   "camper_column": null,
+   "co2_column": null,
+   "co2_max_column": null,
+   "co2_min_column": null,
+   "confidence": 0.95,
+   "euro_norm_column": null,
+   "fuel_column": null,
+   "full_name_column": null,
+   "model_name_column": "Oprema",
+   "notes": "The column 'Oprema' contains equipment/trim names (ACENTA, N-CONNECTA, TEKNA) which serve as the model identifier in this catalogue. No brand, fuel, CO2, power-in-kW-separate, type code, or date columns exist. The 'kw/KS' column provides power as a combined string (e.g., '110/150'), which appears to be kW/PS; it is mapped to power_kw_column despite being a combined string, as it's the only power column. The price column 'Cijena s PDV-om' is clearly labeled and the numbers match prices. The first column is empty headers but contains battery capacity data in rows—this is not a proper column header. Confidence is high because the mapping is straightforward given the header names.",
+   "pickup_8704_column": null,
+   "plug_in_range_column": null,
+   "power_kw_column": "kw/KS",
+   "price_column": "Cijena s PDV-om",
+   "price_currency": "HRK",
+   "seats_7plus1_column": null,
+   "seats_8plus1_column": null,
+   "type_code_column": null,
+   "valid_from_column": null
+  },
   "sample_header": [
    "Uporabni kapacitet baterije",
    "Oprema",
    "kw/KS",
    "Cijena s PDV-om"
   ],
-  "status": "fail"
+  "status": "ok"
  },
  "85cb37941ab6b044b96576dd0a843910fb16ee0b": {
   "reason": "confidence 0.30: Duplicate headers (CRO, FSO, etc.) appear merged; price_column set to 'CRO' assuming it represents Croatian price, but numeric sample values (9.0, 14.0) are unusually small. 'EL_COD' used for both typ",
@@ -19772,6 +19982,49 @@
    "kW/KS",
    "CO2",
    "Cijena s PDV-om"
+  ],
+  "status": "ok"
+ },
+ "8ae055dbb1b6478ce77ad253fd2f0b91c6e1fda5": {
+  "confidence": 0.6,
+  "mapping": {
+   "brand_column": null,
+   "camper_column": null,
+   "co2_column": null,
+   "co2_max_column": null,
+   "co2_min_column": null,
+   "confidence": 0.6,
+   "euro_norm_column": null,
+   "fuel_column": null,
+   "full_name_column": null,
+   "model_name_column": "V_LIB",
+   "notes": "The header uses cryptic codes (V_LIB, V_EU, V_COD, V_KW, V_CO, V_PO, V_BO, V_CG, V_MA) that do not match any canonical field names. V_LIB appears to be the model name (contains 'Renault KADJAR' and 'CJENIK VOZILA'). V_KW likely means power in kW. V_CO might be CO2. V_BO, V_CG, V_MA appear three times each, possibly for different price types or dates. No clear price column found — V_BO, V_CG, V_MA contain numeric values but also 'LINK' and 'RAZLIKA', making them ambiguous. No brand, fuel, date, or other standard columns identifiable. Mapping is uncertain due to cryptic headers.",
+   "pickup_8704_column": null,
+   "plug_in_range_column": null,
+   "power_kw_column": "V_KW",
+   "price_column": "V_BO",
+   "price_currency": "HRK",
+   "seats_7plus1_column": null,
+   "seats_8plus1_column": null,
+   "type_code_column": "V_COD",
+   "valid_from_column": null
+  },
+  "sample_header": [
+   "V_LIB",
+   "V_EU",
+   "V_COD",
+   "V_KW",
+   "V_CO",
+   "V_PO",
+   "V_BO",
+   "V_CG",
+   "V_MA",
+   "V_BO",
+   "V_CG",
+   "V_MA",
+   "V_BO",
+   "V_CG",
+   "V_MA"
   ],
   "status": "ok"
  },
@@ -20909,6 +21162,36 @@
   ],
   "status": "fail"
  },
+ "92b5ab6baf54f59cd76a021e4bd893ea07e283ea": {
+  "reason": "confidence 0.10: The header row contains only body style categories (BODY STYLE, 5-Door, Coupe, Convertible) and an empty first cell. None of the canonical fields (brand, model, fuel, price, CO2, power, etc.) are repr",
+  "sample_header": [
+   "BODY STYLE",
+   "5-Door",
+   "5-Door",
+   "5-Door",
+   "5-Door",
+   "5-Door",
+   "5-Door",
+   "5-Door",
+   "5-Door",
+   "5-Door",
+   "5-Door",
+   "5-Door",
+   "5-Door",
+   "5-Door",
+   "5-Door",
+   "5-Door",
+   "5-Door",
+   "5-Door",
+   "5-Door",
+   "5-Door",
+   "5-Door",
+   "Coupe",
+   "Coupe",
+   "Coupe"
+  ],
+  "status": "fail"
+ },
  "9317ae9641e5a521cd47e364986a91c6737052c7": {
   "confidence": 0.75,
   "mapping": {
@@ -21996,6 +22279,44 @@
    "Cijena\nza kupca\ns PDVom i trošarinom",
    "Akcijski\npopust",
    "Krajnja cijena\ns PDVom i\ntrošarinom"
+  ],
+  "status": "ok"
+ },
+ "9b050f8daf32055f8271b9203922118732002520": {
+  "confidence": 0.9,
+  "mapping": {
+   "brand_column": null,
+   "camper_column": null,
+   "co2_column": "Indicative",
+   "co2_max_column": null,
+   "co2_min_column": null,
+   "confidence": 0.9,
+   "euro_norm_column": "Euro classification",
+   "fuel_column": null,
+   "full_name_column": null,
+   "model_name_column": null,
+   "notes": "The header row has two 'Model code' columns and two 'List price with VAT' columns. The first 'Model code' (index 1) contains long numeric codes (e.g. 5000399744) that appear to be internal system IDs; the second 'Model code' (index 2) contains shorter codes like 'AA550' which are more typical type/model codes. I chose the second 'Model code' as type_code_column because it looks like a specific variant code. The 'Indicative' column header is ambiguous but the sample data shows CO2 values (148.0) in that column, so it maps to co2_column. There is no explicit fuel column header; the sample data shows fuel values ('Petrol/diesel', 'diesel') under the empty header at index 6, but since the header is empty I cannot map it. The brand is not in the header (it's in the first cell of the header row as 'CROATIA - LR Discovery Sport MY19' but that's a title, not a column). The price_column is 'List price with VAT' (index 7, HRK values) because the EUR column (index 8) is also labeled 'List price with VAT' but the sample data shows HRK values in index 7 and EUR in index 8; I chose the HRK one as primary since it appears first, but the EUR column is also present. price_currency is 'HRK' based on the sample data showing 'HRK' in the first data row under that column. valid_from_column is null as there is no date column.",
+   "pickup_8704_column": null,
+   "plug_in_range_column": null,
+   "power_kw_column": null,
+   "price_column": "List price with VAT",
+   "price_currency": "HRK",
+   "seats_7plus1_column": null,
+   "seats_8plus1_column": null,
+   "type_code_column": "Model code",
+   "valid_from_column": null
+  },
+  "sample_header": [
+   "CROATIA - LR Discovery Sport MY19",
+   "Model code",
+   "Model code",
+   "Pack code",
+   "Indicative",
+   "Euro classification",
+   "List price with VAT",
+   "List price with VAT",
+   "VAT",
+   "Net retail price"
   ],
   "status": "ok"
  },
@@ -26639,6 +26960,18 @@
    "390.0",
    "ROČNO VPISANA CENA",
    "ročno"
+  ],
+  "status": "fail"
+ },
+ "b95947741cc7863f830b2faf6c96838de059e17e": {
+  "reason": "confidence 0.10: This is not a standard price catalogue but an options/equipment list for Mercedes SL models. The header row contains model names (SL 400, SL 500, etc.) as column headers, not a model_name column. The ",
+  "sample_header": [
+   "l =lieferbar gegen Mehrpreis; ¡ =lieferbar ohne Mehrpreis; Þ =Hinweise vorhanden;\nS =Serienausstattung; - =nicht lieferbar;   « =Fußnote;  U =Lackierung;  A =Ausstattung",
+   "l =available at extra charge; ¡ =available at no extra charge; Þ=annotations existing;\nS=standard equipment;    - =not available; «=Footnote;  U=Paintwork;  A=Upholstery",
+   "SL 400",
+   "SL 500",
+   "Mercedes-AMG SL 63",
+   "Mercedes-AMG SL 65"
   ],
   "status": "fail"
  },
@@ -35088,7 +35421,29 @@
   "status": "ok"
  },
  "eeb1bebcdfb28b1e3cb813fcdfa4273125efaed4": {
-  "reason": "ColumnMapping.__init__() missing 10 required positional arguments: 'full_name_column', 'valid_from_column', 'co2_min_column', 'co2_max_column', 'plug_in_range_column', 'seats_7plus1_column', 'seats_8plus1_column', 'camper_column', 'pickup_8704_column', and 'euro_norm_column'",
+  "confidence": 0.95,
+  "mapping": {
+   "brand_column": "MARKA",
+   "camper_column": null,
+   "co2_column": "CO2",
+   "co2_max_column": null,
+   "co2_min_column": null,
+   "confidence": 0.95,
+   "euro_norm_column": null,
+   "fuel_column": "GORIVO",
+   "full_name_column": null,
+   "model_name_column": "MODEL",
+   "notes": "The price column 'PREPORUČENA' is ambiguous but appears to be the recommended retail price in HRK (based on sample values). No currency indicator in header, but values are typical HRK amounts. No valid_from, euro_norm, or plug-in range columns present. Type code is likely 'KATASHIKI' (Japanese chassis code) or 'Vehicle ID' — chose 'KATASHIKI' as more specific to variant. No separate min/max CO2 columns.",
+   "pickup_8704_column": null,
+   "plug_in_range_column": null,
+   "power_kw_column": null,
+   "price_column": "PREPORUČENA",
+   "price_currency": "HRK",
+   "seats_7plus1_column": null,
+   "seats_8plus1_column": null,
+   "type_code_column": "KATASHIKI",
+   "valid_from_column": null
+  },
   "sample_header": [
    "Vehicle ID",
    "MARKA",
@@ -35104,7 +35459,7 @@
    "KATASHIKI",
    "SFX"
   ],
-  "status": "fail"
+  "status": "ok"
  },
  "eefdf3c1f14538f929b720ebf23688939c91392e": {
   "confidence": 0.62,

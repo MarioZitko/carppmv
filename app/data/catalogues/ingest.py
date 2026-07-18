@@ -112,7 +112,13 @@ def _to_catalogue_dict(
     if fuel_type is None or row.co2_g_km is None:
         return None
 
-    model = row.model_name or row.type_code or "unknown"
+    # series_name (from a BMW/MINI-style section-header banner row) is the
+    # real model line when present — model_name in that case is only the
+    # trim (e.g. "116d"), which stays useful for fuel-badge derivation
+    # above but would badly fragment the catalogue's model grouping if used
+    # as the model itself. Sheets with no banner rows (Audi, etc.) always
+    # have series_name None here, so this is a no-op for them.
+    model = row.series_name or row.model_name or row.type_code or "unknown"
     variant = row.full_name or row.type_code or row.model_name or "unknown"
 
     # Snap the row's brand to the canonical spelling allowed for this file's

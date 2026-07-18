@@ -246,3 +246,115 @@ all-electric (fuel maps to None → exempt, verify in source); Maserati has no f
   mapping*, with the deterministic fallbacks above.
 - Do not lower concurrency thinking it's rate limits — it's timeouts.
 - Do not throw away `column_mappings.json` — migrate it.
+
+## 9. Iteration 2 (2026-07-18) — the `model` field is wrong for BMW/MINI
+
+Found while auditing per-brand row counts on the DB produced by iteration 1
+(159,084 rows / 43 brands — the nullable-column fix landed and `--fresh` was
+run since §2's baseline). `SELECT brand, COUNT(*), COUNT(DISTINCT model) …`
+showed BMW at 4,799 rows / **532 distinct models** (~9 rows/model) vs Audi's
+28,772 rows / 109 models (~264 rows/model). Sample BMW models: `116d Unique
+Line`, `118d Advantage+6U3` — trim/package names, not model lines.
+
+**Root cause** (`app/catalogue/canonical_schema.py`, confirmed against real
+files in `app/data/catalogues/bmw-mini/`): recent-format BMW/MINI sheets
+interleave a section-header "banner" row per series (single populated cell,
+e.g. `"BMW serije 1 (F40)"`, `"MINI CLUBMAN(F54)"`) between blocks of trim
+rows, where `TRGOVAČKI NAZIV` ("trade name") holds only the trim (`118i`,
+`M135i xDrive`). `_is_junk_row` correctly identified these banners as junk
+and **dropped them** — discarding the only real series signal in the file —
+so the trim column got ingested as `model` directly. `matching.py`'s
+`build_match_key` docstring already assumed `model='serija 3'` was the real
+shape; it never was, for these files.
+
+Same shape confirmed in **Jaguar** (451 rows/290 models, `model='260JY'` — an
+internal type code) and **Land Rover** (999/541, `model='350NA'`) — both use a
+type code instead of a real model name (`"RR Sport HSE..."`, `"Jaguar XF
+S..."` sits in `variant`/`full_name` instead). NOT fixed by iteration 2 — no
+banner rows to recover from in these two, would need a model-family regex
+extraction from the descriptive text instead. Left for iteration 3.
+
+Also found in passing, NOT fixed (separate bug classes, flagged for later):
+- **Mazda: 59 source files, 0 DB rows.** `apply_mapping` succeeds, but every
+  row is dropped in `ingest.py::_to_catalogue_dict` because `fuel_type`
+  resolves to `None`. Mazda uses plain displacement badges (`"1.3i"`,
+  `"2.0d"`) with no fuel column in the sheet; `matching.py`'s
+  `_fuel_from_badge` regex requires a 2-3 digit badge
+  (`\b\d{2,3}[di]\b`, tuned for BMW-style `320d`) and `normalize_text`
+  fragments `"1.3i"` into tokens `"1"`/`"3i"` — `"3i"` is 1 digit, never
+  matches. Fix: widen the badge regex (or add a decimal-displacement variant)
+  — needs testing against the full Mazda corpus for false positives first.
+- **Suzuki: 38 source files, 1 DB row.** At least the pre-2014 files have no
+  CO2 column in the sheet at all (`missing_co2` on every row) — looks like a
+  genuine source-data gap (pre-dating stricter CO2 labeling), not a parsing
+  bug. Spot-check a couple of newer Suzuki files before concluding this is
+  unfixable.
+- **A legacy BMW format** (`bmw-mini/2013/BMW 2013 0731.xls`, header
+  `Marka/Tip/Varijanta/Trgovački naziv/...`) has NO banner rows — instead
+  `Tip` holds the series per-row (`"Serija 1 (F20)"`, populated on every
+  data row). The cached mapping (confidence 0.95) declined to map `Tip` at
+  all because its 5-row LLM sample happened to show it blank (`'/'`); the
+  full sheet has it populated throughout. Iteration 2's fix doesn't touch
+  this — no banner to detect, so it's inert here (no regression either).
+  Re-mapping needs a fresh (paid) LLM call for this fingerprint, or a
+  code-level override; out of scope for now.
+- Other low-row brands (BAIC 2, Foton 5, Forthing 5, Lynk & Co 5, Isuzu 11,
+  Geely 14, smart 33, Infiniti 37, Subaru 40) look structurally plausible for
+  low-volume marques — re-audit after the Mazda/Suzuki items above land, in
+  case the same junk-row/fuel-derivation bug classes are clipping them too.
+
+### Fix implemented (`app/catalogue/canonical_schema.py`, `app/data/catalogues/ingest.py`)
+
+- New `CanonicalRow.series_name: str | None` field.
+- `_detect_series_banner(row, brand_col_idx, typical_brand_text)`: a row is a
+  banner only if ALL of — exactly one populated cell in the whole row; that
+  cell sits in the mapped `brand_column` position; its text is non-numeric;
+  and its text differs from `_typical_brand_cell_text` (the sheet's
+  majority/mode brand-cell value, e.g. `"bmw"`). That last check is the
+  important guard: without it, an ordinary malformed row with only its
+  (plain) brand cell populated — a real junk shape, unrelated to banners —
+  would be misread as a banner and forward-fill a bogus series onto every
+  later row in the sheet. `brand_col_idx`/`typical_brand_text` are computed
+  once per `apply_mapping` call, not per row.
+- `apply_mapping` tracks `current_series`, updated on each banner row
+  (skip-logged as `"series_banner"`, not `"junk_row"`, for auditability) and
+  carried onto every subsequent `CanonicalRow.series_name` until the next
+  banner. Sheets with no banner rows (Audi, VW, ...) get `series_name=None`
+  throughout — behavior is unchanged for every brand except BMW/MINI.
+- `ingest.py::_to_catalogue_dict`: `model = row.series_name or row.model_name
+  or row.type_code or "unknown"` (was `row.model_name or row.type_code or
+  "unknown"`). `variant` is untouched. The fuel-derivation call still passes
+  `row.model_name` (the trim, e.g. `"320d"`) — badge-based fuel detection
+  needs the trim text, not the series name, so that path is deliberately
+  left alone.
+- Tests: `tests/test_apply_mapping.py` — updated the two existing BMW
+  section-header tests (`"junk_row"` → `"series_banner"` skip reason) and
+  added coverage for `series_name` propagation across multiple banners, the
+  "no banner → series_name stays None" case for non-BMW families, and the
+  `_to_catalogue_dict` model-selection behavior end-to-end.
+
+### Verified against real files (not yet a DB rebuild)
+`bmw-mini/2020/BMW 2020 3011.xlsx`, BMW sheet: 179 rows, **16 distinct
+models** (was ~implicitly ~100+ trim-polluted values under the old logic) —
+`BMW serije 1`, `BMW serija 2 Gran Coupe`, `BMW serija 5 LCI (G30/F90)`, etc.
+`bmw-mini/2013/BMW 2013 0731.xls` (the no-banner legacy format above):
+unchanged, 201 rows / 115 models, as expected — confirms no regression.
+
+### Next step — local rebuild (no LLM cost)
+This iteration changes only `apply_mapping`'s row-transform logic, not the
+column-*mapping* step — `column_mappings.json` stays fully valid, so a
+rebuild costs $0 and makes 0 new LLM calls. Run:
+
+```
+.venv/bin/python -m app.data.catalogues.ingest --fresh
+```
+
+Then verify:
+```sql
+SELECT brand, COUNT(*), COUNT(DISTINCT model) FROM catalogue
+WHERE brand IN ('BMW','MINI') GROUP BY brand;
+```
+BMW's distinct-model count should drop from ~532 to roughly the mid-teens
+(real BMW series count); MINI similarly. Every other brand's row/model counts
+should be unchanged from before this iteration (spot-check Audi/VW to
+confirm the no-banner path is untouched).

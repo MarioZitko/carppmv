@@ -103,6 +103,7 @@ class CanonicalRow:
 
     brand: str
     model_name: str | None
+    series_name: str | None  # model-line/series name recovered from a section-header banner row (e.g. 'BMW serije 1'), None when the sheet has no such banner — see _detect_series_banner. model_name stays the raw trim/type text either way (still needed for fuel-badge derivation).
     type_code: str | None  # raw value from whatever column the mapping pointed at — meaning/uniqueness varies per source, do not assume global uniqueness
     full_name: str | None
 
@@ -270,6 +271,89 @@ def _to_str(value: object) -> str | None:
         return None
     text = str(value).strip()
     return text or None
+
+
+# Strips a trailing chassis/generation code in parentheses off a banner's
+# series text, e.g. "BMW serije 1 (F40)" -> "BMW serije 1",
+# "MINI CLUBMAN(F54)" -> "MINI CLUBMAN". Left in place if there's nothing
+# else in the string (defensive; not seen in practice).
+_CHASSIS_CODE_SUFFIX_RE = re.compile(r"\(\s*[A-Za-z0-9]+\s*\)\s*$")
+
+
+def _clean_series_text(text: str) -> str:
+    cleaned = _CHASSIS_CODE_SUFFIX_RE.sub("", text).strip()
+    return cleaned or text.strip()
+
+
+def _is_numeric_like(value: object) -> bool:
+    """True for a number or a purely numeric string — mirrors ingest.py's
+    _looks_numeric (duplicated rather than imported: canonical_schema is the
+    pure/deterministic layer ingest.py depends on, not the reverse)."""
+    if isinstance(value, bool):
+        return False
+    if isinstance(value, (int, float)):
+        return True
+    if isinstance(value, str):
+        s = value.strip().replace(".", "").replace(",", "").replace(" ", "")
+        return s.isdigit()
+    return False
+
+
+def _typical_brand_cell_text(rows: list[tuple], brand_col_idx: int | None) -> str | None:
+    """The most common non-blank value at the brand column across a sheet's
+    rows — a sheet's real data rows all repeat the same plain brand string
+    ('BMW ', 'VW', ...), so this is what a genuine brand cell looks like on
+    THIS sheet. Used to tell a banner ('BMW serije 1 (F40)') apart from an
+    ordinary row that merely happens to have only its brand cell populated
+    (e.g. a malformed row) — both are 'one populated text cell in the brand
+    column', but only the banner's text differs from the sheet's norm."""
+    if brand_col_idx is None:
+        return None
+    counts: dict[str, int] = {}
+    for row in rows:
+        if brand_col_idx >= len(row):
+            continue
+        text = _to_str(row[brand_col_idx])
+        if text is None:
+            continue
+        key = text.strip().lower()
+        counts[key] = counts.get(key, 0) + 1
+    if not counts:
+        return None
+    return max(counts, key=lambda k: counts[k])
+
+
+def _detect_series_banner(
+    row: tuple, brand_col_idx: int | None, typical_brand_text: str | None
+) -> str | None:
+    """BMW/MINI-style sheets interleave section-header rows carrying the
+    model series name (e.g. 'BMW serije 1 (F40)', 'MINI CLUBMAN(F54)')
+    between blocks of trim rows, with every other cell in the row blank —
+    confirmed against real BMW/MINI files, always sitting in the brand
+    column. Requires ALL of: exactly one populated cell in the whole row;
+    that cell is the mapped brand column (not any arbitrary column — a
+    stray junk cell elsewhere isn't a banner); its text isn't purely
+    numeric (excludes the stray-conversion-rate junk shape this module
+    already handles); and its text differs from the sheet's normal brand
+    string (excludes an ordinary malformed row that merely repeats the
+    plain brand, e.g. a lone 'VW' with everything else blank — that's junk,
+    not a banner, and must NOT get forward-filled as a fake series). No
+    brand_col_idx (sheet has no brand column mapped) always returns None —
+    conservative default, since banner text has nowhere reliable to live."""
+    if brand_col_idx is None or typical_brand_text is None:
+        return None
+    populated = [(j, c) for j, c in enumerate(row) if not _is_blank(c)]
+    if len(populated) != 1:
+        return None
+    idx, value = populated[0]
+    if idx != brand_col_idx:
+        return None
+    if _is_numeric_like(value):
+        return None
+    text = _to_str(value)
+    if not text or text.strip().lower() == typical_brand_text:
+        return None
+    return _clean_series_text(text)
 
 
 def _to_bool(value: object) -> bool:
@@ -508,12 +592,26 @@ def apply_mapping(
     settings = get_settings()
     results: list[CanonicalRow] = []
 
+    # Updated whenever a section-header banner row is seen (BMW/MINI-style
+    # sheets); carried forward onto every subsequent data row as series_name
+    # until the next banner. Stays None for sheets with no banner rows at
+    # all (Audi, etc.) — those are entirely unaffected by this.
+    current_series: str | None = None
+    brand_col_idx = column_index.get(mapping.brand_column) if mapping.brand_column else None
+    typical_brand_text = _typical_brand_cell_text(rows, brand_col_idx)
+
     for offset, row in enumerate(rows):
         source_row_index = offset + 2
 
         def skip(reason: str) -> None:
             if skip_log is not None:
                 skip_log.append((source_row_index, reason))
+
+        banner = _detect_series_banner(row, brand_col_idx, typical_brand_text)
+        if banner is not None:
+            current_series = banner
+            skip("series_banner")
+            continue
 
         model_name_raw = _cell(row, column_index, mapping.model_name_column)
         fuel_raw = _cell(row, column_index, mapping.fuel_column)
@@ -586,6 +684,7 @@ def apply_mapping(
             CanonicalRow(
                 brand=brand,
                 model_name=_to_str(model_name_raw),
+                series_name=current_series,
                 type_code=_to_str(_cell(row, column_index, mapping.type_code_column)),
                 full_name=_to_str(_cell(row, column_index, mapping.full_name_column)),
                 fuel_category=fuel_category,

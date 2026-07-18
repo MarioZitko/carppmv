@@ -134,7 +134,18 @@ def extract_file_links(soup: BeautifulSoup, page_url: str) -> list[tuple[str, st
         if not (lower.endswith(".xlsx") or lower.endswith(".xls")):
             continue
         full = urljoin(page_url, href)
-        filename = Path(urlparse(full).path).name
+        # Not urlparse(full).path — urlparse treats a ';' in the last path
+        # segment as the start of legacy URL "params" and silently drops
+        # everything from it onward. Confirmed against a real carina.gov.hr
+        # link ("BMW;MINI 16.05.2023..xlsx") that parsed to path=".../BMW",
+        # losing the rest of the filename (and its extension) entirely — the
+        # file itself still downloaded fine since fetch() uses `full`, not
+        # this derived filename, but the truncated name meant
+        # parse_valid_from later found no date in "BMW" and the whole file
+        # silently never got ingested. Splitting the raw path on '/' instead
+        # keeps the ';' and everything after it.
+        parsed = urlparse(full)
+        filename = parsed.path.rsplit("/", 1)[-1] + (";" + parsed.params if parsed.params else "")
         if full not in seen:
             seen.add(full)
             links.append((filename, full))
