@@ -1,7 +1,7 @@
 "use client";
 
-import { FormEvent, useState } from "react";
-import { Turnstile } from "@marsidev/react-turnstile";
+import { FormEvent, useRef, useState } from "react";
+import { Turnstile, TurnstileInstance } from "@marsidev/react-turnstile";
 
 const TURNSTILE_SITE_KEY = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY;
 
@@ -16,6 +16,18 @@ export function UrlInputForm({ onSubmit, loading }: Props) {
 	const [value, setValue] = useState("");
 	const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
 	const [pasteState, setPasteState] = useState<PasteState>("idle");
+	const turnstileRef = useRef<TurnstileInstance>(undefined);
+
+	// A Turnstile token is single-use — the backend consumes it on the first
+	// verify call, so resubmitting the same token on a second paste/submit
+	// always 403s ("sigurnosna provjera nije uspjela"). Reset the widget right
+	// after every submit so it silently mints a fresh token in the background,
+	// ready before the user's next paste.
+	function submitAndResetTurnstile(url: string, token: string | null) {
+		onSubmit(url, token);
+		setTurnstileToken(null);
+		turnstileRef.current?.reset();
+	}
 	// Only genuinely unsupported (old browser, insecure context) hides the
 	// button permanently — a denied/failed read leaves it in place so the user
 	// can just tap it again, instead of the control vanishing on them.
@@ -26,7 +38,7 @@ export function UrlInputForm({ onSubmit, loading }: Props) {
 	function handleSubmit(e: FormEvent) {
 		e.preventDefault();
 		if (!value.trim()) return;
-		onSubmit(value, turnstileToken);
+		submitAndResetTurnstile(value, turnstileToken);
 	}
 
 	async function handlePaste() {
@@ -42,7 +54,7 @@ export function UrlInputForm({ onSubmit, loading }: Props) {
 				// that actually looks like a URL, so a pasted non-link doesn't fire a
 				// pointless request.
 				if (/^https?:\/\/\S+/i.test(trimmed)) {
-					onSubmit(trimmed, turnstileToken);
+					submitAndResetTurnstile(trimmed, turnstileToken);
 				}
 			}
 		} catch {
@@ -130,6 +142,7 @@ export function UrlInputForm({ onSubmit, loading }: Props) {
 			</div>
 			{TURNSTILE_SITE_KEY && (
 				<Turnstile
+					ref={turnstileRef}
 					siteKey={TURNSTILE_SITE_KEY}
 					onSuccess={setTurnstileToken}
 					onExpire={() => setTurnstileToken(null)}

@@ -105,6 +105,13 @@ YEAR_PENALTY = 27.0
 MODEL_MATCH_THRESHOLD = 70.0
 MODEL_MISMATCH_PENALTY = 40.0
 
+# When brand/model, fuel, gearbox and body all agree and at least one of
+# power_kw/year is confirmed within tolerance (with the other either also
+# confirmed or absent from the listing), free-text trim/dealer-package wording
+# is capped to costing at most this many points — see the core_confirmed
+# floor in _score_one for the full rationale.
+TRIM_MISMATCH_MAX_PENALTY = 10.0
+
 # Fuel/engine-family mismatch. The engine badge (TDI/TFSI, or a numeric badge's
 # trailing d/i) is the single most reliable cross-source signal after
 # brand+model: it appears in the free-text variant on BOTH sides and it *defines*
@@ -431,6 +438,7 @@ def _score_one(
     query_tokens: frozenset[str] | None = None,
 ) -> float:
     base = float(fuzz.token_set_ratio(query_key, cand.match_key))
+    model_mismatch = False
 
     if query_model and (cand.model or cand.variant):
         # A listing's stated "model" is usually the trim/badge text (a site says
@@ -454,6 +462,7 @@ def _score_one(
         digits_mismatch = q_digits is not None and c_digits is not None and q_digits != c_digits
         if combined_score < MODEL_MATCH_THRESHOLD or digits_mismatch:
             base = max(0.0, base - MODEL_MISMATCH_PENALTY)
+            model_mismatch = True
 
     # Positive (bonus) and negative (penalty) adjustments are kept apart on
     # purpose: bonuses are capped so they can't push the score past 100, but
@@ -503,19 +512,44 @@ def _score_one(
         else:
             penalty += -signed
 
+    power_confirmed = False
     if listing_power_kw is not None and cand.power_kw is not None:
         diff = abs(listing_power_kw - cand.power_kw)
+        power_confirmed = diff <= POWER_TOLERANCE_KW
         _accumulate(_ramp_adjustment(diff, POWER_TOLERANCE_KW, POWER_PENALTY_GAP_KW, POWER_BONUS, POWER_PENALTY))
 
     if listing_co2_g_km is not None and cand.co2_g_km is not None:
         diff = abs(listing_co2_g_km - cand.co2_g_km)
         _accumulate(_ramp_adjustment(diff, CO2_TOLERANCE_G_KM, CO2_PENALTY_GAP_G_KM, CO2_BONUS, CO2_PENALTY))
 
+    year_confirmed = False
     if year is not None and cand.valid_from is not None:
         diff = abs(year - cand.valid_from.year)
+        year_confirmed = diff <= YEAR_TOLERANCE_YEARS
         _accumulate(_ramp_adjustment(diff, YEAR_TOLERANCE_YEARS, YEAR_PENALTY_GAP_YEARS, YEAR_BONUS, YEAR_PENALTY))
 
-    return max(0.0, min(100.0, base + bonus) - penalty)
+    score = max(0.0, min(100.0, base + bonus) - penalty)
+
+    # Trim/dealer-package text (e.g. "718 Cayman Approved 02.27 Sportabgasanlage")
+    # never appears in the catalogue's own spec blob and can drag the raw
+    # token_set_ratio well below ACCEPT_SCORE even when every hard spec that
+    # actually matters — brand, model, power, registration year, fuel, gearbox,
+    # body — agrees. When those core signals all confirm (no model/fuel/gearbox/
+    # body penalty, and every disambiguator that had data on both sides landed
+    # within tolerance), trim wording alone is capped to costing at most
+    # TRIM_MISMATCH_MAX_PENALTY points rather than however much the free-text
+    # blob happens to diverge by.
+    core_confirmed = (
+        not model_mismatch
+        and penalty == 0.0
+        and (listing_power_kw is None or power_confirmed)
+        and (year is None or year_confirmed)
+        and (power_confirmed or year_confirmed)
+    )
+    if core_confirmed:
+        score = max(score, 100.0 - TRIM_MISMATCH_MAX_PENALTY)
+
+    return score
 
 
 def rank_candidates(

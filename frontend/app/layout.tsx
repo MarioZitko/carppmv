@@ -3,10 +3,45 @@ import Image from "next/image";
 import Link from "next/link";
 import "./globals.css";
 
+const SITE_URL = "https://kalkulatoruvoza.com";
+const SITE_NAME = "carPPMV — Kalkulator uvoza";
+const DESCRIPTION =
+	"Besplatan kalkulator PPMV-a (posebni porez na motorna vozila) za uvoz automobila u Hrvatsku. Zalijepite link oglasa (mobile.de, autoscout24, autobid.de) ili pretražite bazu vozila i odmah dobijte procjenu carine i poreza.";
+
 export const metadata: Metadata = {
-	title: "carPPMV — izračun PPMV-a",
-	description:
-		"Procijenite hrvatski PPMV (posebni porez na motorna vozila) iz linka oglasa ili baze vozila.",
+	metadataBase: new URL(SITE_URL),
+	title: {
+		default: `${SITE_NAME} — izračun PPMV-a za uvoz auta`,
+		template: `%s | ${SITE_NAME}`,
+	},
+	description: DESCRIPTION,
+	keywords: [
+		"PPMV kalkulator",
+		"posebni porez na motorna vozila",
+		"izračun PPMV",
+		"uvoz automobila iz Njemačke",
+		"carina za auto",
+		"porez na uvoz vozila",
+		"mobile.de uvoz",
+		"autoscout24 uvoz",
+	],
+	applicationName: SITE_NAME,
+	authors: [{ name: "Mario Žitković", url: "https://mariozitko.github.io" }],
+	alternates: { canonical: "/" },
+	robots: { index: true, follow: true },
+	openGraph: {
+		type: "website",
+		locale: "hr_HR",
+		url: SITE_URL,
+		siteName: SITE_NAME,
+		title: `${SITE_NAME} — izračun PPMV-a za uvoz auta`,
+		description: DESCRIPTION,
+	},
+	twitter: {
+		card: "summary_large_image",
+		title: `${SITE_NAME} — izračun PPMV-a za uvoz auta`,
+		description: DESCRIPTION,
+	},
 };
 
 export default function RootLayout({
@@ -17,6 +52,24 @@ export default function RootLayout({
 	return (
 		<html lang="hr" className="h-full">
 			<body className="min-h-full flex flex-col">
+				<script
+					type="application/ld+json"
+					// Describes the calculator as a WebApplication so search results
+					// can surface it as a free tool (rich snippet), not just a page.
+					dangerouslySetInnerHTML={{
+						__html: JSON.stringify({
+							"@context": "https://schema.org",
+							"@type": "WebApplication",
+							name: SITE_NAME,
+							url: SITE_URL,
+							description: DESCRIPTION,
+							applicationCategory: "FinanceApplication",
+							operatingSystem: "Any",
+							inLanguage: "hr",
+							offers: { "@type": "Offer", price: "0", priceCurrency: "EUR" },
+						}),
+					}}
+				/>
 				<header className="sticky top-0 z-10 border-b border-[var(--border)] bg-white/80 backdrop-blur-sm">
 					<div className="mx-auto max-w-6xl px-6 py-4 flex items-center justify-between">
 						<Link href="/" className="flex items-center gap-2.5 text-lg">

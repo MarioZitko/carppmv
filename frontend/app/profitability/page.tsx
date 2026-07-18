@@ -1,3 +1,12 @@
+import type { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "Isplativost uvoza vozila",
+  description:
+    "Usporedite trošak uvoza automobila s njegovom prodajnom vrijednosti na hrvatskom tržištu.",
+  alternates: { canonical: "/profitability" },
+};
+
 export default function ProfitabilityPage() {
   return (
     <div className="mx-auto max-w-3xl px-6 py-14">

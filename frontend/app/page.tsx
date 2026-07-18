@@ -177,8 +177,13 @@ export default function Home() {
 			});
 			setPriceAnchorToken((t) => t + 1);
 
-			if (data.match_status === "auto_matched" && data.candidates.length > 0) {
-				setSelectedCatalogueId(data.candidates[0].catalogue_id);
+			// Candidates come back ranked best-first (see rank_candidates in
+			// matching.py) — always preselect the top match so the price/CO2
+			// panel is populated immediately, whether or not the backend was
+			// confident enough to auto-accept it. The user can still pick a
+			// different row from the list if the guess is wrong.
+			if (data.candidates.length > 0) {
+				applyCandidate(data.candidates[0]);
 			}
 		} catch (err) {
 			setUrlError(describeUrlError(err));

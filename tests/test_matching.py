@@ -417,20 +417,43 @@ def test_bmw_marketing_title_matches_lean_catalogue_after_strip():
     # The reported bug: a "118i Steptronic Advantage" listing found nothing,
     # because "steptronic"/"advantage" (absent from every BMW row) dragged the
     # score below the floor. Against the lean post-ingest key it must auto-match.
+    #
+    # No listing_power_kw here on purpose: the core_confirmed trim-mismatch
+    # floor in _score_one (see TRIM_MISMATCH_MAX_PENALTY) only engages when a
+    # hard spec signal (power_kw or year) is confirmed within tolerance, so
+    # with neither supplied this still isolates what stripping alone buys —
+    # see test_bmw_marketing_noise_capped_when_power_confirms below for the
+    # floor engaging.
     lean = _cand(model="serije 1", variant="118i", fuel="petrol", power_kw=100.0,
                  co2=129.0, price_eur=30000.0)
     noisy = build_match_key("BMW", "118I", "BMW 118i Steptronic Advantage")
     # Without stripping, the noise holds the score below the auto-accept bar
     # (in production, against the old spec-bloated key, it fell under the floor
     # entirely — "found nothing"; here the point is simply: no auto-match).
-    unstripped = rank_candidates(noisy, [lean], listing_power_kw=100.0, query_model="118I")
+    unstripped = rank_candidates(noisy, [lean], query_model="118I")
     assert unstripped.status != MatchStatus.AUTO_MATCHED
     assert unstripped.candidates[0].score < ACCEPT_SCORE
     # With stripping (what find_match does for BMW/MINI), it auto-matches.
     stripped = _strip_bmw_mini_query_noise(noisy)
-    result = rank_candidates(stripped, [lean], listing_power_kw=100.0, query_model="118I")
+    result = rank_candidates(stripped, [lean], query_model="118I")
     assert result.status == MatchStatus.AUTO_MATCHED
     assert result.matched.variant == "118i"
+
+
+def test_bmw_marketing_noise_capped_when_power_confirms():
+    # Same noisy, unstripped query as above, but this time the listing states
+    # its power and it matches the candidate exactly. Trim/marketing wording
+    # ("Steptronic Advantage") must not be able to cost more than
+    # TRIM_MISMATCH_MAX_PENALTY once brand/model/power all agree — this is the
+    # behaviour the confirm-unless-certain floor exists for (e.g. a Porsche
+    # "718 Cayman Approved 02.27 Sportabgasanlage" dealer listing scoring far
+    # below its true match against the catalogue's bare "718 Cayman" row).
+    lean = _cand(model="serije 1", variant="118i", fuel="petrol", power_kw=100.0,
+                 co2=129.0, price_eur=30000.0)
+    noisy = build_match_key("BMW", "118I", "BMW 118i Steptronic Advantage")
+    result = rank_candidates(noisy, [lean], listing_power_kw=100.0, query_model="118I")
+    assert result.candidates[0].score >= 90.0
+    assert result.status == MatchStatus.AUTO_MATCHED
 
 
 def test_bmw_touring_query_prefers_wagon_over_cheaper_sedan():
