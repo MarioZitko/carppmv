@@ -7530,8 +7530,8 @@
    "confidence": 0.95,
    "euro_norm_column": "Razina emisija",
    "fuel_column": null,
-   "full_name_column": null,
-   "model_name_column": "Trgovački naziv",
+   "full_name_column": "Trgovački naziv",
+   "model_name_column": "Tip",
    "notes": "Brand is clearly 'Marka'. Model name is 'Trgovački naziv' (e.g. '125d'). No explicit type code column was identified; 'Tip' contains high-level series names (e.g. 'Serija 1 (F20)'), 'Varijanta' contains body style codes (e.g. '1T31'), and the empty header column between 'Tip' and 'Varijanta' contains values like '1K4' (likely a platform code), but none of these seem to be a dedicated unique model code column. Fuel is absent (derived from engine text later). CO2 column is '*Prosječna emisija CO2' with values like '114*' (asterisk likely a footnote marker). Power column is 'Snaga motora' in kW. Price is in HRK (price values are in kn, e.g. 269184.375). Valid from is 'Datum primjene'. Euro norm from 'Razina emisija' (values like '(EU6)'). Empty columns 2 and 7–8 are ignored.",
    "pickup_8704_column": null,
    "plug_in_range_column": null,
@@ -7543,6 +7543,7 @@
    "type_code_column": null,
    "valid_from_column": "Datum primjene"
   },
+  "notes_patch": "Iteration 3 (10.1): manually patched, same root cause as 59b66e02379c3638e40f38d91b539c651e0dc2f5 — 'Tip' holds the real BMW/MINI series per row but the LLM declined to map it. model_name_column moved Trgovački naziv -> Tip; full_name_column set to Trgovački naziv.",
   "sample_header": [
    "Marka",
    "Tip",
@@ -12862,8 +12863,8 @@
    "confidence": 0.95,
    "euro_norm_column": "Razina emisija",
    "fuel_column": null,
-   "full_name_column": null,
-   "model_name_column": "Trgovački naziv",
+   "full_name_column": "Trgovački naziv",
+   "model_name_column": "Tip",
    "notes": "The header 'Tip' is empty in the sample rows (value '/') and appears to be a section header or unused column, so it is not mapped. 'Varijanta' is chosen as type_code_column because it is the most specific variant code per row. 'Trgovački naziv' is the model name. No fuel column exists; fuel is likely derived from engine text. 'Razina emisija' contains EURO norm values like '(EU5)'. Price is in HRK (no EUR column present). 'Datum primjene' is the valid-from date. 'Snaga motora' is power in kW (values 160, 135, etc.). 'Prosječna emisija CO2' is the single CO2 column. No full_name, plug-in range, seats, camper, or pickup columns present.",
    "pickup_8704_column": null,
    "plug_in_range_column": null,
@@ -12875,6 +12876,7 @@
    "type_code_column": "Varijanta",
    "valid_from_column": "Datum primjene"
   },
+  "notes_patch": "Iteration 3 (10.1): manually patched — LLM's 5-row sample saw 'Tip' blank ('/') but it's populated with the real series (e.g. 'Serija 1 (F20)') throughout the full sheet. model_name_column moved Trgovački naziv -> Tip; full_name_column set to Trgovački naziv so the trim text isn't lost.",
   "sample_header": [
    "Marka",
    "Tip",

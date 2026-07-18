@@ -358,3 +358,199 @@ BMW's distinct-model count should drop from ~532 to roughly the mid-teens
 (real BMW series count); MINI similarly. Every other brand's row/model counts
 should be unchanged from before this iteration (spot-check Audi/VW to
 confirm the no-banner path is untouched).
+
+### Iteration 2 result (verified against the live DB, 2026-07-18)
+`--fresh` was run and committed (`b17ce51`). Actual outcome:
+- **MINI: 100% fixed** — 620/620 rows have a real series model
+  (`MINI CLUBMAN`, `MINI COUNTRYMAN (F60) LCI`, ...).
+- **BMW: 67.5% fixed** — 3,228 of 4,779 rows now carry a real series name
+  (56 distinct series/generation strings, e.g. `BMW serije 1`, `BMW serija 5
+  LCI (G30/F90)` — the count is >15 because generation/facelift suffixes and
+  inconsistent year-to-year spelling of "serija"/"serije" each produce a
+  distinct string; still vastly better than the old ~500+ trim-polluted
+  values). The other 1,551 rows (32.5%) are still trim-named.
+- The **entire unfixed 32.5%** traces to exactly **61 `.xls` files, 2013-2017**
+  — none from `.xlsx` files. Every one of them shares one of two near-identical
+  header layouts (`Marka, Tip, [blank], Varijanta, Trgovački naziv, ...` and a
+  variant with no blank column) — this is the same legacy format flagged in
+  §9's "legacy BMW format" note, just now fully scoped. `Tip` holds the real
+  series per-row (`"Serija 1 (F20)"`) but the cached LLM mapping (confidence
+  0.95, all 61 files share the same 2 fingerprints) declined to map it —
+  its 5-row sample happened to show `Tip` blank, even though it's populated
+  throughout the real sheet.
+
+## 10. Iteration 3 — handoff plan (not yet started)
+
+Five known, scoped issues remain. Ordered by impact/effort. None of these
+require re-touching the iteration-2 banner-row logic — they're independent.
+
+### 10.1 Legacy 2013-2017 BMW `.xls` format (highest impact, ~1,551 rows)
+**Root cause**: `Tip` (holds the real series, e.g. `"Serija 1 (F20)"`,
+populated on every data row) was left unmapped because the LLM's 5-row
+sample happened to show it blank. This is a mapping-cache quality issue, not
+a code bug — the same class of failure could recur for any column that's
+sparse in whichever 5 rows happen to get sampled.
+
+**Recommended fix** — do NOT re-pay for a fresh LLM call (uncertain it'd fix
+itself, same sampling luck applies). Instead, directly patch the 2 affected
+cache entries in `column_mappings.json`:
+1. Find the two fingerprints: `mapping_store.fingerprint_key(header)` for
+   `['Marka','Tip','','Varijanta','Trgovački naziv',...]` and the no-blank
+   variant.
+2. Set `model_name_column: "Tip"` (was `"Trgovački naziv"`) on both cached
+   entries directly in the JSON (or via a small one-off script using
+   `mapping_store.load()`/`save()` — mirrors `scripts/migrate_mapping_cache.py`'s
+   pattern of editing the store programmatically).
+3. `Trgovački naziv` (the actual trim, e.g. `"125d"`) then needs to keep
+   flowing into `variant` — check what `full_name_column`/`type_code_column`
+   are mapped to for these two fingerprints first; if neither already covers
+   the trim text, remap one of them to `"Trgovački naziv"` so `variant` isn't
+   left with only the type code.
+4. Re-run `--fresh` (still $0 — these are cache edits, not new LLM calls).
+5. Verify: `SELECT COUNT(*) FROM catalogue WHERE brand='BMW' AND model NOT
+   ILIKE '%serij%' AND model NOT ILIKE '%serie%';` should drop close to 0
+   (a few pre-2013 or odd-format rows may remain — check before assuming bug).
+
+**Effort**: small — 2 cache entries, no new logic, verify via SQL diff.
+
+### 10.2 Jaguar / Land Rover: type-code-as-model (~1,450 rows combined)
+**Root cause** (§9): no banner rows in these files — `model='260JY'` (Jaguar)
+/ `'350NA'` (Land Rover) are internal type codes; the real model name
+(`Range Rover Sport`, `XF`, `Discovery`, `F-Pace`...) is embedded in
+`variant`/`full_name` text like `"RR Sport HSE Dynamic 5.0 V8..."` /
+`"Jaguar XF S 2.0D I4..."`.
+
+**Recommended fix**: a small, hand-maintained regex/keyword extraction —
+NOT an LLM call (this is row-level text, out of scope for the per-sheet
+column mapper). Add a `_extract_model_family(text: str, known_families:
+tuple[str,...]) -> str | None` helper (probably in `canonical_schema.py`
+next to `_detect_series_banner`, or a new small module if it needs a
+per-brand family list) that matches the longest known family name appearing
+in the variant/full_name text. Needs real family lists:
+- Land Rover: `Range Rover Sport`, `Range Rover Velar`, `Range Rover Evoque`,
+  `Range Rover` (check longest-match-first so "Range Rover Sport" doesn't
+  match as plain "Range Rover"), `Discovery Sport`, `Discovery`, `Defender`.
+- Jaguar: `XE`, `XF`, `XF Sportbrake`, `XJ`, `F-Pace`, `E-Pace`, `I-Pace`,
+  `F-Type`.
+Verify these lists against real file samples first (`grep` a few dozen
+`variant` values per brand out of the current DB — the strings are already
+there) rather than trusting the WebSearch-sourced 2026 lineup blind, since
+these files span 2013-2024 and include discontinued models (e.g. Jaguar XE
+was discontinued but will appear in older files).
+**Fallback** for text that matches no known family: keep the current
+type-code behavior (`model = type_code`) rather than dropping the row —
+same "never silently invent, but don't lose data either" principle as the
+rest of this pipeline.
+
+**Effort**: medium — needs real-data-verified family lists per brand, plus
+tests per family. Higher risk of false matches than 10.1 (regex-based, not
+a clean per-row column), so test thoroughly against the full corpus before
+trusting it.
+
+### 10.3 Mazda: 0 DB rows despite 59 source files
+**Root cause** (§9): `_fuel_from_badge` (`app/catalogue/matching.py:272-273`,
+`\b\d{2,3}[di]\b`) requires a 2-3 digit badge; Mazda's `"1.3i"`/`"2.0d"`
+style gets fragmented by `normalize_text` into sub-2-digit tokens (`"1"`,
+`"3i"`), so fuel never resolves and every row is dropped (NOT NULL
+`fuel_type`).
+
+**Recommended fix**: add a second regex alongside `_BADGE_DIESEL_RE`/
+`_BADGE_PETROL_RE` for the decimal-displacement style, e.g.
+`\b\d\.\d[di]\b` matched against the RAW text (before `normalize_text`
+strips the `.`) — or normalize differently for this specific pattern.
+**Caution**: this is a shared, multi-brand function (`_derive_fuel_family` is
+used for fuel derivation across ALL brands during ingest AND for scoring
+listing matches in `/calculate`). Before landing this, grep the full corpus
+for any OTHER brand using `\d\.\d[di]` as a coincidental substring that
+would now misfire (e.g. a trim name containing a version number like "2.0i
+Limited" is fine/intended, but something like a random spec code shouldn't
+false-positive). Test against Mazda's full 59-file corpus for the actual
+fix, and spot-check 2-3 other brands' full data for false positives before
+committing.
+
+**Effort**: small code change, but needs careful cross-brand regression
+testing since `matching.py` fuel derivation is shared, high-blast-radius code.
+
+### 10.4 Suzuki: 1 DB row despite 38 source files
+**Not confirmed as a bug yet** — at least the pre-2014 files genuinely lack
+a CO2 column in the sheet. Before writing any code:
+1. Open 3-4 of the newer Suzuki files (`app/data/catalogues/suzuki/2020/` or
+   later) directly and check by eye whether they have a CO2 column.
+2. If yes and it's just not mapping: check the cached mapping for those
+   fingerprints (`mapping_store.load()`, filter by any file under
+   `suzuki/`) and see whether `co2_column`/`co2_min_column`/`co2_max_column`
+   are all null despite a real CO2 header being present — that'd be an LLM
+   mapping-quality issue like 10.1, fixable the same way (direct cache edit).
+3. If no CO2 in any Suzuki file ever: this is a genuine source-data gap,
+   not fixable in code. Document it and move on.
+
+**Effort**: investigation first (30 min), fix only if step 1/2 finds a real
+mapping bug — could be zero-effort ("confirmed not a bug") or small
+(cache edit like 10.1).
+
+### 10.5 Re-audit remaining low-row brands
+BAIC, Foton, Forthing, Lynk & Co, Isuzu, Geely, smart, Infiniti, Subaru —
+row/model ratios looked structurally plausible for low-volume marques when
+last checked, but weren't individually root-caused. Re-run the same probe
+used for Mazda/Suzuki this session (`apply_mapping` + `_to_catalogue_dict`
+on a sample file per brand, check whether rows survive `apply_mapping` but
+get dropped in `_to_catalogue_dict`, and why) — do this AFTER 10.3 lands,
+since a fuel-derivation fix might independently un-block some of these too.
+
+**Effort**: investigation only, small if it turns out to be the same root
+causes as 10.3/10.4; otherwise scope per-brand as discovered.
+
+### Suggested order
+10.1 (BMW legacy format) → 10.3 (Mazda) → 10.5 (re-audit, may now be smaller)
+→ 10.4 (Suzuki, investigation-only) → 10.2 (Jaguar/Land Rover, highest effort,
+do last). Each is independent — no ordering dependency, this is just
+effort/impact sorted. Run `--fresh` once after all code/cache changes land
+rather than after each one (all are free/cache-only, no reason to rebuild
+5 times), then do one full per-brand row/model diff against this session's
+baseline (§2's table plus the iteration-2 result above) before calling it done.
+
+### 10.1 result (DONE, 2026-07-18)
+Two cache entries patched directly in `column_mappings.json`
+(`mapping_store.load()`/`save()`, no LLM call, $0):
+- `59b66e02379c3638e40f38d91b539c651e0dc2f5` — the blank-column variant
+  (`Marka, Tip, '', Varijanta, Trgovački naziv, ...`). Note: this single
+  fingerprint actually covers BOTH header shapes described in the original
+  plan (blank-column and no-blank-column) — `fingerprint_key` hashes the
+  *set* of non-empty normalized cells, so a blank column doesn't change the
+  key. The "two fingerprints" in the original diagnosis turned out to be one.
+- `3616f5f3f670890fadc5d4696d2cc6747e4b4c81` — a second, distinct legacy
+  fingerprint found only after rebuilding once and re-auditing leftover
+  trim-named rows by `source_file`: 2015-2017 files whose CO2 header has a
+  literal `*` prefix (`'*Prosječna emisija CO2'`, a footnote marker), which
+  hashes differently. Same root cause, same fix.
+
+Both entries: `model_name_column` moved `"Trgovački naziv"` → `"Tip"`;
+`full_name_column` set to `"Trgovački naziv"` (was `null`) so the trim text
+keeps flowing into `variant` instead of being dropped.
+
+**False lead, ruled out before patching further**: a broader grep of the
+whole cache for "`Tip` + `Trgovački naziv` present, `model_name_column` ==
+`Trgovački naziv`" turned up 10 fingerprints, not 2. Traced all 10 to their
+source files across the full 2160-file corpus (not just `bmw-mini/`) before
+touching anything — only the 2 above are actually BMW/MINI. The other 8 are
+Mercedes-Benz/smart and Honda files that happen to reuse the same Croatian
+column labels with different semantics (Mercedes' `Tip` is a genuine model
+class, e.g. `"C klasa"`/`"E klasa"` — already correct; patching those would
+have broken Mercedes-Benz, which was not broken). Lesson: header *label*
+reuse across brands is not evidence of the same bug — verify against a real
+source file per brand before batch-patching by grep pattern alone.
+
+Rebuilt `--fresh` twice (once per fingerprint fix, $0 both times — cache
+edits only, zero new LLM calls, `2141 succeeded, 22 failed` unchanged from
+before, the 22 failures are pre-existing and unrelated). Verified against
+the live DB:
+- **BMW: 99.6% fixed** — 4,850 of 4,870 rows now carry a real series name
+  (was 3,228/4,779 = 67.5%). The remaining 20 rows are two `.xlsx` files
+  (`bmw-mini/2019/BMW 2019 0102.xlsx`, `bmw-mini/2020/BMW 2020 2407.xlsx`) —
+  a modern, structurally different format, out of scope for this item and
+  negligible (20 rows).
+- Full per-brand rebuild produced 43 brands (Nissan/Opel/Subaru now populated
+  from the earlier iteration's nullable-column fix, as expected); no phantom
+  brands, no other brand's row count changed from this session's baseline.
+
+Next up per the suggested order: **10.3 (Mazda)**.
