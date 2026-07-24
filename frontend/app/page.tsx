@@ -333,7 +333,6 @@ export default function Home() {
 					{ppmvResult ? (
 						<>
 							<PPMVBreakdownCard result={ppmvResult} updating={ppmvLoading} />
-							<CarVerticalCard vin={urlResult?.parsed.vin} />
 						</>
 					) : (
 						<div className="rounded-2xl border border-dashed border-[var(--border)] bg-[var(--surface-alt)] px-5 py-6 text-sm text-[var(--text-soft)]">
@@ -341,6 +340,10 @@ export default function Home() {
 						</div>
 					)}
 				</div>
+			</div>
+
+			<div className="mt-4">
+				<CarVerticalCard />
 			</div>
 
 			<MobilePriceBar

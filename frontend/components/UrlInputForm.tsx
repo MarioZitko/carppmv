@@ -1,9 +1,18 @@
 "use client";
 
-import { FormEvent, useRef, useState } from "react";
+import {
+	FormEvent,
+	useRef,
+	useState,
+	useSyncExternalStore,
+} from "react";
 import { Turnstile, TurnstileInstance } from "@marsidev/react-turnstile";
 
 const TURNSTILE_SITE_KEY = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY;
+
+// Never changes after mount, so there's nothing to subscribe to — this only
+// exists to give useSyncExternalStore a no-op subscribe function.
+const noopSubscribe = () => () => {};
 
 interface Props {
 	onSubmit: (url: string, turnstileToken: string | null) => void;
@@ -31,8 +40,12 @@ export function UrlInputForm({ onSubmit, loading }: Props) {
 	// Only genuinely unsupported (old browser, insecure context) hides the
 	// button permanently — a denied/failed read leaves it in place so the user
 	// can just tap it again, instead of the control vanishing on them.
-	const [clipboardSupported] = useState(
-		() => typeof navigator !== "undefined" && !!navigator.clipboard?.readText,
+	// getServerSnapshot always returns false so SSR/first-client-render markup
+	// matches (server has no `navigator`); the real value kicks in right after.
+	const clipboardSupported = useSyncExternalStore(
+		noopSubscribe,
+		() => !!navigator.clipboard?.readText,
+		() => false,
 	);
 
 	function handleSubmit(e: FormEvent) {

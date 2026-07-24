@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
+import Script from "next/script";
 import "./globals.css";
 
 const SITE_URL = "https://kalkulatoruvoza.com";
@@ -52,6 +53,11 @@ export default function RootLayout({
 	return (
 		<html lang="hr" className="h-full">
 			<body className="min-h-full flex flex-col">
+				<Script
+					id="carvertical-sdk"
+					strategy="afterInteractive"
+					src="https://aff.carvertical.com/sdk.js"
+				/>
 				<script
 					type="application/ld+json"
 					// Describes the calculator as a WebApplication so search results

@@ -1,41 +1,71 @@
-/** carVertical affiliate CTA (see docs/MONETIZATION_SPEC.md). Pre-fills the
- * VIN extracted from the scraped listing so the vehicle-history check is a
- * single click. Renders nothing when no VIN was extracted — never show a
- * broken/empty VIN link. */
+"use client";
 
-const CARVERTICAL_LOCALE = process.env.NEXT_PUBLIC_CARVERTICAL_LOCALE || "hr";
-const CARVERTICAL_AFFILIATE_ID = process.env.NEXT_PUBLIC_CARVERTICAL_AFFILIATE_ID || "";
+import { useEffect } from "react";
 
-function buildCarVerticalUrl(vin: string): string {
-  const params = new URLSearchParams({
-    vin,
-    utm_source: "kalkulatoruvoza",
-    utm_medium: "affiliate",
-    utm_campaign: "ppmv_result",
-  });
-  if (CARVERTICAL_AFFILIATE_ID) {
-    params.set("a_aid", CARVERTICAL_AFFILIATE_ID);
-  }
-  return `https://www.carvertical.com/${CARVERTICAL_LOCALE}/landing?${params.toString()}`;
+/** carVertical affiliate banner (Everflow-tracked, see docs/MONETIZATION_SPEC.md).
+ * Static per-partner tracking attributes — not personalized per listing, so it
+ * renders unconditionally, filling the full page width below the calculator.
+ * Swaps to a narrower/taller aspect below `sm` to match mobile's viewport.
+ *
+ * The SDK (aff.carvertical.com/sdk.js) only scans for `[data-cvaff]` elements
+ * once, on the browser's `load` event, which has usually already fired by the
+ * time next/script's `afterInteractive` strategy attaches the script tag — so
+ * its own auto-scan is missed. We call `window.CVAff.loadBanners()` ourselves
+ * once the SDK is available; it's idempotent (skips iframes whose src already
+ * matches), so this is safe to call even if the SDK's own listener also runs. */
+declare global {
+	interface Window {
+		CVAff?: { loadBanners: () => void };
+	}
 }
 
-export function CarVerticalCard({ vin }: { vin: string | null | undefined }) {
-  if (!vin) return null;
+export function CarVerticalCard() {
+	useEffect(() => {
+		if (window.CVAff) {
+			window.CVAff.loadBanners();
+			return;
+		}
+		const interval = setInterval(() => {
+			if (window.CVAff) {
+				window.CVAff.loadBanners();
+				clearInterval(interval);
+			}
+		}, 100);
+		return () => clearInterval(interval);
+	}, []);
 
-  return (
-    <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] shadow-sm px-5 py-4">
-      <p className="text-sm font-medium text-[var(--text)]">Provjeri povijest vozila</p>
-      <p className="text-xs text-[var(--text-soft)] mt-0.5 mb-3">
-        Provjeri kilometražu, štete i vlasništvo na carVertical (partnerski link)
-      </p>
-      <a
-        href={buildCarVerticalUrl(vin)}
-        target="_blank"
-        rel="noopener noreferrer sponsored"
-        className="flex items-center justify-center gap-2 rounded-xl bg-[var(--primary)] px-4 py-2.5 text-sm font-medium text-white transition-opacity hover:opacity-90"
-      >
-        Provjeri povijest vozila →
-      </a>
-    </div>
-  );
+	return (
+		<>
+			<div
+				data-cvaff
+				data-platform="everflow"
+				data-locale="hr"
+				data-partner-id="2CRT9JN"
+				data-offer-id="964QF6"
+				data-uid="https://www.carvertical.deal/2CRT9JN/964QF6/?source_id=AFF&sub1=kalkulatoruvoza"
+				data-chan="Website"
+				data-voucher="kalkulatoruvoza"
+				data-integration-type="banner"
+				data-variant="drowned"
+				data-background="lightblue"
+				className="hidden sm:block w-full"
+				style={{ height: 180 }}
+			/>
+			<div
+				data-cvaff
+				data-platform="everflow"
+				data-locale="hr"
+				data-partner-id="2CRT9JN"
+				data-offer-id="964QF6"
+				data-uid="https://www.carvertical.deal/2CRT9JN/964QF6/?source_id=AFF&sub1=kalkulatoruvoza"
+				data-chan="Website"
+				data-voucher="kalkulatoruvoza"
+				data-integration-type="banner"
+				data-variant="drowned"
+				data-background="lightblue"
+				className="sm:hidden w-full"
+				style={{ height: 280 }}
+			/>
+		</>
+	);
 }

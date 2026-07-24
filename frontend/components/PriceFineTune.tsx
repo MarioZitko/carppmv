@@ -14,8 +14,6 @@ interface Props {
 	anchorToken?: number;
 }
 
-const STEPS = [-1000, -100, 100, 1000];
-
 // Extras only ever push the price up from the catalogue's base-trim (no
 // extras) price, so the control is anchored to that base price rather than
 // an arbitrary absolute window around whatever priceEur currently is.
@@ -95,12 +93,6 @@ export function PriceFineTune({ priceEur, onChange, anchorToken }: Props) {
 		}
 	}
 
-	function handleStep(step: number) {
-		const next = Math.max(0, priceEur + step);
-		setSelectedPct(nearestSnapPercent(next, anchor, max));
-		onChange(next);
-	}
-
 	function handleNumberChange(raw: string) {
 		const next = Number(raw) || 0;
 		setSelectedPct(nearestSnapPercent(next, anchor, max));
@@ -112,14 +104,6 @@ export function PriceFineTune({ priceEur, onChange, anchorToken }: Props) {
 			<h3 className="text-sm font-semibold text-[var(--text)]">
 				Fino podešavanje cijene
 			</h3>
-			<div className="rounded-xl border border-[var(--warn)]/30 bg-[var(--warn-bg)] px-3.5 py-2.5">
-				<p className="text-sm text-[var(--warn)] font-medium leading-snug">
-					Napomena: baza sadrži cijene osnovnih izvedbi (trim varijanti) bez
-					dodatne opreme. Stvarna cijena novog vozila može biti viša zbog paketa
-					opreme i dodatne opreme, a to može utjecati i na CO2 emisiju, a time i
-					na iznos PPMV-a.
-				</p>
-			</div>
 
 			<div>
 				<div className="flex items-center justify-between font-mono-tab text-xl font-semibold text-[var(--text)]">
@@ -173,19 +157,6 @@ export function PriceFineTune({ priceEur, onChange, anchorToken }: Props) {
 					<option key={pct} value={priceForPercent(anchor, pct)} />
 				))}
 			</datalist>
-
-			<div className="grid grid-cols-4 gap-2">
-				{STEPS.map((step) => (
-					<button
-						key={step}
-						type="button"
-						onClick={() => handleStep(step)}
-						className="rounded-lg border border-[var(--border)] bg-[var(--surface-alt)] py-1.5 text-xs font-medium text-[var(--text)] hover:border-[var(--primary)] hover:text-[var(--primary)] transition-colors"
-					>
-						{step > 0 ? `+${step}` : step}
-					</button>
-				))}
-			</div>
 
 			<input
 				type="number"
