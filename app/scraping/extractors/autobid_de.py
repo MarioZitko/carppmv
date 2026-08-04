@@ -65,11 +65,29 @@ _LABEL_MAP: dict[str, str] = {
     "oprema": "variant",
     "marka": "brand",
     "proizvođač": "brand",
+    # VIN / chassis number — German sites label this "FIN", English/Croatian "VIN"
+    "fin": "vin",
+    "fahrgestellnummer": "vin",
+    "fahrzeug-identifizierungsnummer": "vin",
+    "vehicle identification no": "vin",
+    "vehicle identification number": "vin",
+    "vin": "vin",
+    "identifikacijski broj vozila": "vin",
+    "broj šasije": "vin",
     # Icon-card labels synthesized by _parse_car_parameter_cards()
     "first registration": "first_registration",
     "mileage": "mileage_km",
     "power": "power_kw",
 }
+
+_VIN_RE = re.compile(r"^[A-HJ-NPR-Z0-9]{11,17}$")  # excludes I/O/Q, standard VIN charset
+
+
+def _parse_vin(raw: str | None) -> str | None:
+    if not raw:
+        return None
+    candidate = raw.strip().upper()
+    return candidate if _VIN_RE.match(candidate) else None
 
 _FUEL_MAP: dict[str, str] = {
     "diesel": "diesel",
@@ -328,6 +346,7 @@ class AutobidDeExtractor:
         variant: str | None = None
         brand: str | None = None
         model: str | None = None
+        vin: str | None = None
 
         for raw_label, raw_value in specs.items():
             canonical = _LABEL_MAP.get(raw_label)
@@ -356,6 +375,8 @@ class AutobidDeExtractor:
                 brand = raw_value.strip() or None
             elif canonical == "model":
                 model = raw_value.strip() or None
+            elif canonical == "vin":
+                vin = _parse_vin(raw_value)
 
         # Fill from JSON-LD Vehicle schema when spec table didn't cover a field
         if json_ld:
@@ -377,6 +398,10 @@ class AutobidDeExtractor:
                     v = ld_p.get("enginePower", {}).get("value")
                     if isinstance(v, (int, float)):
                         power_kw = float(v)
+            if vin is None:
+                ld_vin = json_ld.get("vehicleIdentificationNumber")
+                if isinstance(ld_vin, str):
+                    vin = _parse_vin(ld_vin)
 
         # Variant fallback: pull from title if not in spec table
         if variant is None and title:
@@ -406,4 +431,5 @@ class AutobidDeExtractor:
             seat_count=seat_count,
             brand=brand,
             model=model,
+            vin=vin,
         )

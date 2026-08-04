@@ -343,7 +343,7 @@ export default function Home() {
 			</div>
 
 			<div className="mt-4">
-				<CarVerticalCard />
+				<CarVerticalCard vin={urlResult?.parsed.vin} />
 			</div>
 
 			<MobilePriceBar

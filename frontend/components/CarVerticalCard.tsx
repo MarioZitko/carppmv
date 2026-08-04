@@ -19,7 +19,11 @@ declare global {
 	}
 }
 
-export function CarVerticalCard() {
+export function CarVerticalCard({ vin }: { vin?: string | null }) {
+	const uid = `https://www.carvertical.deal/2CRT9JN/964QF6/?uid=167&source_id=AFF&sub1=kalkulatoruvoza${
+		vin ? `&sub3=${encodeURIComponent(vin)}` : ""
+	}`;
+
 	useEffect(() => {
 		if (window.CVAff) {
 			window.CVAff.loadBanners();
@@ -32,7 +36,7 @@ export function CarVerticalCard() {
 			}
 		}, 100);
 		return () => clearInterval(interval);
-	}, []);
+	}, [uid]);
 
 	return (
 		<>
@@ -42,7 +46,7 @@ export function CarVerticalCard() {
 				data-locale="hr"
 				data-partner-id="2CRT9JN"
 				data-offer-id="964QF6"
-				data-uid="https://www.carvertical.deal/2CRT9JN/964QF6/?source_id=AFF&sub1=kalkulatoruvoza"
+				data-uid={uid}
 				data-chan="Website"
 				data-voucher="kalkulatoruvoza"
 				data-integration-type="banner"
@@ -57,7 +61,7 @@ export function CarVerticalCard() {
 				data-locale="hr"
 				data-partner-id="2CRT9JN"
 				data-offer-id="964QF6"
-				data-uid="https://www.carvertical.deal/2CRT9JN/964QF6/?source_id=AFF&sub1=kalkulatoruvoza"
+				data-uid={uid}
 				data-chan="Website"
 				data-voucher="kalkulatoruvoza"
 				data-integration-type="banner"

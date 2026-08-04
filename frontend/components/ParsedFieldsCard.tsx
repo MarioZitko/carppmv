@@ -66,6 +66,7 @@ export function ParsedFieldsCard({ parsed, warnings }: Props) {
             {field("CO2", parsed.co2_g_km !== null ? `${parsed.co2_g_km} g/km` : null)}
             {field("Cijena", formatEur(parsed.price_eur))}
             {field("Broj sjedala", parsed.seat_count)}
+            {field("VIN", parsed.vin)}
           </div>
 
           {warnings.length > 0 && (
