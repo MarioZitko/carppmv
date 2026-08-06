@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
 
 /** carVertical affiliate CTA (Everflow-tracked, see docs/MONETIZATION_SPEC.md).
  * Self-styled banner — replaces the earlier CVAff SDK iframe integration per
@@ -10,6 +11,8 @@ import { useState } from "react";
 // this partner-branded card only, so it reads as their CTA, not ours.
 const CV_BLUE = "#1352F1";
 const CV_BLUE_SOFT = "#EAF0FE";
+const CV_CODE_LINK =
+	"https://www.carvertical.deal/2CRT9JN/964QF6/?source_id=AFF&sub1=kalkulatoruvoza";
 
 export function CarVerticalCard({ vin }: { vin?: string | null }) {
 	// Prefilled from the parsed listing when we have one, but always editable —
@@ -41,14 +44,24 @@ export function CarVerticalCard({ vin }: { vin?: string | null }) {
 		>
 			<div className="flex items-center gap-2 mb-1.5">
 				<span
-					className="rounded-full text-white text-xs font-bold px-2.5 py-1"
+					className="rounded-full text-white text-xs font-bold px-2.5 py-1 mt-2"
 					style={{ backgroundColor: CV_BLUE }}
 				>
 					-20%
 				</span>
-				<p className="text-sm font-semibold text-[var(--text)]">
-					carVertical provjera povijesti vozila
-				</p>
+				<a
+					href={CV_CODE_LINK}
+					target="_blank"
+					rel="noopener noreferrer nofollow sponsored"
+				>
+					<Image
+						src="/carvertical-logo.svg"
+						alt="carVertical"
+						width={220}
+						height={18}
+						priority={false}
+					/>
+				</a>
 			</div>
 			<p className="text-sm text-[var(--text-soft)]">
 				{vin
@@ -57,12 +70,15 @@ export function CarVerticalCard({ vin }: { vin?: string | null }) {
 			</p>
 			<p className="mt-2 text-sm text-[var(--text)]">
 				Kôd za 20% popusta:{" "}
-				<span
-					className="font-mono-tab font-bold text-base"
+				<a
+					href={CV_CODE_LINK}
+					target="_blank"
+					rel="noopener noreferrer nofollow sponsored"
+					className="font-mono-tab font-bold text-base hover:underline"
 					style={{ color: CV_BLUE }}
 				>
 					kalkulatoruvoza
-				</span>
+				</a>
 			</p>
 
 			<div className="mt-4 flex flex-col sm:flex-row gap-2">
