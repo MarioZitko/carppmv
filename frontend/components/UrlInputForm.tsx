@@ -79,7 +79,7 @@ export function UrlInputForm({ onSubmit, loading }: Props) {
 	}
 
 	return (
-		<form onSubmit={handleSubmit} className="flex flex-col gap-3">
+		<form onSubmit={handleSubmit} autoComplete="off" className="flex flex-col gap-3">
 			<div className="flex flex-col sm:flex-row gap-3">
 				<div className="relative flex-1">
 					<input
@@ -148,6 +148,7 @@ export function UrlInputForm({ onSubmit, loading }: Props) {
 				<button
 					type="submit"
 					disabled={loading || !value.trim()}
+					suppressHydrationWarning
 					className="rounded-xl bg-[var(--primary)] text-white px-6 py-3 text-sm font-semibold shadow-sm disabled:opacity-40 disabled:cursor-not-allowed hover:bg-[var(--primary-dark)] transition-colors"
 				>
 					{loading ? "Dohvaćanje oglasa…" : "Učitaj oglas"}

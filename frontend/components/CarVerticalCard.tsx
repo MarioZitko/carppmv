@@ -1,75 +1,89 @@
 "use client";
 
-import { useEffect } from "react";
+import { useState } from "react";
 
-/** carVertical affiliate banner (Everflow-tracked, see docs/MONETIZATION_SPEC.md).
- * Static per-partner tracking attributes — not personalized per listing, so it
- * renders unconditionally, filling the full page width below the calculator.
- * Swaps to a narrower/taller aspect below `sm` to match mobile's viewport.
- *
- * The SDK (aff.carvertical.com/sdk.js) only scans for `[data-cvaff]` elements
- * once, on the browser's `load` event, which has usually already fired by the
- * time next/script's `afterInteractive` strategy attaches the script tag — so
- * its own auto-scan is missed. We call `window.CVAff.loadBanners()` ourselves
- * once the SDK is available; it's idempotent (skips iframes whose src already
- * matches), so this is safe to call even if the SDK's own listener also runs. */
-declare global {
-	interface Window {
-		CVAff?: { loadBanners: () => void };
-	}
-}
+/** carVertical affiliate CTA (Everflow-tracked, see docs/MONETIZATION_SPEC.md).
+ * Self-styled banner — replaces the earlier CVAff SDK iframe integration per
+ * carVertical's own request, so the discount is front and center and the
+ * link doubles as their VIN/plate precheck deep-link when we have one. */
+// carVertical's own brand blue (not this site's --accent teal) — scoped to
+// this partner-branded card only, so it reads as their CTA, not ours.
+const CV_BLUE = "#1352F1";
+const CV_BLUE_SOFT = "#EAF0FE";
 
 export function CarVerticalCard({ vin }: { vin?: string | null }) {
-	const uid = `https://www.carvertical.deal/2CRT9JN/964QF6/?uid=167&source_id=AFF&sub1=kalkulatoruvoza${
-		vin ? `&sub3=${encodeURIComponent(vin)}` : ""
+	// Prefilled from the parsed listing when we have one, but always editable —
+	// a user who came in via the "search the catalogue" tab or hasn't loaded a
+	// listing yet still has a VIN/plate in hand and shouldn't be locked out of
+	// the precheck link.
+	const [manualId, setManualId] = useState(vin ?? "");
+	// A listing can finish parsing after this card has already mounted (vin
+	// starts undefined, then arrives once the fetch resolves) — sync the field
+	// when that happens so the user doesn't have to retype what we already know.
+	// Adjusted during render (React's recommended pattern for "derive state from
+	// a changed prop") instead of an effect, so it doesn't trigger the
+	// setState-in-effect cascading-render warning.
+	const [prevVin, setPrevVin] = useState(vin);
+	if (vin !== prevVin) {
+		setPrevVin(vin);
+		if (vin) setManualId(vin);
+	}
+	const effectiveId = (manualId || vin || "").trim();
+
+	const href = `https://www.carvertical.deal/2CRT9JN/964QF6/?uid=167&source_id=AFF&sub1=kalkulatoruvoza${
+		effectiveId ? `&sub3=${encodeURIComponent(effectiveId)}` : ""
 	}`;
 
-	useEffect(() => {
-		if (window.CVAff) {
-			window.CVAff.loadBanners();
-			return;
-		}
-		const interval = setInterval(() => {
-			if (window.CVAff) {
-				window.CVAff.loadBanners();
-				clearInterval(interval);
-			}
-		}, 100);
-		return () => clearInterval(interval);
-	}, [uid]);
-
 	return (
-		<>
-			<div
-				data-cvaff
-				data-platform="everflow"
-				data-locale="hr"
-				data-partner-id="2CRT9JN"
-				data-offer-id="964QF6"
-				data-uid={uid}
-				data-chan="Website"
-				data-voucher="kalkulatoruvoza"
-				data-integration-type="banner"
-				data-variant="drowned"
-				data-background="lightblue"
-				className="hidden sm:block w-full"
-				style={{ height: 180 }}
-			/>
-			<div
-				data-cvaff
-				data-platform="everflow"
-				data-locale="hr"
-				data-partner-id="2CRT9JN"
-				data-offer-id="964QF6"
-				data-uid={uid}
-				data-chan="Website"
-				data-voucher="kalkulatoruvoza"
-				data-integration-type="banner"
-				data-variant="drowned"
-				data-background="lightblue"
-				className="sm:hidden w-full"
-				style={{ height: 280 }}
-			/>
-		</>
+		<div
+			className="rounded-2xl border p-5 sm:p-6"
+			style={{ borderColor: `${CV_BLUE}4d`, backgroundColor: CV_BLUE_SOFT }}
+		>
+			<div className="flex items-center gap-2 mb-1.5">
+				<span
+					className="rounded-full text-white text-xs font-bold px-2.5 py-1"
+					style={{ backgroundColor: CV_BLUE }}
+				>
+					-20%
+				</span>
+				<p className="text-sm font-semibold text-[var(--text)]">
+					carVertical provjera povijesti vozila
+				</p>
+			</div>
+			<p className="text-sm text-[var(--text-soft)]">
+				{vin
+					? "Imamo VIN ovog vozila — provjerite kilometražu, štete i vlasništvo odmah."
+					: "Unesite broj šasije ili registraciju i provjerite kilometražu, vlasništvo i je li vozilo bilo u nesreći prije kupnje."}
+			</p>
+			<p className="mt-2 text-sm text-[var(--text)]">
+				Kôd za 20% popusta:{" "}
+				<span
+					className="font-mono-tab font-bold text-base"
+					style={{ color: CV_BLUE }}
+				>
+					kalkulatoruvoza
+				</span>
+			</p>
+
+			<div className="mt-4 flex flex-col sm:flex-row gap-2">
+				<input
+					type="text"
+					value={manualId}
+					onChange={(e) => setManualId(e.target.value)}
+					placeholder="Broj šasije ili registracija (npr. ZG1234AB)"
+					className="flex-1 rounded-xl border bg-white px-4 py-3 text-sm text-[var(--text)] placeholder:text-[var(--text-soft)] focus:outline-none"
+					style={{ borderColor: `${CV_BLUE}4d` }}
+				/>
+				<a
+					href={href}
+					target="_blank"
+					rel="noopener noreferrer nofollow sponsored"
+					className="shrink-0 rounded-xl text-white px-6 py-3 text-sm font-semibold shadow-sm hover:opacity-90 transition-opacity text-center"
+					style={{ backgroundColor: CV_BLUE }}
+				>
+					Provjeri povijest vozila →
+				</a>
+			</div>
+		</div>
 	);
 }

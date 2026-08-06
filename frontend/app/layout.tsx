@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
-import Script from "next/script";
 import "./globals.css";
+import { SupportSection } from "@/components/SupportSection";
 
 const SITE_URL = "https://kalkulatoruvoza.com";
 const SITE_NAME = "carPPMV — Kalkulator uvoza";
@@ -53,11 +53,6 @@ export default function RootLayout({
 	return (
 		<html lang="hr" className="h-full">
 			<body className="min-h-full flex flex-col">
-				<Script
-					id="carvertical-sdk"
-					strategy="afterInteractive"
-					src="https://aff.carvertical.com/sdk.js"
-				/>
 				<script
 					type="application/ld+json"
 					// Describes the calculator as a WebApplication so search results
@@ -115,22 +110,25 @@ export default function RootLayout({
 				</header>
 				<main className="flex-1">{children}</main>
 				<footer className="border-t border-[var(--border)] mt-16">
-					<div className="mx-auto max-w-6xl px-4 sm:px-6 py-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 text-xs text-[var(--text-soft)]">
-						<p>
-							Ovo je procjena — uvijek provjerite konačan iznos u službenom
-							carinskom rješenju.
-						</p>
-						<p>
-							Izradio{" "}
-							<a
-								href="https://mariozitko.github.io"
-								target="_blank"
-								rel="noopener noreferrer"
-								className="font-medium text-[var(--text)] hover:text-[var(--primary)] transition-colors"
-							>
-								Mario Žitković
-							</a>
-						</p>
+					<div className="mx-auto max-w-6xl px-4 sm:px-6 py-6 space-y-4">
+						<div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 text-xs text-[var(--text-soft)]">
+							<p>
+								Ovo je procjena — uvijek provjerite konačan iznos u službenom
+								carinskom rješenju.
+							</p>
+							<p>
+								Izradio{" "}
+								<a
+									href="https://mariozitko.github.io"
+									target="_blank"
+									rel="noopener noreferrer"
+									className="font-medium text-[var(--text)] hover:text-[var(--primary)] transition-colors"
+								>
+									Mario Žitković
+								</a>
+							</p>
+						</div>
+						<SupportSection />
 					</div>
 				</footer>
 			</body>

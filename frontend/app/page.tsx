@@ -330,15 +330,11 @@ export default function Home() {
 						anchorToken={priceAnchorToken}
 					/>
 
-					{ppmvResult ? (
-						<>
-							<PPMVBreakdownCard result={ppmvResult} updating={ppmvLoading} />
-						</>
-					) : (
-						<div className="rounded-2xl border border-dashed border-[var(--border)] bg-[var(--surface-alt)] px-5 py-6 text-sm text-[var(--text-soft)]">
-							{ppmvHint ?? "Popunite podatke o vozilu za izračun PPMV-a."}
-						</div>
-					)}
+					<PPMVBreakdownCard
+						result={ppmvResult}
+						updating={ppmvLoading}
+						hint={ppmvHint ?? "Popunite podatke o vozilu za izračun PPMV-a."}
+					/>
 				</div>
 			</div>
 

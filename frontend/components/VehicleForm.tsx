@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { Tooltip } from "@/components/Tooltip";
 import { ToggleSwitch } from "@/components/ToggleSwitch";
 import { DateInput } from "@/components/DateInput";
@@ -18,13 +19,28 @@ interface Props {
  * comes prefilled straight from the parsed listing (see page.tsx) — still a
  * plain editable date field in case the parse got it wrong. */
 export function VehicleForm({ values, onChange }: Props) {
+	// Gates the red error border: a pristine, untouched field shouldn't look
+	// like the user did something wrong before they've even reached it.
+	const [touched, setTouched] = useState<Record<string, boolean>>({});
+	function markTouched(field: string) {
+		setTouched((prev) => (prev[field] ? prev : { ...prev, [field]: true }));
+	}
+
 	const label =
 		"block text-xs font-medium uppercase tracking-wide text-[var(--text-soft)] mb-1";
 	const input =
 		"w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3.5 py-2 text-sm text-[var(--text)] focus:border-[var(--primary)] transition-colors disabled:opacity-50 disabled:bg-[var(--surface-alt)]";
+	const errInput = `${input} border-[var(--err)] focus:border-[var(--err)]`;
 
 	const hasMoreSeats = values.seatCount !== "" && Number(values.seatCount) >= 8;
 	const is9Plus = Number(values.seatCount) >= 9;
+
+	const priceMissing = !values.priceEur || Number(values.priceEur) <= 0;
+	const co2Missing =
+		values.fuelType !== "electric" && (!values.co2 || Number(values.co2) <= 0);
+	const fuelMissing = !values.fuelType;
+	const regDateMissing = !values.regDate;
+	const declDateMissing = !values.declDate;
 
 	return (
 		<div className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] shadow-sm p-4 space-y-4">
@@ -42,23 +58,25 @@ export function VehicleForm({ values, onChange }: Props) {
 				<div>
 					<label className={label}>Cijena (EUR)</label>
 					<input
-						className={input}
+						className={priceMissing && touched.priceEur ? errInput : input}
 						type="number"
 						min="0"
 						step="1"
 						value={values.priceEur}
 						onChange={(e) => onChange({ priceEur: e.target.value })}
+						onBlur={() => markTouched("priceEur")}
 					/>
 				</div>
 
 				<div>
 					<label className={label}>Vrsta goriva</label>
 					<select
-						className={input}
+						className={fuelMissing && touched.fuelType ? errInput : input}
 						value={values.fuelType}
 						onChange={(e) =>
 							onChange({ fuelType: e.target.value as FuelType | "" })
 						}
+						onBlur={() => markTouched("fuelType")}
 					>
 						<option value="">Odaberite…</option>
 						<option value="diesel">Dizel</option>
@@ -70,12 +88,13 @@ export function VehicleForm({ values, onChange }: Props) {
 				<div>
 					<label className={label}>CO2 (g/km)</label>
 					<input
-						className={input}
+						className={co2Missing && touched.co2 ? errInput : input}
 						type="number"
 						min="0"
 						step="1"
 						value={values.fuelType === "electric" ? "0" : values.co2}
 						onChange={(e) => onChange({ co2: e.target.value })}
+						onBlur={() => markTouched("co2")}
 						disabled={values.fuelType === "electric"}
 					/>
 				</div>
@@ -83,9 +102,10 @@ export function VehicleForm({ values, onChange }: Props) {
 				<div>
 					<label className={label}>Datum prve registracije</label>
 					<DateInput
-						className={input}
+						className={regDateMissing && touched.regDate ? errInput : input}
 						value={values.regDate}
 						onChange={(v) => onChange({ regDate: v })}
+						onBlur={() => markTouched("regDate")}
 					/>
 				</div>
 
@@ -95,7 +115,7 @@ export function VehicleForm({ values, onChange }: Props) {
 						<Tooltip text="Datum kada se vozilo prijavljuje carini u Hrvatskoj. Razlika između ovog datuma i datuma prve registracije određuje starost vozila u mjesecima, koja izravno smanjuje poreznu osnovicu kroz tablicu amortizacije (npr. vozilo staro 5 godina plaća samo ~40% PPMV-a novog vozila)." />
 					</label>
 					<DateInput
-						className={input}
+						className={declDateMissing ? errInput : input}
 						value={values.declDate}
 						onChange={(v) => onChange({ declDate: v })}
 					/>
