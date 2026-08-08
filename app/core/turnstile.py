@@ -15,9 +15,16 @@ async def verify_turnstile(token: str | None, ip: str) -> bool:
     if not settings.turnstile_secret_key:
         return True
 
-    async with httpx.AsyncClient(timeout=10.0) as client:
-        response = await client.post(
-            _SITEVERIFY_URL,
-            data={"secret": settings.turnstile_secret_key, "response": token or "", "remoteip": ip},
-        )
-    return bool(response.json().get("success"))
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            response = await client.post(
+                _SITEVERIFY_URL,
+                data={"secret": settings.turnstile_secret_key, "response": token or "", "remoteip": ip},
+            )
+        response.raise_for_status()
+        return bool(response.json().get("success"))
+    except (httpx.HTTPStatusError, httpx.TransportError, ValueError):
+        # Cloudflare unreachable/5xx or a malformed body — fail closed rather
+        # than let the exception escape as an unhandled 500. A bot-check that
+        # can't be verified is treated the same as a failed bot-check.
+        return False

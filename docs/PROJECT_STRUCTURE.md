@@ -21,6 +21,13 @@ app/
     extractors/       # One per site: autobid_de, autoscout24, mobile_de, njuskalo
     engines.py          # Per-site fetch engine config (httpx | chromium | firefox)
     schemas.py          # ListingData — the shared contract every extractor returns
+    site_registry.py    # Shared EXTRACTORS/detect_site()/SITE_TO_SCRAPE_SITE — used by
+                         # both calculate/router.py and scraping/router.py so the two
+                         # entry points can't drift apart
+    parsing.py           # parse_listing_date() — shared raw-string date parsing
+    persistence.py        # record_scrape_run()/finish_scrape_run()/record_scrape_outcome()
+                           # — writes ScrapeRun + Listing rows for every scrape attempt
+                           # (success or failure), from either entry point below
     router.py           # POST /scrape/listing — url in, ListingData out
 
   calculate/        # The actual product endpoint — DONE
@@ -40,7 +47,9 @@ app/
     <brand-slug>/         # Downloaded source Excel files, one dir per brand group
 
   db/                 # SQLAlchemy models + session — DONE
-    models.py             # Catalogue, ScrapeRun, Listing
+    models.py             # Catalogue, ScrapeRun, Listing (both actively written via
+                           # scraping/persistence.py — every /calculate and
+                           # /scrape/listing call records a ScrapeRun + Listing row)
     session.py             # AsyncSessionLocal, engine (NullPool)
 
   profitability/      # DEFERRED — currently an empty package (__init__.py only)

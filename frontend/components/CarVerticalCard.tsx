@@ -11,8 +11,21 @@ import Image from "next/image";
 // this partner-branded card only, so it reads as their CTA, not ours.
 const CV_BLUE = "#1352F1";
 const CV_BLUE_SOFT = "#EAF0FE";
-const CV_CODE_LINK =
-	"https://www.carvertical.deal/2CRT9JN/964QF6/?source_id=AFF&sub1=kalkulatoruvoza";
+
+/** Single source of truth for the carVertical affiliate link shape — every
+ * link on this card shares the base path + source_id/sub1 tracking params,
+ * and only differs in whether a `uid` (precheck deep-link) or `sub3`
+ * (VIN/plate) is attached. Previously duplicated between CV_CODE_LINK and
+ * the inline `href` template, which could drift if the tracking params ever
+ * changed in one place and not the other. */
+function buildCarVerticalUrl(opts?: { uid?: number; effectiveId?: string }): string {
+	const params = new URLSearchParams({ source_id: "AFF", sub1: "kalkulatoruvoza" });
+	if (opts?.uid !== undefined) params.set("uid", String(opts.uid));
+	if (opts?.effectiveId) params.set("sub3", opts.effectiveId);
+	return `https://www.carvertical.deal/2CRT9JN/964QF6/?${params.toString()}`;
+}
+
+const CV_CODE_LINK = buildCarVerticalUrl();
 
 export function CarVerticalCard({ vin }: { vin?: string | null }) {
 	// Prefilled from the parsed listing when we have one, but always editable —
@@ -33,9 +46,7 @@ export function CarVerticalCard({ vin }: { vin?: string | null }) {
 	}
 	const effectiveId = (manualId || vin || "").trim();
 
-	const href = `https://www.carvertical.deal/2CRT9JN/964QF6/?uid=167&source_id=AFF&sub1=kalkulatoruvoza${
-		effectiveId ? `&sub3=${encodeURIComponent(effectiveId)}` : ""
-	}`;
+	const href = buildCarVerticalUrl({ uid: 167, effectiveId: effectiveId || undefined });
 
 	return (
 		<div

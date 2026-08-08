@@ -9,6 +9,7 @@ Apify spend cap is enforced regardless of which endpoint is hit.
 from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
@@ -80,6 +81,7 @@ async def get_mobile_de_listing(url: str, db: AsyncSession, ip_hash: str = "") -
         if cached is not None:
             cached.payload = listing.model_dump()
             cached.fetched_at = datetime.now(timezone.utc)
+            await db.commit()
         else:
             db.add(
                 ListingCache(
@@ -88,7 +90,21 @@ async def get_mobile_de_listing(url: str, db: AsyncSession, ip_hash: str = "") -
                     fetched_at=datetime.now(timezone.utc),
                 )
             )
-        await db.commit()
+            try:
+                await db.commit()
+            except IntegrityError:
+                # A concurrent request for the same never-cached listing_id
+                # won the race and inserted first — cache_key is unique, so
+                # this commit fails. Fall back to updating the row it just
+                # created instead of surfacing a 500 for an otherwise
+                # successful fetch.
+                await db.rollback()
+                result = await db.execute(select(ListingCache).where(ListingCache.cache_key == cache_key))
+                existing = result.scalar_one_or_none()
+                if existing is not None:
+                    existing.payload = listing.model_dump()
+                    existing.fetched_at = datetime.now(timezone.utc)
+                    await db.commit()
 
     await log_apify_event(db, ip_hash, listing_id, "apify", "success", 0.0015)
     return listing

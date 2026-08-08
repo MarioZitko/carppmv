@@ -10,7 +10,7 @@ import { MobilePriceBar } from "@/components/MobilePriceBar";
 import { PPMVBreakdownCard } from "@/components/PPMVBreakdownCard";
 import { CarVerticalCard } from "@/components/CarVerticalCard";
 import { ParsedFieldsCard } from "@/components/ParsedFieldsCard";
-import { calculateFromUrl, calculateFromSpecs } from "@/lib/api";
+import { ApiTimeoutError, calculateFromUrl, calculateFromSpecs } from "@/lib/api";
 import { normalizeUrl } from "@/lib/format";
 import { guessFuelType, toIsoDate, todayIso } from "@/lib/fuel";
 import {
@@ -33,6 +33,9 @@ type EntryMode = "link" | "search";
 // the backend's own error text (ScrapingError/PPMVError messages) is written
 // for logs, not for this audience, so it's deliberately never shown as-is.
 function describeUrlError(err: unknown): string {
+	if (err instanceof ApiTimeoutError) {
+		return "Dohvat oglasa predugo traje — poslužitelj trenutno ne odgovara. Pokušajte ponovno za trenutak ili unesite podatke ručno u nastavku.";
+	}
 	if (!(err instanceof ApiError)) {
 		return "Nismo se uspjeli povezati s poslužiteljem. Provjerite internetsku vezu i pokušajte ponovno.";
 	}
@@ -61,6 +64,9 @@ function describeUrlError(err: unknown): string {
 // errors (out-of-range price/CO2 brackets) are also written in English for
 // logs, so translate them into something an average user can act on.
 function describePpmvError(err: unknown): string {
+	if (err instanceof ApiTimeoutError) {
+		return "Izračun predugo traje — poslužitelj trenutno ne odgovara. Pokušajte ponovno za trenutak.";
+	}
 	if (!(err instanceof ApiError)) {
 		return "Izračun trenutno nije dostupan — pokušajte ponovno za trenutak.";
 	}
@@ -107,7 +113,7 @@ export default function Home() {
 		setForm((prev) => ({ ...prev, ...patch }));
 	}
 
-	function applyCandidate(candidate: CatalogueCandidate) {
+	function applyCandidate(candidate: CatalogueCandidate, scroll = true) {
 		setSelectedCatalogueId(candidate.catalogue_id);
 		patchForm({
 			priceEur: String(candidate.price_eur),
@@ -130,6 +136,13 @@ export default function Home() {
 		// to roughly where the panel would sit if it weren't sticky. On mobile
 		// (not sticky, stacked below the form) it's genuinely off-screen and
 		// still needs the scroll.
+		//
+		// `scroll=false` is passed by handleUrlSubmit's auto-preselect of the
+		// top candidate — that path already has its own scroll (the urlResult
+		// effect below, which targets candidatesRef so the user lands on the
+		// picker first) and firing this scroll too raced it to a different
+		// target on the same submit.
+		if (!scroll) return;
 		const panel = pricePanelRef.current;
 		if (panel) {
 			const rect = panel.getBoundingClientRect();
@@ -183,7 +196,7 @@ export default function Home() {
 			// confident enough to auto-accept it. The user can still pick a
 			// different row from the list if the guess is wrong.
 			if (data.candidates.length > 0) {
-				applyCandidate(data.candidates[0]);
+				applyCandidate(data.candidates[0], false);
 			}
 		} catch (err) {
 			setUrlError(describeUrlError(err));

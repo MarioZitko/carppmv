@@ -276,6 +276,19 @@ def _parse_title(listing: dict) -> str | None:
 
 class AutoScout24Extractor:
     async def extract(self, url: str) -> ListingData:
+        """Public entrypoint — wraps _extract() so any unexpected failure
+        (Playwright timeout, an unhandled parse exception) surfaces as the
+        domain-level ScrapingError (-> clean 502) instead of an unhandled
+        500. ScrapingErrors raised deliberately inside _extract() pass
+        through unchanged."""
+        try:
+            return await self._extract(url)
+        except ScrapingError:
+            raise
+        except Exception as exc:
+            raise ScrapingError(f"autoscout24.com: unexpected error scraping {url}: {exc}") from exc
+
+    async def _extract(self, url: str) -> ListingData:
         async with async_playwright() as pw:
             browser = await pw.chromium.launch(headless=True)
             try:

@@ -42,6 +42,10 @@ class CO2Standard(str, Enum):
 class FuelType(str, Enum):
     DIESEL = "diesel"
     PETROL = "petrol"
+    ELECTRIC = "electric"
+    HYBRID = "hybrid"
+    LPG = "lpg"
+    CNG = "cng"
 
 
 class Catalogue(Base):

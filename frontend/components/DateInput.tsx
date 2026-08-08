@@ -5,6 +5,7 @@ interface Props {
   onChange: (isoValue: string) => void;
   className?: string;
   onBlur?: () => void;
+  id?: string;
 }
 
 const MIN_YEAR = 1980;
@@ -16,9 +17,10 @@ const MAX_DATE = `${MAX_YEAR}-12-31`;
  * plain ISO yyyy-mm-dd strings, since that's what the rest of the form and the
  * API expect — the browser handles locale display, calendar affordance, and
  * calendar-impossible-date rejection for us. */
-export function DateInput({ value, onChange, className, onBlur }: Props) {
+export function DateInput({ value, onChange, className, onBlur, id }: Props) {
   return (
     <input
+      id={id}
       type="date"
       lang="hr"
       min={MIN_DATE}

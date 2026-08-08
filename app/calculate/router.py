@@ -11,8 +11,7 @@ Pipeline:
 """
 
 import logging
-import re
-from datetime import date, datetime
+from datetime import date
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -22,25 +21,19 @@ from app.catalogue.display import format_variant_display
 from app.catalogue.matching import MatchStatus, find_match
 from app.catalogue.schemas import CatalogueCandidate
 from app.core.config import get_settings
+from app.core.exceptions import ScrapingError
 from app.db.session import get_db_session
 from app.ppmv.engine import calculate_ppmv
 from app.ppmv.schemas import FuelType
-from app.scraping.engines import SITE_ENGINE_MAP
-from app.scraping.extractors.autobid_de import AutobidDeExtractor
-from app.scraping.extractors.autoscout24 import AutoScout24Extractor
-from app.scraping.extractors.njuskalo import NjuskaloExtractor
 from app.scraping.mobile_de_guard import guarded_mobile_de_listing
 from app.scraping.mobile_de_service import MOBILE_DE_SITE, ApifyBudgetExceeded
+from app.scraping.parsing import parse_listing_date
+from app.scraping.persistence import record_scrape_outcome
+from app.scraping.site_registry import EXTRACTORS, SITE_TO_SCRAPE_SITE, detect_site
 
 log = logging.getLogger(__name__)
 
 router = APIRouter()
-
-_EXTRACTORS = {
-    "autobid.de": AutobidDeExtractor(),
-    "autoscout24": AutoScout24Extractor(),
-    "njuskalo": NjuskaloExtractor(),
-}
 
 # A scraped listing already carries a strong brand/model/variant/power signal,
 # so it's worth surfacing more alternatives than the catalogue-search default —
@@ -59,46 +52,10 @@ _FUEL_MAP: dict[str, FuelType] = {
 }
 
 
-def _detect_site(url: str) -> str:
-    for site in SITE_ENGINE_MAP:
-        if site in url:
-            return site
-    return ""
-
-
 def _parse_fuel(raw: str | None) -> FuelType | None:
     if not raw:
         return None
     return _FUEL_MAP.get(raw.strip().lower())
-
-
-def _parse_date(raw: str | None) -> date | None:
-    """Parses whatever date format a scraper handed back. Listing sites are
-    inconsistent about this — ISO datetimes with a time suffix, single-digit
-    day/month, a trailing "." (Croatian convention), slash-separated dates,
-    "MM/YYYY", or a bare year are all seen in practice, so this deliberately
-    tries several shapes rather than requiring one exact format."""
-    if not raw:
-        return None
-
-    text = raw.strip()
-
-    # ISO date, optionally with a time component ("2021-05-17T00:00:00.000Z").
-    iso_prefix = text[:10]
-    try:
-        return datetime.strptime(iso_prefix, "%Y-%m-%d").date()
-    except ValueError:
-        pass
-
-    # Normalize whitespace around separators ("17. 05. 2021." -> "17.05.2021.")
-    normalized = re.sub(r"\s*([./])\s*", r"\1", text)
-
-    for fmt in ("%d.%m.%Y.", "%d.%m.%Y", "%d/%m/%Y", "%m.%Y", "%m/%Y", "%Y-%m", "%Y"):
-        try:
-            return datetime.strptime(normalized, fmt).date()
-        except ValueError:
-            continue
-    return None
 
 
 def _to_candidate(row, score: float) -> CatalogueCandidate:
@@ -126,13 +83,21 @@ async def calculate(
     url = str(body.url)
     settings = get_settings()
 
-    site = _detect_site(url)
+    site = detect_site(url)
+
+    scrape_site = SITE_TO_SCRAPE_SITE.get(site)
 
     if site == MOBILE_DE_SITE:
         try:
             listing = await guarded_mobile_de_listing(url, session, request, body.turnstile_token)
         except ApifyBudgetExceeded:
             # Daily Apify budget exhausted — degrade gracefully instead of erroring.
+            if scrape_site is not None:
+                await record_scrape_outcome(
+                    session,
+                    site=scrape_site,
+                    error_message="Daily Apify budget exhausted",
+                )
             return CalculateResponse(
                 ppmv_eur=None,
                 parsed=ParsedFields(),
@@ -142,14 +107,23 @@ async def calculate(
                 match_status="not_attempted",
                 candidates=[],
             )
-    elif not site or site not in _EXTRACTORS:
+        if scrape_site is not None:
+            await record_scrape_outcome(session, site=scrape_site, listing=listing)
+    elif not site or site not in EXTRACTORS:
         raise HTTPException(
             status_code=422,
             detail=[{"loc": ["body", "url"], "msg": f"Unrecognized domain: {url}", "type": "value_error"}],
         )
     else:
-        extractor = _EXTRACTORS[site]
-        listing = await extractor.extract(url)
+        extractor = EXTRACTORS[site]
+        try:
+            listing = await extractor.extract(url)
+        except ScrapingError as exc:
+            if scrape_site is not None:
+                await record_scrape_outcome(session, site=scrape_site, error_message=str(exc))
+            raise
+        if scrape_site is not None:
+            await record_scrape_outcome(session, site=scrape_site, listing=listing)
 
     # Build ParsedFields from listing.
     # first_registration: ListingData uses first_registration_date (raw string)
@@ -175,7 +149,7 @@ async def calculate(
     candidates: list[CatalogueCandidate] = []
 
     co2_g_km = listing.co2_g_km
-    reg_date = _parse_date(listing.first_registration_date)
+    reg_date = parse_listing_date(listing.first_registration_date)
 
     # Catalogue matching always runs when the brand is known — it fills CO2
     # when missing, and always surfaces ranked candidates so the user can

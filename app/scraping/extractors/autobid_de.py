@@ -301,6 +301,19 @@ def _parse_spec_table(soup: BeautifulSoup) -> dict[str, str]:
 
 class AutobidDeExtractor:
     async def extract(self, url: str) -> ListingData:
+        """Public entrypoint — wraps _extract() so any unexpected failure
+        (httpx timeout/connect error, an unhandled parse exception) surfaces
+        as the domain-level ScrapingError (-> clean 502) instead of an
+        unhandled 500. ScrapingErrors raised deliberately inside _extract()
+        pass through unchanged."""
+        try:
+            return await self._extract(url)
+        except ScrapingError:
+            raise
+        except Exception as exc:
+            raise ScrapingError(f"autobid.de: unexpected error scraping {url}: {exc}") from exc
+
+    async def _extract(self, url: str) -> ListingData:
         headers = {
             "User-Agent": (
                 "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "

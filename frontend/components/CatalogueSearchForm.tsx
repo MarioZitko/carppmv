@@ -35,9 +35,17 @@ export function CatalogueSearchForm({ onResult }: Props) {
 
   useEffect(() => {
     if (!brand) return;
+    let ignore = false;
     getCatalogueModels(brand)
-      .then(setModels)
-      .catch(() => setModels([]));
+      .then((result) => {
+        if (!ignore) setModels(result);
+      })
+      .catch(() => {
+        if (!ignore) setModels([]);
+      });
+    return () => {
+      ignore = true;
+    };
   }, [brand]);
 
   async function handleSubmit(e: FormEvent) {
@@ -70,28 +78,35 @@ export function CatalogueSearchForm({ onResult }: Props) {
 
   const inputCls =
     "w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3.5 py-2 text-sm text-[var(--text)] placeholder:text-[var(--text-soft)] focus:border-[var(--primary)] transition-colors";
+  const srOnly = "sr-only";
 
   return (
     <form onSubmit={handleSubmit} className="space-y-3">
       <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
-        <select
-          className={inputCls}
-          value={brand}
-          onChange={(e) => {
-            setBrand(e.target.value);
-            setModels([]);
-          }}
-        >
-          <option value="">Marka…</option>
-          {brands.map((b) => (
-            <option key={b} value={b}>
-              {b}
-            </option>
-          ))}
-        </select>
+        <div>
+          <label className={srOnly} htmlFor="cs-brand">Marka</label>
+          <select
+            id="cs-brand"
+            className={inputCls}
+            value={brand}
+            onChange={(e) => {
+              setBrand(e.target.value);
+              setModels([]);
+            }}
+          >
+            <option value="">Marka…</option>
+            {brands.map((b) => (
+              <option key={b} value={b}>
+                {b}
+              </option>
+            ))}
+          </select>
+        </div>
 
         <div>
+          <label className={srOnly} htmlFor="cs-model">Model</label>
           <input
+            id="cs-model"
             className={inputCls}
             placeholder="Model (npr. 320d, A4…)"
             list="catalogue-model-suggestions"
@@ -105,31 +120,42 @@ export function CatalogueSearchForm({ onResult }: Props) {
           </datalist>
         </div>
 
-        <input
-          className={inputCls}
-          placeholder="Varijanta / oprema (opc.)"
-          value={variant}
-          onChange={(e) => setVariant(e.target.value)}
-        />
+        <div>
+          <label className={srOnly} htmlFor="cs-variant">Varijanta / oprema</label>
+          <input
+            id="cs-variant"
+            className={inputCls}
+            placeholder="Varijanta / oprema (opc.)"
+            value={variant}
+            onChange={(e) => setVariant(e.target.value)}
+          />
+        </div>
 
-        <select className={inputCls} value={year} onChange={(e) => setYear(e.target.value)}>
-          <option value="">Godina (opc.)</option>
-          {YEARS.map((y) => (
-            <option key={y} value={y}>
-              {y}
-            </option>
-          ))}
-        </select>
+        <div>
+          <label className={srOnly} htmlFor="cs-year">Godina</label>
+          <select id="cs-year" className={inputCls} value={year} onChange={(e) => setYear(e.target.value)}>
+            <option value="">Godina (opc.)</option>
+            {YEARS.map((y) => (
+              <option key={y} value={y}>
+                {y}
+              </option>
+            ))}
+          </select>
+        </div>
 
-        <input
-          className={inputCls}
-          type="number"
-          min="0"
-          step="1"
-          placeholder="Snaga u kW (opc.)"
-          value={powerKw}
-          onChange={(e) => setPowerKw(e.target.value)}
-        />
+        <div>
+          <label className={srOnly} htmlFor="cs-power">Snaga u kW</label>
+          <input
+            id="cs-power"
+            className={inputCls}
+            type="number"
+            min="0"
+            step="1"
+            placeholder="Snaga u kW (opc.)"
+            value={powerKw}
+            onChange={(e) => setPowerKw(e.target.value)}
+          />
+        </div>
       </div>
 
       <button

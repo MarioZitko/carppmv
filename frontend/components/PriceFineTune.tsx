@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { formatEur } from "@/lib/format";
 
 interface Props {
@@ -71,8 +71,17 @@ export function PriceFineTune({ priceEur, onChange, anchorToken }: Props) {
 		anchor > 0 ? roundToStep(anchor * (1 + SLIDER_MAX_FRACTION)) : 50000;
 
 	// Notifying the parent (an external callback) is the one part of this
-	// reset that genuinely belongs in an effect.
+	// reset that genuinely belongs in an effect. Skipped on the initial mount —
+	// at that point anchorToken hasn't actually changed (there's no prior
+	// value to compare against), so firing onChange here would push a
+	// premature `priceForPercent(priceEur, DEFAULT_PCT)` update before any
+	// real anchor/listing price exists.
+	const isFirstRender = useRef(true);
 	useEffect(() => {
+		if (isFirstRender.current) {
+			isFirstRender.current = false;
+			return;
+		}
 		onChange(priceForPercent(priceEur, DEFAULT_PCT));
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [anchorToken]);
@@ -117,7 +126,7 @@ export function PriceFineTune({ priceEur, onChange, anchorToken }: Props) {
 				</p>
 			</div>
 
-			<label className="block text-xs font-medium uppercase tracking-wide text-[var(--text-soft)]">
+			<label id="pft-extras-label" className="block text-xs font-medium uppercase tracking-wide text-[var(--text-soft)]">
 				Dodatna oprema iznad osnovne izvedbe
 			</label>
 			<div className="flex flex-wrap gap-1.5">
@@ -143,6 +152,7 @@ export function PriceFineTune({ priceEur, onChange, anchorToken }: Props) {
 			<input
 				type="range"
 				list="extras-ticks"
+				aria-labelledby="pft-extras-label"
 				min={min}
 				max={max}
 				step={STEP}
@@ -158,7 +168,9 @@ export function PriceFineTune({ priceEur, onChange, anchorToken }: Props) {
 				))}
 			</datalist>
 
+			<label className="sr-only" htmlFor="pft-number">Cijena vozila (EUR)</label>
 			<input
+				id="pft-number"
 				type="number"
 				value={priceEur}
 				min={0}

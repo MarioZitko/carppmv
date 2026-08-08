@@ -41,7 +41,7 @@ export function CandidatesList({ candidates, selectedCatalogueId, onSelect, titl
         {candidates.map((c, i) => {
           const active = selectedCatalogueId != null && selectedCatalogueId === c.catalogue_id;
           return (
-            <li key={`${c.catalogue_id}-${i}`}>
+            <li key={`${c.catalogue_id ?? "null"}-${c.brand}-${c.model}-${c.variant}-${c.valid_from}-${i}`}>
               <button
                 type="button"
                 onClick={() => onSelect(c)}

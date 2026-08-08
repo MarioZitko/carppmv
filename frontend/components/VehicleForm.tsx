@@ -56,8 +56,9 @@ export function VehicleForm({ values, onChange }: Props) {
 
 			<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
 				<div>
-					<label className={label}>Cijena (EUR)</label>
+					<label className={label} htmlFor="vf-price">Cijena (EUR)</label>
 					<input
+						id="vf-price"
 						className={priceMissing && touched.priceEur ? errInput : input}
 						type="number"
 						min="0"
@@ -69,8 +70,9 @@ export function VehicleForm({ values, onChange }: Props) {
 				</div>
 
 				<div>
-					<label className={label}>Vrsta goriva</label>
+					<label className={label} htmlFor="vf-fuel">Vrsta goriva</label>
 					<select
+						id="vf-fuel"
 						className={fuelMissing && touched.fuelType ? errInput : input}
 						value={values.fuelType}
 						onChange={(e) =>
@@ -86,8 +88,9 @@ export function VehicleForm({ values, onChange }: Props) {
 				</div>
 
 				<div>
-					<label className={label}>CO2 (g/km)</label>
+					<label className={label} htmlFor="vf-co2">CO2 (g/km)</label>
 					<input
+						id="vf-co2"
 						className={co2Missing && touched.co2 ? errInput : input}
 						type="number"
 						min="0"
@@ -100,8 +103,9 @@ export function VehicleForm({ values, onChange }: Props) {
 				</div>
 
 				<div>
-					<label className={label}>Datum prve registracije</label>
+					<label className={label} htmlFor="vf-reg-date">Datum prve registracije</label>
 					<DateInput
+						id="vf-reg-date"
 						className={regDateMissing && touched.regDate ? errInput : input}
 						value={values.regDate}
 						onChange={(v) => onChange({ regDate: v })}
@@ -110,14 +114,16 @@ export function VehicleForm({ values, onChange }: Props) {
 				</div>
 
 				<div>
-					<label className={`${label} flex items-center`}>
+					<label className={`${label} flex items-center`} htmlFor="vf-decl-date">
 						Datum deklaracije
 						<Tooltip text="Datum kada se vozilo prijavljuje carini u Hrvatskoj. Razlika između ovog datuma i datuma prve registracije određuje starost vozila u mjesecima, koja izravno smanjuje poreznu osnovicu kroz tablicu amortizacije (npr. vozilo staro 5 godina plaća samo ~40% PPMV-a novog vozila)." />
 					</label>
 					<DateInput
-						className={declDateMissing ? errInput : input}
+						id="vf-decl-date"
+						className={declDateMissing && touched.declDate ? errInput : input}
 						value={values.declDate}
 						onChange={(v) => onChange({ declDate: v })}
+						onBlur={() => markTouched("declDate")}
 					/>
 				</div>
 			</div>
