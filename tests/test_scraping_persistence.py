@@ -16,7 +16,16 @@ from unittest.mock import AsyncMock, patch
 import pytest
 from sqlalchemy import delete, select
 
-from app.db.models import ApifyEvent, FuelType, Listing, ListingCache, ScrapeMode, ScrapeRun, ScrapeRunStatus, ScrapeSite
+from app.db.models import (
+    ApifyEvent,
+    FuelType,
+    Listing,
+    ListingCache,
+    ScrapeMode,
+    ScrapeRun,
+    ScrapeRunStatus,
+    ScrapeSite,
+)
 from app.db.session import AsyncSessionLocal
 from app.scraping.mobile_de_service import get_mobile_de_listing
 from app.scraping.persistence import finish_scrape_run, record_scrape_run

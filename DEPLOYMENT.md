@@ -1,17 +1,29 @@
 # Deployment
 
-Deploys the whole stack (Postgres, FastAPI backend with Playwright, Next.js
-frontend, Caddy reverse proxy) to a single VPS with Docker Compose. Written
-against a Hetzner CAX11 (2 vCPU / 4 GB ARM, €6/mo) but works on any VPS with
-Docker installed — ARM or x86.
+Deploys the stack (Postgres, FastAPI backend with Playwright, Next.js
+frontend) to a single VPS with Docker Compose. Written against a Hetzner CAX11
+(2 vCPU / 4 GB ARM, €6/mo) but works on any VPS with Docker installed — ARM or
+x86.
+
+TLS and public routing are **not** handled by Compose. Every service binds to
+localhost only —
+
+| Service | Bound to |
+|---|---|
+| backend | `127.0.0.1:8011` |
+| frontend | `127.0.0.1:3011` |
+| db | `127.0.0.1:5433` |
+
+— and a reverse proxy on the host (CloudPanel, in the current setup) terminates
+HTTPS and forwards to those ports. Nothing in this repo configures that proxy.
 
 ---
 
 ## 1. Buy a domain
 
-Caddy's automatic HTTPS (Let's Encrypt) issues certificates for domain names,
-not bare IPs, so you need one. Any registrar works (Namecheap, Porkbun,
-Cloudflare Registrar) — roughly $8–12/year.
+Let's Encrypt issues certificates for domain names, not bare IPs, so you need
+one. Any registrar works (Namecheap, Porkbun, Cloudflare Registrar) — roughly
+$8–12/year.
 
 Once purchased, add two DNS **A records** pointing at your VPS's public IP:
 
@@ -74,9 +86,6 @@ Set the frontend's build-time API URL (used by `docker-compose.yml`'s
 echo "NEXT_PUBLIC_API_BASE_URL=https://api.yourdomain.com" >> .env
 ```
 
-Edit [`Caddyfile`](Caddyfile) and replace `yourdomain.com` / `api.yourdomain.com`
-with your real domain.
-
 ---
 
 ## 4. Build and start everything
@@ -86,20 +95,36 @@ docker compose up -d --build
 ```
 
 This builds and starts, in order: `db` (Postgres, waits for healthcheck),
-`backend` (FastAPI + Playwright/Chromium), `frontend` (Next.js standalone
-build), `caddy` (reverse proxy, requests certs on first boot).
+`backend` (FastAPI + Playwright/Chromium) and `frontend` (Next.js standalone
+build).
 
 First build takes a few minutes (Playwright downloads Chromium + system
 deps). Check status:
 
 ```bash
 docker compose ps
-docker compose logs -f caddy     # confirm certs issued
 docker compose logs -f backend
+curl -sS localhost:3011 >/dev/null && echo "frontend up"
+curl -sS localhost:8011/docs >/dev/null && echo "backend up"
 ```
 
-Visit `https://yourdomain.com` — the frontend should load and be able to
-reach the API at `https://api.yourdomain.com`.
+---
+
+## 4b. Point the reverse proxy at it
+
+In CloudPanel (or whatever proxy you use), create two sites and proxy them to
+the localhost ports above, then issue Let's Encrypt certificates for both:
+
+| Hostname | Proxies to |
+|---|---|
+| `yourdomain.com` | `http://127.0.0.1:3011` |
+| `api.yourdomain.com` | `http://127.0.0.1:8011` |
+
+`CORS_ALLOW_ORIGINS` must list the frontend origin exactly, and the frontend
+is built with `NEXT_PUBLIC_API_BASE_URL` baked in — change either one and you
+have to rebuild the frontend image, not just restart it.
+
+Visit `https://yourdomain.com` — the page should load and reach the API.
 
 ---
 
@@ -154,11 +179,15 @@ docker compose exec db pg_dump -U <POSTGRES_USER> <POSTGRES_DB> > backup.sql
 
 ## Troubleshooting
 
-- **Caddy can't get a certificate** — DNS hasn't propagated yet, or ports
-  80/443 aren't open on the VPS firewall. Check `docker compose logs caddy`.
-- **Backend 502 from Caddy** — backend container crashed or is still
-  starting; check `docker compose logs backend`. Common cause: `DATABASE_URL`
-  mismatch or Postgres not yet healthy.
+- **Certificate issuance fails** — DNS hasn't propagated yet, or ports 80/443
+  aren't open on the VPS firewall. Check the proxy's own logs, not Compose's.
+- **502 from the proxy** — the container crashed or is still starting; check
+  `docker compose logs backend`. Common cause: `DATABASE_URL` mismatch or
+  Postgres not yet healthy. Confirm the port is actually listening with
+  `curl localhost:8011/docs`.
+- **Browser CORS errors** — `CORS_ALLOW_ORIGINS` doesn't match the frontend's
+  real origin, or the frontend image was built with the wrong
+  `NEXT_PUBLIC_API_BASE_URL`. The latter needs a rebuild, not a restart.
 - **Playwright errors about missing libraries** — rebuild the `backend`
   image; `playwright install --with-deps chromium` in the `Dockerfile`
   should cover this, but a stale image won't have it.

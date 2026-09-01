@@ -66,14 +66,24 @@ class ColumnMapping:
     co2_min_max_policy on CanonicalRow for how this gets resolved).
     """
 
-    brand_column: str | None  # None when the sheet has no brand column — the brand then comes from the file's folder-group (snap_brand) or the model/variant text, never guessed by the LLM
+    # None when the sheet has no brand column — the brand then comes from the file's folder-group (snap_brand)
+    # or the model/variant text, never guessed by the LLM
+    brand_column: str | None
     model_name_column: str | None
-    type_code_column: str | None  # whatever this sheet uses as its closest thing to a stable code (MODEL KOD / KOD MODELA / model / etc — name varies per family)
-    full_name_column: str | None  # KOMPLETNO IME / kompletno ime — human-readable, used as fallback display/dedup aid, NOT the lookup key
-    fuel_column: str | None  # None when the sheet has no fuel column — fuel is then derived from the model/variant engine text (TDI/TFSI/dCi/...), see ingest._override_fuel_from_variant
+    # whatever this sheet uses as its closest thing to a stable code (MODEL KOD / KOD MODELA / model / etc —
+    # name varies per family)
+    type_code_column: str | None
+    # KOMPLETNO IME / kompletno ime — human-readable, used as fallback display/dedup aid, NOT the lookup key
+    full_name_column: str | None
+    # None when the sheet has no fuel column — fuel is then derived from the model/variant engine text
+    # (TDI/TFSI/dCi/...), see ingest._override_fuel_from_variant
+    fuel_column: str | None
     price_column: str
-    price_currency: str  # "EUR" or "HRK" — read from the column header text itself (e.g. "(kn)" vs "(EUR)"), not guessed from date
-    valid_from_column: str | None  # None when the sheet has no validity-date column — the date then comes from the filename (default_valid_from), never guessed
+    # "EUR" or "HRK" — read from the column header text itself (e.g. "(kn)" vs "(EUR)"), not guessed from date
+    price_currency: str
+    # None when the sheet has no validity-date column — the date then comes from the filename
+    # (default_valid_from), never guessed
+    valid_from_column: str | None
     co2_column: str | None  # single CO2 column, if this format has one
     co2_min_column: str | None  # Mercedes-style split
     co2_max_column: str | None
@@ -83,7 +93,8 @@ class ColumnMapping:
     seats_8plus1_column: str | None
     camper_column: str | None
     pickup_8704_column: str | None  # KN 8704 pick-up flag — different PPMV formula entirely (PP = S x KS)
-    euro_norm_column: str | None  # only relevant for motorcycle/ATV KO coefficient — out of scope per MASTER_PLAN_v7, kept for completeness
+    # only relevant for motorcycle/ATV KO coefficient — out of scope per MASTER_PLAN_v7, kept for completeness
+    euro_norm_column: str | None
 
     # Confidence/audit trail — the LLM should always report this so low-
     # confidence mappings can be queued for human review rather than
@@ -103,15 +114,21 @@ class CanonicalRow:
 
     brand: str
     model_name: str | None
-    series_name: str | None  # model-line/series name recovered from a section-header banner row (e.g. 'BMW serije 1'), None when the sheet has no such banner — see _detect_series_banner. model_name stays the raw trim/type text either way (still needed for fuel-badge derivation).
-    type_code: str | None  # raw value from whatever column the mapping pointed at — meaning/uniqueness varies per source, do not assume global uniqueness
+    # model-line/series name recovered from a section-header banner row (e.g. 'BMW serije 1'), None when the
+    # sheet has no such banner — see _detect_series_banner. model_name stays the raw trim/type text either way
+    # (still needed for fuel-badge derivation).
+    series_name: str | None
+    # raw value from whatever column the mapping pointed at — meaning/uniqueness varies per source, do not
+    # assume global uniqueness
+    type_code: str | None
     full_name: str | None
 
     fuel_category: FuelCategory
     fuel_raw_value: str  # original source value, kept for audit when fuel_category is UNKNOWN
 
     price_eur: float
-    price_source_currency: str  # "EUR" or "HRK", as detected — kept even after normalization, for traceability
+    # "EUR" or "HRK", as detected — kept even after normalization, for traceability
+    price_source_currency: str
     price_raw_value: float  # pre-normalization, in source_currency
 
     valid_from: date
@@ -119,15 +136,19 @@ class CanonicalRow:
     co2_g_km: float | None  # resolved single value (see co2_resolution_policy)
     co2_min_g_km: float | None  # raw, if source had a min/max split
     co2_max_g_km: float | None
-    co2_resolution_policy: str | None  # e.g. "max" / "min" / "average" / "single_column" — records how co2_g_km was derived, for auditability
+    # e.g. "max" / "min" / "average" / "single_column" — records how co2_g_km was derived, for auditability
+    co2_resolution_policy: str | None
 
     power_kw: float | None  # base kW, hybrid boost suffix (e.g. "+16") stripped into power_boost_kw
-    power_boost_kw: float | None  # the "+NN" mild-hybrid boost component, if present; None if source had a plain number
+    # the "+NN" mild-hybrid boost component, if present; None if source had a plain number
+    power_boost_kw: float | None
 
-    plug_in_range_km: float | None  # drives the plug-in PPMV reduction in engine.py; None if not a plug-in or column absent
+    # drives the plug-in PPMV reduction in engine.py; None if not a plug-in or column absent
+    plug_in_range_km: float | None
 
     is_camper: bool
-    is_pickup_8704: bool  # different PPMV formula entirely (PP = S x KS), out of scope for the standard calculate_ppmv() path
+    # different PPMV formula entirely (PP = S x KS), out of scope for the standard calculate_ppmv() path
+    is_pickup_8704: bool
     seats_7plus1: bool
     seats_8plus1: bool
 
@@ -136,7 +157,8 @@ class CanonicalRow:
     source_row_index: int  # 1-indexed row in the original sheet, for traceability/debugging back to the Excel
 
     mapping_confidence: float  # copied from the ColumnMapping that produced this row
-    needs_review: bool  # True if fuel_category is UNKNOWN, co2/price missing, or mapping_confidence below threshold
+    # True if fuel_category is UNKNOWN, co2/price missing, or mapping_confidence below threshold
+    needs_review: bool
 
 
 def map_sheet_columns(
@@ -628,17 +650,20 @@ def apply_mapping(
     brand_col_idx = column_index.get(mapping.brand_column) if mapping.brand_column else None
     typical_brand_text = _typical_brand_cell_text(rows, brand_col_idx)
 
+    # Defined once rather than per row: a closure built inside the loop would
+    # capture `source_row_index` by reference, so it only happened to log the
+    # right row because every call fired in the same iteration (ruff B023).
+    def log_skip(row_index: int, reason: str) -> None:
+        if skip_log is not None:
+            skip_log.append((row_index, reason))
+
     for offset, row in enumerate(rows):
         source_row_index = offset + 2
-
-        def skip(reason: str) -> None:
-            if skip_log is not None:
-                skip_log.append((source_row_index, reason))
 
         banner = _detect_series_banner(row, brand_col_idx, typical_brand_text)
         if banner is not None:
             current_series = banner
-            skip("series_banner")
+            log_skip(source_row_index, "series_banner")
             continue
 
         model_name_raw = _cell(row, column_index, mapping.model_name_column)
@@ -646,7 +671,7 @@ def apply_mapping(
         price_raw = _cell(row, column_index, mapping.price_column)
 
         if _is_junk_row(mapping.model_name_column, model_name_raw, fuel_raw, price_raw):
-            skip("junk_row")
+            log_skip(source_row_index, "junk_row")
             continue
 
         # No brand column at all → leave brand empty and let the ingest layer
@@ -658,18 +683,18 @@ def apply_mapping(
         else:
             brand = _to_str(_cell(row, column_index, mapping.brand_column))
             if brand is None:
-                skip("missing_brand")
+                log_skip(source_row_index, "missing_brand")
                 continue
 
         price_value = _parse_numeric(price_raw)
         if price_value is None:
-            skip("missing_price")
+            log_skip(source_row_index, "missing_price")
             continue
         if price_value <= 0:
             # A €0 (or negative) as-new price is never a real catalogue entry —
             # it's a stray/placeholder cell (confirmed: one Mercedes S 450 row).
             # Ingesting it would silently zero out a PPMV calculation.
-            skip("nonpositive_price")
+            log_skip(source_row_index, "nonpositive_price")
             continue
 
         currency = _detect_currency_from_header(mapping.price_column) or mapping.price_currency
@@ -678,7 +703,7 @@ def apply_mapping(
         elif currency == "EUR":
             price_eur = price_value
         else:
-            skip("unrecognized_currency")
+            log_skip(source_row_index, "unrecognized_currency")
             continue
 
         # Prefer the sheet's own date column; fall back to the filename date
@@ -690,7 +715,7 @@ def apply_mapping(
         if valid_from is None:
             valid_from = default_valid_from
         if valid_from is None:
-            skip("missing_or_unparseable_valid_from")
+            log_skip(source_row_index, "missing_or_unparseable_valid_from")
             continue
 
         power_kw, power_boost_kw = _parse_power(_cell(row, column_index, mapping.power_kw_column))
@@ -705,7 +730,7 @@ def apply_mapping(
             co2_min_max_policy,
         )
         if co2_g_km is None:
-            skip("missing_co2")
+            log_skip(source_row_index, "missing_co2")
             continue
 
         results.append(

@@ -1,11 +1,17 @@
 """Request/response contracts for the POST /calculate endpoint."""
 
-from datetime import date
 from typing import Literal
 
 from pydantic import BaseModel, HttpUrl
 
 from app.catalogue.schemas import CatalogueCandidate
+
+# Named so the router can annotate its own working state with the same types
+# the response is validated against — otherwise those locals are plain `str`
+# and every response construction needs a type: ignore to get past the check.
+Co2Source = Literal["scraped", "catalogue", "manual_required"]
+Confidence = Literal["high", "low"]
+MatchStatusStr = Literal["auto_matched", "candidates", "no_match", "not_attempted"]
 
 
 class CalculateRequest(BaseModel):
@@ -33,11 +39,11 @@ class ParsedFields(BaseModel):
 class CalculateResponse(BaseModel):
     ppmv_eur: float | None
     parsed: ParsedFields
-    co2_source: Literal["scraped", "catalogue", "manual_required"]
-    confidence: Literal["high", "low"]
+    co2_source: Co2Source
+    confidence: Confidence
     warnings: list[str]
     debug: dict | None = None
     # Ranked catalogue rows the listing was matched against, so the user can
     # pick a different one (and its price/CO2) instead of the auto-picked row.
-    match_status: Literal["auto_matched", "candidates", "no_match", "not_attempted"] = "not_attempted"
+    match_status: MatchStatusStr = "not_attempted"
     candidates: list[CatalogueCandidate] = []

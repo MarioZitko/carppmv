@@ -1,5 +1,7 @@
 from datetime import date
+
 import pytest
+
 from app.data.catalogues.parse_date import parse_valid_from
 
 

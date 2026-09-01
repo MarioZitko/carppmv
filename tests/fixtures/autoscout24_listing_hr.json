@@ -1,0 +1,1351 @@
+{
+ "additionalFuel": [
+  {
+   "co2emissionInGramPerKmWithFallback": {
+    "formatted": null,
+    "isFallback": null,
+    "raw": null
+   },
+   "consumptionCombined": {
+    "formatted": "- (kWh/100 km)",
+    "isFallback": false,
+    "raw": null
+   },
+   "formatted": "Electricity",
+   "raw": 12
+  }
+ ],
+ "allFuelTypes": [
+  {
+   "formatted": "Diesel",
+   "raw": 7
+  }
+ ],
+ "auxiliaryPower": null,
+ "axleSpread": "",
+ "batteryChargingTime": {
+  "formatted": null,
+  "raw": null
+ },
+ "batteryOwnershipType": {
+  "formatted": null,
+  "raw": null
+ },
+ "bodyColor": "siva",
+ "bodyColorOriginal": "Skyscraper Grau",
+ "bodyColorRaw": "Grey",
+ "bodyType": "Kombi",
+ "brakeType": "",
+ "cabinAxleDistance": "",
+ "carpassMileageUrl": null,
+ "chassisManufacturerName": "",
+ "co2emissionInGramPerKmWithFallback": {
+  "formatted": "- (g/km)",
+  "isFallback": false,
+  "raw": null
+ },
+ "controlModuleName": "",
+ "cylinderCapacity": "1.995 cm³",
+ "cylinders": 4,
+ "damageConditions": [],
+ "differentialRatio": "",
+ "displacementInCCM": "1.995 cm³",
+ "driveTrain": "Stražnji dio",
+ "electricRangeCity": {
+  "formatted": null,
+  "raw": null
+ },
+ "electricRangeWithFallback": {
+  "formatted": null,
+  "raw": null
+ },
+ "engineCoolingSystem": "",
+ "engineCount": null,
+ "engineHours": "",
+ "engineManufacturerName": "",
+ "engineMountingType": null,
+ "environmentBImSchV35": {
+  "co2EfficiencyClass": "Green",
+  "description": null,
+  "formatted": "4 (zelena)",
+  "isFallback": false,
+  "label": "Green"
+ },
+ "environmentEuDirective": {
+  "co2EfficiencyClass": "EURO6d",
+  "description": null,
+  "formatted": "Euro 6d",
+  "isFallback": false,
+  "label": "EURO6d"
+ },
+ "environmentPkwEnVKV": null,
+ "equipment": {
+  "comfortAndConvenience": [
+   {
+    "categoryId": "comfortAndConvenience",
+    "categoryName": "Udobnost i praktičnost",
+    "id": "Automatska klima, 3 zone"
+   },
+   {
+    "categoryId": "comfortAndConvenience",
+    "categoryName": "Udobnost i praktičnost",
+    "id": "Elek. podizači prozora"
+   },
+   {
+    "categoryId": "comfortAndConvenience",
+    "categoryName": "Udobnost i praktičnost",
+    "id": "Elek. pomoć kod parkiranja"
+   },
+   {
+    "categoryId": "comfortAndConvenience",
+    "categoryName": "Udobnost i praktičnost",
+    "id": "Električni bočni retrovizor"
+   },
+   {
+    "categoryId": "comfortAndConvenience",
+    "categoryName": "Udobnost i praktičnost",
+    "id": "Električni prtljažnik"
+   },
+   {
+    "categoryId": "comfortAndConvenience",
+    "categoryName": "Udobnost i praktičnost",
+    "id": "Grijanje sjedala"
+   },
+   {
+    "categoryId": "comfortAndConvenience",
+    "categoryName": "Udobnost i praktičnost",
+    "id": "Head-Up zaslon"
+   },
+   {
+    "categoryId": "comfortAndConvenience",
+    "categoryName": "Udobnost i praktičnost",
+    "id": "Hill Holder"
+   },
+   {
+    "categoryId": "comfortAndConvenience",
+    "categoryName": "Udobnost i praktičnost",
+    "id": "Kožni volan"
+   },
+   {
+    "categoryId": "comfortAndConvenience",
+    "categoryName": "Udobnost i praktičnost",
+    "id": "Naslon za ruke"
+   },
+   {
+    "categoryId": "comfortAndConvenience",
+    "categoryName": "Udobnost i praktičnost",
+    "id": "Navigacijski sustav"
+   },
+   {
+    "categoryId": "comfortAndConvenience",
+    "categoryName": "Udobnost i praktičnost",
+    "id": "Parkirni senzori sprijeda"
+   },
+   {
+    "categoryId": "comfortAndConvenience",
+    "categoryName": "Udobnost i praktičnost",
+    "id": "Parkirni senzori straga"
+   },
+   {
+    "categoryId": "comfortAndConvenience",
+    "categoryName": "Udobnost i praktičnost",
+    "id": "Senzor za kišu"
+   },
+   {
+    "categoryId": "comfortAndConvenience",
+    "categoryName": "Udobnost i praktičnost",
+    "id": "Senzor za svjetla"
+   },
+   {
+    "categoryId": "comfortAndConvenience",
+    "categoryName": "Udobnost i praktičnost",
+    "id": "Start/Stop automatik"
+   },
+   {
+    "categoryId": "comfortAndConvenience",
+    "categoryName": "Udobnost i praktičnost",
+    "id": "Tempomat"
+   },
+   {
+    "categoryId": "comfortAndConvenience",
+    "categoryName": "Udobnost i praktičnost",
+    "id": "Višenamjensko vozilo"
+   },
+   {
+    "categoryId": "comfortAndConvenience",
+    "categoryName": "Udobnost i praktičnost",
+    "id": "Zatamnjena stakla"
+   }
+  ],
+  "entertainmentAndMedia": [
+   {
+    "categoryId": "entertainmentAndMedia",
+    "categoryName": "Zabava i mediji",
+    "id": "Bluetooth"
+   },
+   {
+    "categoryId": "entertainmentAndMedia",
+    "categoryName": "Zabava i mediji",
+    "id": "DAB radio"
+   },
+   {
+    "categoryId": "entertainmentAndMedia",
+    "categoryName": "Zabava i mediji",
+    "id": "Digitalna kombinirana mjerna ploča"
+   },
+   {
+    "categoryId": "entertainmentAndMedia",
+    "categoryName": "Zabava i mediji",
+    "id": "Handsfree uređaj"
+   },
+   {
+    "categoryId": "entertainmentAndMedia",
+    "categoryName": "Zabava i mediji",
+    "id": "MP3"
+   },
+   {
+    "categoryId": "entertainmentAndMedia",
+    "categoryName": "Zabava i mediji",
+    "id": "Putno računalo"
+   },
+   {
+    "categoryId": "entertainmentAndMedia",
+    "categoryName": "Zabava i mediji",
+    "id": "Radio"
+   },
+   {
+    "categoryId": "entertainmentAndMedia",
+    "categoryName": "Zabava i mediji",
+    "id": "USB"
+   }
+  ],
+  "extras": [
+   {
+    "categoryId": "extras",
+    "categoryName": "Ekstra",
+    "id": "Aluminijski naplatci"
+   },
+   {
+    "categoryId": "extras",
+    "categoryName": "Extras",
+    "id": "filtar čestica čađe"
+   },
+   {
+    "categoryId": "extras",
+    "categoryName": "Ekstra",
+    "id": "Glasovno navođenje"
+   },
+   {
+    "categoryId": "extras",
+    "categoryName": "Ekstra",
+    "id": "Krovni nosač"
+   },
+   {
+    "categoryId": "extras",
+    "categoryName": "Ekstra",
+    "id": "Mjenjač na volanu"
+   },
+   {
+    "categoryId": "extras",
+    "categoryName": "Ekstra",
+    "id": "Pregrada za prtljažnik"
+   },
+   {
+    "categoryId": "extras",
+    "categoryName": "Ekstra",
+    "id": "Sportska sjedala"
+   },
+   {
+    "categoryId": "extras",
+    "categoryName": "Ekstra",
+    "id": "Touchscreen"
+   },
+   {
+    "categoryId": "extras",
+    "categoryName": "Ekstra",
+    "id": "Unutarnje zrcalo s automatskim zamračivanjem"
+   }
+  ],
+  "safetyAndSecurity": [
+   {
+    "categoryId": "safetyAndSecurity",
+    "categoryName": "Sigurnost",
+    "id": "ABS"
+   },
+   {
+    "categoryId": "safetyAndSecurity",
+    "categoryName": "Sigurnost",
+    "id": "Asistent kočenja u nuždi (EBA)"
+   },
+   {
+    "categoryId": "safetyAndSecurity",
+    "categoryName": "Sigurnost",
+    "id": "Blokada vozila"
+   },
+   {
+    "categoryId": "safetyAndSecurity",
+    "categoryName": "Sigurnost",
+    "id": "Bočni zračni jastuci"
+   },
+   {
+    "categoryId": "safetyAndSecurity",
+    "categoryName": "Sigurnost",
+    "id": "Dnevna LED svijetla"
+   },
+   {
+    "categoryId": "safetyAndSecurity",
+    "categoryName": "Sigurnost",
+    "id": "Epoziv"
+   },
+   {
+    "categoryId": "safetyAndSecurity",
+    "categoryName": "Sigurnost",
+    "id": "Isofix sustav vezanja"
+   },
+   {
+    "categoryId": "safetyAndSecurity",
+    "categoryName": "Sigurnost",
+    "id": "Kontrola proklizavanja"
+   },
+   {
+    "categoryId": "safetyAndSecurity",
+    "categoryName": "Sigurnost",
+    "id": "Lane departure warning sustav"
+   },
+   {
+    "categoryId": "safetyAndSecurity",
+    "categoryName": "Sigurnost",
+    "id": "Prednja LED svijetla"
+   },
+   {
+    "categoryId": "safetyAndSecurity",
+    "categoryName": "Sigurnost",
+    "id": "Prog. elek. stabilnosti (ESP)"
+   },
+   {
+    "categoryId": "safetyAndSecurity",
+    "categoryName": "Sigurnost",
+    "id": "Servo upravljanje"
+   },
+   {
+    "categoryId": "safetyAndSecurity",
+    "categoryName": "Sigurnost",
+    "id": "Središnje zaključavanje"
+   },
+   {
+    "categoryId": "safetyAndSecurity",
+    "categoryName": "Sigurnost",
+    "id": "Sustav nadzora tlaka u gumama (TPMS)"
+   },
+   {
+    "categoryId": "safetyAndSecurity",
+    "categoryName": "Sigurnost",
+    "id": "Sustav prepoznavanja umora"
+   },
+   {
+    "categoryId": "safetyAndSecurity",
+    "categoryName": "Sigurnost",
+    "id": "Sustav prepoznavanja znakova"
+   },
+   {
+    "categoryId": "safetyAndSecurity",
+    "categoryName": "Sigurnost",
+    "id": "Svjetlo koje gori danju"
+   },
+   {
+    "categoryId": "safetyAndSecurity",
+    "categoryName": "Sigurnost",
+    "id": "Upozorenje za sigurnosni razmak"
+   },
+   {
+    "categoryId": "safetyAndSecurity",
+    "categoryName": "Sigurnost",
+    "id": "Uređaj za ograničenje brzine"
+   },
+   {
+    "categoryId": "safetyAndSecurity",
+    "categoryName": "Sigurnost",
+    "id": "Zračni jastuk"
+   },
+   {
+    "categoryId": "safetyAndSecurity",
+    "categoryName": "Sigurnost",
+    "id": "Zračni jastuk za glavu"
+   },
+   {
+    "categoryId": "safetyAndSecurity",
+    "categoryName": "Sigurnost",
+    "id": "Zračni jastuk za suvozača"
+   }
+  ]
+ },
+ "extendedLength": "",
+ "exteriorMaterial": "",
+ "firstRegistrationDate": "03/2023",
+ "firstRegistrationDateRaw": "2023-03-01",
+ "flooringMaterial": "",
+ "frameType": "",
+ "fridgeCapacity": "",
+ "fridgePowerType": "",
+ "frontAxleWeightRating": "",
+ "fuelCapacity": "",
+ "fuelCategory": {
+  "formatted": "Elektro/Dizel",
+  "raw": "3"
+ },
+ "fuelConsumptionCombined": {
+  "formatted": "- (l/100 km)",
+  "isFallback": false,
+  "raw": null
+ },
+ "fuelConsumptionExtraUrban": {
+  "formatted": null,
+  "raw": null
+ },
+ "fuelConsumptionUrban": {
+  "formatted": null,
+  "raw": null
+ },
+ "fuelDeliveryType": "",
+ "gears": 8,
+ "grossVehicleWeight": null,
+ "hadAccident": null,
+ "hasCarRegistration": false,
+ "hasFullServiceHistory": true,
+ "hasParticleFilter": true,
+ "headCount": null,
+ "hsnTsn": "0005/DDH",
+ "hullMaterial": null,
+ "imgAltText": "BMW 318 d Touring + GARANTIE + 1.HAND siva",
+ "isCabinClean": false,
+ "isRental": false,
+ "lastBeltServiceDate": null,
+ "lastTechnicalServiceDate": null,
+ "legalCategories": [
+  "Rabljeno vozilo"
+ ],
+ "legalCategoriesRaw": [
+  "UsedVehicle"
+ ],
+ "licensePlate": null,
+ "loadHeight": null,
+ "loadLength": null,
+ "loadVolume": null,
+ "loadWidth": null,
+ "make": "BMW",
+ "makeId": 13,
+ "marketingDescription": "",
+ "maximumTowingWeight": null,
+ "mileageInKm": "172.004 km",
+ "mileageInKmRaw": 172004,
+ "model": "318",
+ "modelGenerationId": 28,
+ "modelGroup": "3 Series",
+ "modelGroupIds": [
+  100038
+ ],
+ "modelId": 1640,
+ "modelOrModelLineId": 1640,
+ "modelVariantId": 106,
+ "modelVersionCustom": null,
+ "modelVersionInput": "d Touring + GARANTIE + 1.HAND",
+ "motorTypeId": 117,
+ "motorTypeName": "318d",
+ "newDriverSuitable": null,
+ "newInspection": false,
+ "nextVehicleSafetyInspection": "03/2026",
+ "noOfPreviousOwners": 1,
+ "nonSmoking": false,
+ "numberOfAxles": null,
+ "numberOfBeds": null,
+ "numberOfDoors": 5,
+ "numberOfSeats": 5,
+ "offerType": "U",
+ "originalMarket": "Njemačka",
+ "paintType": "Metalik",
+ "payload": null,
+ "powerInHp": "150 KS",
+ "powerInKw": "110 kW",
+ "price": {
+  "isConditionalPrice": false,
+  "isVatLabelLegallyRequired": false,
+  "priceFormatted": "€ 17.690",
+  "priceSuperscriptString": "1"
+ },
+ "prices": {
+  "dealer": {
+   "category": null,
+   "evaluationRanges": null,
+   "median": null,
+   "negotiable": false,
+   "netPrice": null,
+   "netPriceRaw": null,
+   "onRequestOnly": false,
+   "price": "€ 17.690",
+   "priceRaw": 17690,
+   "taxDeductible": true,
+   "vatRate": 19
+  },
+  "error": null,
+  "isFinalPrice": false,
+  "popupUrl": "https://www.autoscout24.com/priceevaluation/price-label-explanation-page/2a8cccf1-6704-494f-9d16-fb752ac43e8c?culture=hr-HR",
+  "public": {
+   "category": null,
+   "evaluationRanges": null,
+   "median": null,
+   "negotiable": false,
+   "netPrice": "€ 14.865",
+   "netPriceRaw": 14865,
+   "onRequestOnly": false,
+   "price": "€ 17.690",
+   "priceRaw": 17690,
+   "taxDeductible": true,
+   "vatRate": 19
+  },
+  "suggestedRetail": null
+ },
+ "primaryFuel": {
+  "formatted": "Diesel",
+  "raw": 7
+ },
+ "productionYear": "2023",
+ "rawCylinderCapacity": 1995,
+ "rawData": {
+  "alloyWheelInches": null,
+  "bodyColor": {
+   "formatted": "siva",
+   "raw": "Grey"
+  },
+  "bodyColorOriginal": "Skyscraper Grau",
+  "bodyType": {
+   "formatted": "Kombi",
+   "raw": "StationWagon"
+  },
+  "classification": {
+   "germanHsnTsn": {
+    "formatted": "0005/DDH"
+   },
+   "make": {
+    "formatted": "BMW",
+    "raw": 13
+   },
+   "model": {
+    "formatted": "318",
+    "raw": 1640
+   },
+   "modelGeneration": {
+    "formatted": "G20/G21/G80/G81",
+    "raw": 28
+   },
+   "modelGroups": [
+    {
+     "formatted": "3 Series",
+     "raw": 100038
+    }
+   ],
+   "modelVariant": {
+    "formatted": "Touring",
+    "raw": 106
+   },
+   "modelVersionCustom": null,
+   "modelVersionInput": "d Touring + GARANTIE + 1.HAND",
+   "modelYear": null,
+   "motorType": {
+    "formatted": "318d",
+    "raw": 117
+   },
+   "trimLine": {
+    "raw": 479990
+   },
+   "type": "Car"
+  },
+  "condition": {
+   "carpassMileageUrl": null,
+   "damage": {
+    "accidentFree": null,
+    "damageConditions": [],
+    "hasRepairedDamages": null,
+    "isCurrentlyDamaged": null,
+    "isRoadworthy": true
+   },
+   "firstRegistrationDate": {
+    "formatted": "03/2023",
+    "raw": "2023-03-01"
+   },
+   "isCabinClean": null,
+   "mileageInKm": {
+    "formatted": "172.004 km",
+    "raw": 172004
+   },
+   "newInspection": false,
+   "nonSmoking": false,
+   "numberOfPreviousOwnersExtended": {
+    "formatted": "1 vlasnik vozila",
+    "raw": 1
+   }
+  },
+  "costModel": null,
+  "emptyWeight": {
+   "formatted": "1.735 kg"
+  },
+  "engine": {
+   "cylinderCapacity": {
+    "formatted": "1.995 cm³",
+    "raw": 1995,
+    "unit": "ccm"
+   },
+   "driveTrain": {
+    "formatted": "Stražnji dio"
+   },
+   "engineDisplacementInCCM": {
+    "formatted": "1.995 cm³",
+    "raw": 1995
+   },
+   "numberOfCylinders": 4,
+   "numberOfGears": 8,
+   "power": {
+    "hp": {
+     "formatted": "150 KS",
+     "raw": 150
+    },
+    "kw": {
+     "formatted": "110 kW",
+     "raw": 110
+    }
+   },
+   "transmissionType": {
+    "formatted": "Automatski mjenjač",
+    "raw": "Automatic"
+   }
+  },
+  "engineHours": null,
+  "environment": {
+   "environmentLabelsWithFallback": [
+    {
+     "description": null,
+     "formatted": "4 (zelena)",
+     "isFallback": false,
+     "label": "Green",
+     "norm": "BImSchV_35"
+    },
+    {
+     "description": null,
+     "formatted": "Euro 6d",
+     "isFallback": false,
+     "label": "EURO6d",
+     "norm": "EU_Directive_70_220_EEC_LDV"
+    }
+   ],
+   "particulateFilter": true
+  },
+  "equipment": {
+   "as24": [
+    {
+     "equipmentCategory": {
+      "formatted": "Udobnost i praktičnost",
+      "raw": "comfortAndConvenience"
+     },
+     "id": {
+      "formatted": "Automatska klima, 3 zone",
+      "raw": 242
+     }
+    },
+    {
+     "equipmentCategory": {
+      "formatted": "Udobnost i praktičnost",
+      "raw": "comfortAndConvenience"
+     },
+     "id": {
+      "formatted": "Elek. podizači prozora",
+      "raw": 13
+     }
+    },
+    {
+     "equipmentCategory": {
+      "formatted": "Udobnost i praktičnost",
+      "raw": "comfortAndConvenience"
+     },
+     "id": {
+      "formatted": "Elek. pomoć kod parkiranja",
+      "raw": 40
+     }
+    },
+    {
+     "equipmentCategory": {
+      "formatted": "Udobnost i praktičnost",
+      "raw": "comfortAndConvenience"
+     },
+     "id": {
+      "formatted": "Električni bočni retrovizor",
+      "raw": 121
+     }
+    },
+    {
+     "equipmentCategory": {
+      "formatted": "Udobnost i praktičnost",
+      "raw": "comfortAndConvenience"
+     },
+     "id": {
+      "formatted": "Električni prtljažnik",
+      "raw": 139
+     }
+    },
+    {
+     "equipmentCategory": {
+      "formatted": "Udobnost i praktičnost",
+      "raw": "comfortAndConvenience"
+     },
+     "id": {
+      "formatted": "Grijanje sjedala",
+      "raw": 34
+     }
+    },
+    {
+     "equipmentCategory": {
+      "formatted": "Udobnost i praktičnost",
+      "raw": "comfortAndConvenience"
+     },
+     "id": {
+      "formatted": "Head-Up zaslon",
+      "raw": 123
+     }
+    },
+    {
+     "equipmentCategory": {
+      "formatted": "Udobnost i praktičnost",
+      "raw": "comfortAndConvenience"
+     },
+     "id": {
+      "formatted": "Hill Holder",
+      "raw": 137
+     }
+    },
+    {
+     "equipmentCategory": {
+      "formatted": "Udobnost i praktičnost",
+      "raw": "comfortAndConvenience"
+     },
+     "id": {
+      "formatted": "Kožni volan",
+      "raw": 142
+     }
+    },
+    {
+     "equipmentCategory": {
+      "formatted": "Udobnost i praktičnost",
+      "raw": "comfortAndConvenience"
+     },
+     "id": {
+      "formatted": "Naslon za ruke",
+      "raw": 134
+     }
+    },
+    {
+     "equipmentCategory": {
+      "formatted": "Udobnost i praktičnost",
+      "raw": "comfortAndConvenience"
+     },
+     "id": {
+      "formatted": "Navigacijski sustav",
+      "raw": 23
+     }
+    },
+    {
+     "equipmentCategory": {
+      "formatted": "Udobnost i praktičnost",
+      "raw": "comfortAndConvenience"
+     },
+     "id": {
+      "formatted": "Parkirni senzori sprijeda",
+      "raw": 128
+     }
+    },
+    {
+     "equipmentCategory": {
+      "formatted": "Udobnost i praktičnost",
+      "raw": "comfortAndConvenience"
+     },
+     "id": {
+      "formatted": "Parkirni senzori straga",
+      "raw": 129
+     }
+    },
+    {
+     "equipmentCategory": {
+      "formatted": "Udobnost i praktičnost",
+      "raw": "comfortAndConvenience"
+     },
+     "id": {
+      "formatted": "Senzor za kišu",
+      "raw": 127
+     }
+    },
+    {
+     "equipmentCategory": {
+      "formatted": "Udobnost i praktičnost",
+      "raw": "comfortAndConvenience"
+     },
+     "id": {
+      "formatted": "Senzor za svjetla",
+      "raw": 126
+     }
+    },
+    {
+     "equipmentCategory": {
+      "formatted": "Udobnost i praktičnost",
+      "raw": "comfortAndConvenience"
+     },
+     "id": {
+      "formatted": "Start/Stop automatik",
+      "raw": 113
+     }
+    },
+    {
+     "equipmentCategory": {
+      "formatted": "Udobnost i praktičnost",
+      "raw": "comfortAndConvenience"
+     },
+     "id": {
+      "formatted": "Tempomat",
+      "raw": 38
+     }
+    },
+    {
+     "equipmentCategory": {
+      "formatted": "Udobnost i praktičnost",
+      "raw": "comfortAndConvenience"
+     },
+     "id": {
+      "formatted": "Višenamjensko vozilo",
+      "raw": 114
+     }
+    },
+    {
+     "equipmentCategory": {
+      "formatted": "Udobnost i praktičnost",
+      "raw": "comfortAndConvenience"
+     },
+     "id": {
+      "formatted": "Zatamnjena stakla",
+      "raw": 54
+     }
+    },
+    {
+     "equipmentCategory": {
+      "formatted": "Zabava i mediji",
+      "raw": "entertainmentAndMedia"
+     },
+     "id": {
+      "formatted": "Bluetooth",
+      "raw": 122
+     }
+    },
+    {
+     "equipmentCategory": {
+      "formatted": "Zabava i mediji",
+      "raw": "entertainmentAndMedia"
+     },
+     "id": {
+      "formatted": "DAB radio",
+      "raw": 138
+     }
+    },
+    {
+     "equipmentCategory": {
+      "formatted": "Zabava i mediji",
+      "raw": "entertainmentAndMedia"
+     },
+     "id": {
+      "formatted": "Digitalna kombinirana mjerna ploča",
+      "raw": 224
+     }
+    },
+    {
+     "equipmentCategory": {
+      "formatted": "Zabava i mediji",
+      "raw": "entertainmentAndMedia"
+     },
+     "id": {
+      "formatted": "Handsfree uređaj",
+      "raw": 124
+     }
+    },
+    {
+     "equipmentCategory": {
+      "formatted": "Zabava i mediji",
+      "raw": "entertainmentAndMedia"
+     },
+     "id": {
+      "formatted": "MP3",
+      "raw": 43
+     }
+    },
+    {
+     "equipmentCategory": {
+      "formatted": "Zabava i mediji",
+      "raw": "entertainmentAndMedia"
+     },
+     "id": {
+      "formatted": "Putno računalo",
+      "raw": 41
+     }
+    },
+    {
+     "equipmentCategory": {
+      "formatted": "Zabava i mediji",
+      "raw": "entertainmentAndMedia"
+     },
+     "id": {
+      "formatted": "Radio",
+      "raw": 10
+     }
+    },
+    {
+     "equipmentCategory": {
+      "formatted": "Zabava i mediji",
+      "raw": "entertainmentAndMedia"
+     },
+     "id": {
+      "formatted": "USB",
+      "raw": 161
+     }
+    },
+    {
+     "equipmentCategory": {
+      "formatted": "Ekstra",
+      "raw": "extras"
+     },
+     "id": {
+      "formatted": "Aluminijski naplatci",
+      "raw": 15
+     }
+    },
+    {
+     "equipmentCategory": {
+      "formatted": "Ekstra",
+      "raw": "extras"
+     },
+     "id": {
+      "formatted": "Glasovno navođenje",
+      "raw": 156
+     }
+    },
+    {
+     "equipmentCategory": {
+      "formatted": "Ekstra",
+      "raw": "extras"
+     },
+     "id": {
+      "formatted": "Krovni nosač",
+      "raw": 27
+     }
+    },
+    {
+     "equipmentCategory": {
+      "formatted": "Ekstra",
+      "raw": "extras"
+     },
+     "id": {
+      "formatted": "Mjenjač na volanu",
+      "raw": 151
+     }
+    },
+    {
+     "equipmentCategory": {
+      "formatted": "Ekstra",
+      "raw": "extras"
+     },
+     "id": {
+      "formatted": "Pregrada za prtljažnik",
+      "raw": 226
+     }
+    },
+    {
+     "equipmentCategory": {
+      "formatted": "Ekstra",
+      "raw": "extras"
+     },
+     "id": {
+      "formatted": "Sportska sjedala",
+      "raw": 117
+     }
+    },
+    {
+     "equipmentCategory": {
+      "formatted": "Ekstra",
+      "raw": "extras"
+     },
+     "id": {
+      "formatted": "Touchscreen",
+      "raw": 159
+     }
+    },
+    {
+     "equipmentCategory": {
+      "formatted": "Ekstra",
+      "raw": "extras"
+     },
+     "id": {
+      "formatted": "Unutarnje zrcalo s automatskim zamračivanjem",
+      "raw": 225
+     }
+    },
+    {
+     "equipmentCategory": {
+      "formatted": "Sigurnost",
+      "raw": "safetyAndSecurity"
+     },
+     "id": {
+      "formatted": "ABS",
+      "raw": 1
+     }
+    },
+    {
+     "equipmentCategory": {
+      "formatted": "Sigurnost",
+      "raw": "safetyAndSecurity"
+     },
+     "id": {
+      "formatted": "Asistent kočenja u nuždi (EBA)",
+      "raw": 148
+     }
+    },
+    {
+     "equipmentCategory": {
+      "formatted": "Sigurnost",
+      "raw": "safetyAndSecurity"
+     },
+     "id": {
+      "formatted": "Blokada vozila",
+      "raw": 26
+     }
+    },
+    {
+     "equipmentCategory": {
+      "formatted": "Sigurnost",
+      "raw": "safetyAndSecurity"
+     },
+     "id": {
+      "formatted": "Bočni zračni jastuci",
+      "raw": 32
+     }
+    },
+    {
+     "equipmentCategory": {
+      "formatted": "Sigurnost",
+      "raw": "safetyAndSecurity"
+     },
+     "id": {
+      "formatted": "Dnevna LED svijetla",
+      "raw": 141
+     }
+    },
+    {
+     "equipmentCategory": {
+      "formatted": "Sigurnost",
+      "raw": "safetyAndSecurity"
+     },
+     "id": {
+      "formatted": "Epoziv",
+      "raw": 149
+     }
+    },
+    {
+     "equipmentCategory": {
+      "formatted": "Sigurnost",
+      "raw": "safetyAndSecurity"
+     },
+     "id": {
+      "formatted": "Isofix sustav vezanja",
+      "raw": 125
+     }
+    },
+    {
+     "equipmentCategory": {
+      "formatted": "Sigurnost",
+      "raw": "safetyAndSecurity"
+     },
+     "id": {
+      "formatted": "Kontrola proklizavanja",
+      "raw": 31
+     }
+    },
+    {
+     "equipmentCategory": {
+      "formatted": "Sigurnost",
+      "raw": "safetyAndSecurity"
+     },
+     "id": {
+      "formatted": "Lane departure warning sustav",
+      "raw": 157
+     }
+    },
+    {
+     "equipmentCategory": {
+      "formatted": "Sigurnost",
+      "raw": "safetyAndSecurity"
+     },
+     "id": {
+      "formatted": "Prednja LED svijetla",
+      "raw": 140
+     }
+    },
+    {
+     "equipmentCategory": {
+      "formatted": "Sigurnost",
+      "raw": "safetyAndSecurity"
+     },
+     "id": {
+      "formatted": "Prog. elek. stabilnosti (ESP)",
+      "raw": 42
+     }
+    },
+    {
+     "equipmentCategory": {
+      "formatted": "Sigurnost",
+      "raw": "safetyAndSecurity"
+     },
+     "id": {
+      "formatted": "Servo upravljanje",
+      "raw": 12
+     }
+    },
+    {
+     "equipmentCategory": {
+      "formatted": "Sigurnost",
+      "raw": "safetyAndSecurity"
+     },
+     "id": {
+      "formatted": "Središnje zaključavanje",
+      "raw": 17
+     }
+    },
+    {
+     "equipmentCategory": {
+      "formatted": "Sigurnost",
+      "raw": "safetyAndSecurity"
+     },
+     "id": {
+      "formatted": "Sustav nadzora tlaka u gumama (TPMS)",
+      "raw": 150
+     }
+    },
+    {
+     "equipmentCategory": {
+      "formatted": "Sigurnost",
+      "raw": "safetyAndSecurity"
+     },
+     "id": {
+      "formatted": "Sustav prepoznavanja umora",
+      "raw": 146
+     }
+    },
+    {
+     "equipmentCategory": {
+      "formatted": "Sigurnost",
+      "raw": "safetyAndSecurity"
+     },
+     "id": {
+      "formatted": "Sustav prepoznavanja znakova",
+      "raw": 162
+     }
+    },
+    {
+     "equipmentCategory": {
+      "formatted": "Sigurnost",
+      "raw": "safetyAndSecurity"
+     },
+     "id": {
+      "formatted": "Svjetlo koje gori danju",
+      "raw": 115
+     }
+    },
+    {
+     "equipmentCategory": {
+      "formatted": "Sigurnost",
+      "raw": "safetyAndSecurity"
+     },
+     "id": {
+      "formatted": "Upozorenje za sigurnosni razmak",
+      "raw": 232
+     }
+    },
+    {
+     "equipmentCategory": {
+      "formatted": "Sigurnost",
+      "raw": "safetyAndSecurity"
+     },
+     "id": {
+      "formatted": "Uređaj za ograničenje brzine",
+      "raw": 227
+     }
+    },
+    {
+     "equipmentCategory": {
+      "formatted": "Sigurnost",
+      "raw": "safetyAndSecurity"
+     },
+     "id": {
+      "formatted": "Zračni jastuk",
+      "raw": 2
+     }
+    },
+    {
+     "equipmentCategory": {
+      "formatted": "Sigurnost",
+      "raw": "safetyAndSecurity"
+     },
+     "id": {
+      "formatted": "Zračni jastuk za glavu",
+      "raw": 46
+     }
+    },
+    {
+     "equipmentCategory": {
+      "formatted": "Sigurnost",
+      "raw": "safetyAndSecurity"
+     },
+     "id": {
+      "formatted": "Zračni jastuk za suvozača",
+      "raw": 3
+     }
+    }
+   ]
+  },
+  "fuels": {
+   "additional": [
+    {
+     "co2emissionInGramPerKmWithFallback": null,
+     "consumption": {
+      "combinedWithFallback": {
+       "formatted": "- (kWh/100 km)",
+       "isFallback": false,
+       "raw": null
+      }
+     },
+     "type": {
+      "formatted": "Electricity",
+      "raw": 12
+     }
+    }
+   ],
+   "allFuelTypes": [
+    {
+     "formatted": "Diesel",
+     "raw": 7
+    }
+   ],
+   "battery": null,
+   "electricRangeCity": null,
+   "electricRangeWithFallback": null,
+   "fuelCategory": {
+    "formatted": "Elektro/Dizel",
+    "raw": "3"
+   },
+   "isPluginHybrid": null,
+   "primary": {
+    "co2emissionInGramPerKmWithFallback": {
+     "formatted": "- (g/km)",
+     "isFallback": false,
+     "raw": null
+    },
+    "consumption": {
+     "combinedWithFallback": {
+      "formatted": "- (l/100 km)",
+      "isFallback": false,
+      "raw": null
+     },
+     "extraUrban": null,
+     "urban": null
+    },
+    "type": {
+     "formatted": "Diesel",
+     "raw": 7
+    }
+   },
+   "wltp": null
+  },
+  "grossVehicleWeight": null,
+  "hasCarRegistration": {
+   "raw": false
+  },
+  "interior": {
+   "numberOfSeats": 5,
+   "upholstery": {
+    "formatted": "Koža djelomično"
+   },
+   "upholsteryColor": {
+    "formatted": "Crna"
+   }
+  },
+  "legalCategories": [
+   {
+    "formatted": "Rabljeno vozilo",
+    "raw": "UsedVehicle"
+   }
+  ],
+  "loadHeight": null,
+  "loadLength": null,
+  "loadVolume": null,
+  "loadWidth": null,
+  "maintenance": {
+   "hasFullServiceHistory": {
+    "raw": true
+   },
+   "lastBeltServiceDate": null,
+   "lastTechnicalServiceDate": null,
+   "nextVehicleSafetyInspection": {
+    "formatted": "03/2026"
+   }
+  },
+  "maximumTowingWeight": null,
+  "newDriverSuitable": null,
+  "numberOfAxles": {
+   "formatted": "- (Broj osovina)",
+   "raw": null
+  },
+  "numberOfBeds": {
+   "formatted": "- (Broj spavaćih mjesta)",
+   "raw": null
+  },
+  "numberOfDoors": 5,
+  "originalMarket": {
+   "formatted": "Njemačka"
+  },
+  "paintType": {
+   "formatted": "Metalik"
+  },
+  "payload": null,
+  "productionDate": {
+   "formatted": "01/2023",
+   "raw": "2023-01-01"
+  },
+  "totalHeight": null,
+  "totalLength": null,
+  "totalWidth": null,
+  "usageState": "U",
+  "wheelBase": null
+ },
+ "rawDisplacementInCCM": 1995,
+ "rawPowerInHp": 150,
+ "rawPowerInKw": 110,
+ "rearAxleWeightRating": "",
+ "skiStanceWidth": "",
+ "slideOutCount": null,
+ "steeringType": null,
+ "totalHeight": null,
+ "totalLength": null,
+ "totalWidth": null,
+ "trackDimension": "",
+ "transmissionType": "Automatski mjenjač",
+ "trimLineId": 479990,
+ "type": "Car",
+ "upholstery": "Koža djelomično",
+ "upholsteryColor": "Crna",
+ "variant": "Touring",
+ "wasteTankCapacity": "",
+ "waterTankCapacity": "",
+ "weight": "1.735 kg",
+ "wheelBase": null,
+ "wltp": null
+}

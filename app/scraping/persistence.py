@@ -12,7 +12,7 @@ non-critical side effects (see mobile_de_service.py's cache-write handling).
 """
 
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -65,7 +65,7 @@ async def finish_scrape_run(
     are bounded varchars and an unhandled scraper exception's str() can be
     arbitrarily long.
     """
-    run.finished_at = datetime.now(timezone.utc)
+    run.finished_at = datetime.now(UTC)
     run.status = status
     run.estimated_cost_usd = estimated_cost_usd
     if error_message:

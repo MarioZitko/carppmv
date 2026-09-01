@@ -7,14 +7,15 @@ CO2 is extracted if explicitly shown on the page, never guessed.
 seat_count is extracted only when explicitly stated (e.g. "7 sjedala"), never inferred.
 """
 
+import contextlib
 import re
 
 from bs4 import BeautifulSoup
-from playwright.async_api import TimeoutError as PlaywrightTimeoutError
-from playwright.async_api import async_playwright
+from playwright.async_api import TimeoutError as PlaywrightTimeoutError, async_playwright
 from playwright_stealth import Stealth
 
 from app.core.exceptions import ScrapingError
+from app.scraping.parsing import parse_number
 from app.scraping.schemas import ListingData
 
 HRK_TO_EUR = 7.53450  # fixed ECB conversion rate
@@ -53,33 +54,9 @@ def _parse_price(text: str) -> tuple[float, str] | None:
 
 
 def _normalise_number(text: str) -> float | None:
-    """Handles both '12.500,00' (HRK/HR format) and '12,500.00' (EN format)."""
-    text = text.strip()
-    if "," in text and "." in text:
-        # Determine which is the decimal separator by position from the right
-        last_comma = text.rfind(",")
-        last_dot = text.rfind(".")
-        if last_comma > last_dot:
-            # comma is decimal — HRK/HR format: 12.500,00
-            text = text.replace(".", "").replace(",", ".")
-        else:
-            # dot is decimal — EN format: 12,500.00
-            text = text.replace(",", "")
-    elif "," in text:
-        # Only comma — could be decimal (12,5) or thousands (12,500)
-        parts = text.split(",")
-        if len(parts) == 2 and len(parts[1]) == 3:
-            text = text.replace(",", "")  # thousands separator
-        else:
-            text = text.replace(",", ".")  # decimal separator
-    elif "." in text:
-        parts = text.split(".")
-        if len(parts) == 2 and len(parts[1]) == 3:
-            text = text.replace(".", "")  # thousands separator
-    try:
-        return float(text)
-    except ValueError:
-        return None
+    """Thin alias — the implementation moved to app/scraping/parsing.py so
+    autobid.de and the mobile.de fetcher use the same separator handling."""
+    return parse_number(text)
 
 
 def _extract_power_kw(text: str) -> float | None:
@@ -214,10 +191,10 @@ class NjuskaloExtractor:
                     raise ScrapingError(
                         f"njuskalo.hr returned {response.status} for {url}"
                     )
-                try:
+                # Bot-challenge pages poll indefinitely, so a networkidle timeout
+                # is expected here — fall through to the block check below.
+                with contextlib.suppress(PlaywrightTimeoutError):
                     await page.wait_for_load_state("networkidle", timeout=15_000)
-                except PlaywrightTimeoutError:
-                    pass  # bot-challenge pages poll indefinitely; fall through to the block check below
                 # njuskalo.hr fronts listings with a Radware bot-management challenge that
                 # redirects to validate.perfdrive.com instead of returning a 4xx — detect the
                 # redirect so callers get a clear error instead of an all-None ListingData.

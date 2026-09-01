@@ -1,5 +1,11 @@
 # mobile.de on-demand scraping via Apify actor — implementation spec
 
+> **STATUS: implemented and live.** This is the design record for the shipped
+> mobile.de path, not a task list — `app/scraping/fetchers/apify_mobile_de.py`,
+> `mobile_de_guard.py`, `mobile_de_service.py`, `core/limits.py`,
+> `core/turnstile.py` and the `ListingCache`/`ApifyEvent` tables all exist.
+> Code and `.env.example` point here for the rationale, so it stays.
+
 > Hand this to Claude Code to execute. All paths under
 > `/Users/mariozitko/Projects/carPPMV`. Stack: FastAPI/Python, async SQLAlchemy,
 > httpx, uv. Prior context: `MASTER_PLAN_v7.md`, `MOBILE_DE_FREE_PARSING_PLAN.md`.

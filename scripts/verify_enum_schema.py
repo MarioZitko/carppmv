@@ -22,7 +22,6 @@ import sys
 from app.catalogue import llm_mapper
 from app.catalogue.llm_mapper import map_sheet_columns
 
-
 HEADER = [
     "OPREMA", "MODEL", "GORIVO", "MOTOR", "kW (KS)", "CO2 (g/km)",
     "CIJENA ZA KUPCA S PDV-OM",

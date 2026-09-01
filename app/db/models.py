@@ -66,7 +66,8 @@ class Catalogue(Base):
 
     brand: Mapped[str] = mapped_column(String(64), index=True)
     model: Mapped[str] = mapped_column(String(128), index=True)
-    variant: Mapped[str] = mapped_column(String(256))  # exact trim/variant string as it appears in the source Excel
+    # exact trim/variant string as it appears in the source Excel
+    variant: Mapped[str] = mapped_column(String(256))
 
     # Normalized brand+model+variant (lowercased, diacritics/punctuation stripped),
     # computed at ingestion. Drives listing→catalogue matching: the exact tier
@@ -77,7 +78,8 @@ class Catalogue(Base):
     # only viable cross-source key.
     match_key: Mapped[str] = mapped_column(String(512), index=True, default="")
 
-    price_eur: Mapped[float] = mapped_column(Float)  # always normalized to EUR at ingestion (HRK_TO_EUR_RATE if source was HRK)
+    # always normalized to EUR at ingestion (HRK_TO_EUR_RATE if source was HRK)
+    price_eur: Mapped[float] = mapped_column(Float)
     co2_g_km: Mapped[float] = mapped_column(Float)
     # Base engine power in kW, when the source Excel had it. Not part of the
     # lookup key, but the strongest disambiguator between same-named variants
@@ -87,11 +89,15 @@ class Catalogue(Base):
     co2_standard: Mapped[CO2Standard] = mapped_column(SAEnum(CO2Standard, native_enum=False))
     fuel_type: Mapped[FuelType] = mapped_column(SAEnum(FuelType, native_enum=False))
 
-    valid_from: Mapped[date] = mapped_column(Date)  # source Excel's "VRIJEDI OD", decoded from Excel serial date
-    valid_to: Mapped[date | None] = mapped_column(Date, nullable=True)  # null = still current as of last ingestion
+    # source Excel's "VRIJEDI OD", decoded from Excel serial date
+    valid_from: Mapped[date] = mapped_column(Date)
+    # null = still current as of last ingestion
+    valid_to: Mapped[date | None] = mapped_column(Date, nullable=True)
 
-    source_file: Mapped[str] = mapped_column(String(512))  # original Excel filename, kept for traceability after the Excels themselves are discarded
-    source_currency: Mapped[str] = mapped_column(String(3))  # "EUR" or "HRK" — the currency as it appeared in the source, pre-normalization
+    # original Excel filename, kept for traceability after the Excels themselves are discarded
+    source_file: Mapped[str] = mapped_column(String(512))
+    # "EUR" or "HRK" — the currency as it appeared in the source, pre-normalization
+    source_currency: Mapped[str] = mapped_column(String(3))
     ingested_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     __table_args__ = (
@@ -178,14 +184,16 @@ class Listing(Base):
 
     site: Mapped[ScrapeSite] = mapped_column(SAEnum(ScrapeSite, native_enum=False))
     source_url: Mapped[str] = mapped_column(String(1024))
-    external_id: Mapped[str | None] = mapped_column(String(128), nullable=True)  # site's own listing ID, if exposed
+    # site's own listing ID, if exposed
+    external_id: Mapped[str | None] = mapped_column(String(128), nullable=True)
 
     brand: Mapped[str | None] = mapped_column(String(64), nullable=True)
     model: Mapped[str | None] = mapped_column(String(128), nullable=True)
     variant: Mapped[str | None] = mapped_column(String(256), nullable=True)
 
     price_eur: Mapped[float | None] = mapped_column(Float, nullable=True)
-    co2_g_km: Mapped[float | None] = mapped_column(Float, nullable=True)  # often unavailable pre-login/pre-COC — see PPMV §7 CO2 problem
+    # often unavailable pre-login/pre-COC — see PPMV §7 CO2 problem
+    co2_g_km: Mapped[float | None] = mapped_column(Float, nullable=True)
     fuel_type: Mapped[FuelType | None] = mapped_column(SAEnum(FuelType, native_enum=False), nullable=True)
     first_registration_date: Mapped[date | None] = mapped_column(Date, nullable=True)
     mileage_km: Mapped[int | None] = mapped_column(Integer, nullable=True)

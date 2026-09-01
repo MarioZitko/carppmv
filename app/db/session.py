@@ -7,8 +7,8 @@ get_db_session via FastAPI's Depends() to get a request-scoped session.
 
 from collections.abc import AsyncGenerator
 
-from sqlalchemy.pool import NullPool
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.pool import NullPool
 
 from app.core.config import get_settings
 

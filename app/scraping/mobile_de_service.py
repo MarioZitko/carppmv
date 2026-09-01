@@ -6,7 +6,7 @@ so a listing is only ever paid for once per cache TTL window and the daily
 Apify spend cap is enforced regardless of which endpoint is hit.
 """
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
@@ -38,7 +38,7 @@ async def log_apify_event(
             source=source,
             status=status,
             cost_usd=cost_usd,
-            created_at=datetime.now(timezone.utc),
+            created_at=datetime.now(UTC),
         )
     )
     await db.commit()
@@ -63,7 +63,7 @@ async def get_mobile_de_listing(url: str, db: AsyncSession, ip_hash: str = "") -
         cached = result.scalar_one_or_none()
         if cached is not None:
             ttl = timedelta(hours=settings.listing_cache_ttl_hours)
-            if datetime.now(timezone.utc) - cached.fetched_at < ttl:
+            if datetime.now(UTC) - cached.fetched_at < ttl:
                 await log_apify_event(db, ip_hash, listing_id, "cache", "success", 0.0)
                 return ListingData(**cached.payload)
 
@@ -80,14 +80,14 @@ async def get_mobile_de_listing(url: str, db: AsyncSession, ip_hash: str = "") -
     if cache_key:
         if cached is not None:
             cached.payload = listing.model_dump()
-            cached.fetched_at = datetime.now(timezone.utc)
+            cached.fetched_at = datetime.now(UTC)
             await db.commit()
         else:
             db.add(
                 ListingCache(
                     cache_key=cache_key,
                     payload=listing.model_dump(),
-                    fetched_at=datetime.now(timezone.utc),
+                    fetched_at=datetime.now(UTC),
                 )
             )
             try:
@@ -103,7 +103,7 @@ async def get_mobile_de_listing(url: str, db: AsyncSession, ip_hash: str = "") -
                 existing = result.scalar_one_or_none()
                 if existing is not None:
                     existing.payload = listing.model_dump()
-                    existing.fetched_at = datetime.now(timezone.utc)
+                    existing.fetched_at = datetime.now(UTC)
                     await db.commit()
 
     await log_apify_event(db, ip_hash, listing_id, "apify", "success", 0.0015)

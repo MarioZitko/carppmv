@@ -5,7 +5,6 @@ plain function call with no app/DB bootstrap required.
 """
 
 from datetime import date
-from typing import Optional
 
 from app.ppmv.exceptions import InvalidCO2Value, InvalidPriceValue, UnsupportedVehicleCategory
 from app.ppmv.schemas import CO2Standard, FuelType, PPMVBreakdown
@@ -108,8 +107,8 @@ def calculate_ppmv(
     fuel_type: FuelType,
     first_registration_date: date,
     declaration_date: date,
-    eaer_city_range_km: Optional[float] = None,
-    seat_count: Optional[int] = None,
+    eaer_city_range_km: float | None = None,
+    seat_count: int | None = None,
     is_camper: bool = False,
     is_new_vehicle: bool = False,
 ) -> PPMVBreakdown:

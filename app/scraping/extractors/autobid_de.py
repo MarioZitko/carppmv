@@ -12,13 +12,13 @@ CO2 is not exposed pre-login on autobid.de — always returned as None.
 import json
 import re
 import urllib.parse
-from decimal import Decimal, InvalidOperation
 
 import httpx
 from bs4 import BeautifulSoup
 
 from app.catalogue.brands import brand_from_slug_tokens
 from app.core.exceptions import ScrapingError
+from app.scraping.parsing import parse_number
 from app.scraping.schemas import ListingData
 
 # Maps the German spec-table labels used on autobid.de to canonical names.
@@ -74,10 +74,11 @@ _LABEL_MAP: dict[str, str] = {
     "vin": "vin",
     "identifikacijski broj vozila": "vin",
     "broj šasije": "vin",
-    # Icon-card labels synthesized by _parse_car_parameter_cards()
-    "first registration": "first_registration",
-    "mileage": "mileage_km",
-    "power": "power_kw",
+    # The labels _parse_car_parameter_cards() synthesizes from icon classes
+    # ("first registration", "mileage", "power") are already covered by the
+    # English entries above — those are in fact the only keys that ever fire in
+    # practice, since the site renders its specs as icon cards rather than a
+    # dt/dd table. The rest are kept as a fallback for the table layout.
 }
 
 _VIN_RE = re.compile(r"^[A-HJ-NPR-Z0-9]{11,17}$")  # excludes I/O/Q, standard VIN charset
@@ -101,21 +102,15 @@ _FUEL_MAP: dict[str, str] = {
 }
 
 
-def _parse_german_float(text: str) -> float | None:
-    """Parse German-formatted numbers: '1.500,00' → 1500.0, '1500' → 1500.0."""
+def _parse_amount(text: str) -> float | None:
+    """Strips currency/whitespace noise, then defers to the shared locale-aware
+    parse_number(). autobid.de serves German number formatting on every one of
+    its language paths (/de/, /en/, /hr/ all render "18.500 €"), but the old
+    hardcoded-German parser turned any English-formatted "1,234.56" into
+    1.23456 — a silent 1000x error one site change away."""
     cleaned = text.strip().replace("\xa0", "").replace(" ", "")
-    # Remove currency symbols and unit noise
-    cleaned = re.sub(r"[€$£]", "", cleaned)
-    cleaned = cleaned.strip()
-    # German format: dot = thousands separator, comma = decimal
-    if "," in cleaned:
-        cleaned = cleaned.replace(".", "").replace(",", ".")
-    else:
-        cleaned = cleaned.replace(".", "")
-    try:
-        return float(Decimal(cleaned))
-    except (InvalidOperation, ValueError):
-        return None
+    cleaned = re.sub(r"[€$£]", "", cleaned).strip()
+    return parse_number(cleaned)
 
 
 def _extract_price(soup: BeautifulSoup) -> float | None:
@@ -132,7 +127,7 @@ def _extract_price(soup: BeautifulSoup) -> float | None:
     ]:
         el = soup.select_one(sel)
         if el:
-            v = _parse_german_float(el.get_text())
+            v = _parse_amount(el.get_text())
             if v and v > 0:
                 return v
 
@@ -141,7 +136,7 @@ def _extract_price(soup: BeautifulSoup) -> float | None:
     for tag in soup.find_all(string=pattern):
         m = pattern.search(tag)
         if m:
-            v = _parse_german_float(m.group(1))
+            v = _parse_amount(m.group(1))
             if v and v > 0:
                 return v
     return None
@@ -151,8 +146,7 @@ def _extract_power_kw(text: str) -> float | None:
     """Parse '110 kW (150 PS)' or '110kW' → 110.0."""
     m = re.search(r"(\d+(?:[.,]\d+)?)\s*kw", text, re.IGNORECASE)
     if m:
-        v = _parse_german_float(m.group(1))
-        return v
+        return _parse_amount(m.group(1))
     return None
 
 
@@ -160,7 +154,7 @@ def _extract_mileage(text: str) -> int | None:
     """Parse '50.000 km', '50000 km', or '233.900 kilometrima' → mileage int."""
     m = re.search(r"(\d[\d.,]*)\s*(?:km|kilomet)", text, re.IGNORECASE)
     if m:
-        v = _parse_german_float(m.group(1))
+        v = _parse_amount(m.group(1))
         return int(v) if v is not None else None
     return None
 

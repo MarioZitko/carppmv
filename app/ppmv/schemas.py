@@ -6,7 +6,6 @@ features) should depend on. engine.py and tables.py stay internal.
 
 from datetime import date
 from enum import Enum
-from typing import Optional
 
 from pydantic import BaseModel, Field, model_validator
 
@@ -31,9 +30,9 @@ class PPMVRequest(BaseModel):
     # Plug-in hybrid: EAER city electric range in km; reduction % equals km value (capped at 100).
     # Note: use EAER *city* cycle, NOT WLTP combined range — the law cites
     # "Electric range (EAER city) [km]" explicitly.
-    eaer_city_range_km: Optional[float] = Field(default=None, ge=0)
+    eaer_city_range_km: float | None = Field(default=None, ge=0)
     # Total seat count (driver included). 8 seats (7+1) → −50%; 9+ seats (8+1) → −75%.
-    seat_count: Optional[int] = Field(default=None, ge=1)
+    seat_count: int | None = Field(default=None, ge=1)
     is_camper: bool = False  # kamper: −85%
     # True when declaring a brand-new vehicle (not yet / simultaneously registered).
     # Pravilnik čl. 9: Tablica 1 depreciation only applies to USED vehicles;

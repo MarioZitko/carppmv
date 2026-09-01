@@ -1,7 +1,7 @@
 """Daily spend ceiling and per-IP rate limiting for the Apify on-demand
 scraping path (mobile.de)."""
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -14,7 +14,7 @@ from app.db.models import ApifyEvent
 async def apify_budget_remaining(db: AsyncSession) -> bool:
     """Returns True if today's Apify call count is under the daily budget."""
     settings = get_settings()
-    today_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+    today_start = datetime.now(UTC).replace(hour=0, minute=0, second=0, microsecond=0)
     result = await db.execute(
         select(func.count()).where(
             ApifyEvent.source == "apify",
@@ -32,7 +32,7 @@ async def check_rate_limit(db: AsyncSession, ip_hash: str) -> None:
     calls — this throttles request volume, separate from apify_budget_remaining
     which caps spend."""
     settings = get_settings()
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
 
     hour_count = await db.scalar(
         select(func.count()).where(

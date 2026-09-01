@@ -1,11 +1,21 @@
 import { FuelType } from "./types";
 
+/** Mirror of `_FUEL_MAP` in app/calculate/router.py — keep the two in sync.
+ * They answer the same question (a scraped listing's raw fuel string -> the
+ * PPMV fuel enum), so any spelling one accepts and the other doesn't shows up
+ * as the manual form disagreeing with the automatic result on the same car.
+ *
+ * lpg/cng/hybrid fold to petrol because FuelType.PETROL is defined as "also
+ * covers LPG/CNG/other non-diesel per Tablice 3/6". */
 const FUEL_MAP: Record<string, FuelType> = {
   diesel: "diesel",
   dizel: "diesel",
   petrol: "petrol",
   benzin: "petrol",
   gasoline: "petrol",
+  lpg: "petrol",
+  cng: "petrol",
+  hybrid: "petrol",
   electric: "electric",
   elektrisch: "electric",
   elektro: "electric",

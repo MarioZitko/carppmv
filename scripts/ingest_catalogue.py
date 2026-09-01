@@ -37,7 +37,7 @@ from app.catalogue.canonical_schema import CanonicalRow, FuelCategory, apply_map
 from app.catalogue.llm_mapper import map_sheet_columns
 from app.catalogue.matching import build_match_key
 from app.core.config import get_settings
-from app.db.models import CO2Standard, Catalogue, FuelType
+from app.db.models import Catalogue, CO2Standard, FuelType
 from app.db.session import AsyncSessionLocal
 
 # Sheet-level confidence gate — see module docstring for rationale.

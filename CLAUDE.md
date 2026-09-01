@@ -219,10 +219,10 @@ group — some groups bundle several marques, see `FOLDER_BRANDS` in
   writes), and filters bad rows individually rather than failing an
   entire file's batch on one row.
 - Run with `python -m app.data.catalogues.ingest --brand <slug>
-  --concurrency 24` (omit `--brand` for everything). See
-  `docs/PROJECT_STRUCTURE.md` for current ingestion status per brand —
-  it tracks which of the 38 brand folders are actually loaded, since
-  this is an ongoing, partially-completed effort, not a one-time script.
+  --concurrency 24` (omit `--brand` for everything). Ingestion status is
+  a property of the database, not of a doc — query per-brand row counts
+  directly (`docs/PROJECT_STRUCTURE.md` has the command) rather than
+  trusting a checked-in list, which drifts the moment a brand is loaded.
 
 ### Database (`app/db/models.py`)
 

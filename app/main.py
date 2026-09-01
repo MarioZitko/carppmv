@@ -5,14 +5,14 @@ import logging
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.db.models import Base
-from app.db.session import engine
 from app.calculate.router import router as calculate_router
 from app.catalogue.router import router as catalogue_router
-from app.ppmv.router import router as ppmv_router
-from app.scraping.router import router as scraping_router
 from app.core.config import get_settings
 from app.core.exceptions import register_exception_handlers
+from app.db.models import Base
+from app.db.session import engine
+from app.ppmv.router import router as ppmv_router
+from app.scraping.router import router as scraping_router
 
 log = logging.getLogger(__name__)
 

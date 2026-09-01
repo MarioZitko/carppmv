@@ -12,14 +12,12 @@ No mocking — these tests exercise real network + HTML parsing.
 """
 
 import pytest
-import pytest_asyncio
 
+from app.core.exceptions import ScrapingError
 from app.scraping.extractors.autobid_de import AutobidDeExtractor
 from app.scraping.extractors.autoscout24 import AutoScout24Extractor, _parse_model_name, _parse_vin
 from app.scraping.extractors.njuskalo import NjuskaloExtractor
 from app.scraping.schemas import ListingData
-from app.core.exceptions import ScrapingError
-
 
 # ---------------------------------------------------------------------------
 # autoscout24 model-badge assembly (pure — no network)

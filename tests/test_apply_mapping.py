@@ -17,13 +17,11 @@ from datetime import date
 import pytest
 
 from app.catalogue.canonical_schema import (
-    CanonicalRow,
     ColumnMapping,
     FuelCategory,
     apply_mapping,
 )
 from app.core.config import get_settings
-
 
 # ---------------------------------------------------------------------------
 # Helper: build a ColumnMapping with optional fields defaulted to None
@@ -569,7 +567,7 @@ def test_skip_log_all_reasons():
 # ===========================================================================
 
 def test_series_name_wins_as_catalogue_model():
-    from app.data.catalogues.ingest import _to_catalogue_dict, _co2_standard_from_year
+    from app.data.catalogues.ingest import _co2_standard_from_year, _to_catalogue_dict
 
     rows = [
         ("BMW serije 1 (F40)", None, None, None, None, None, None),
@@ -587,7 +585,7 @@ def test_series_name_wins_as_catalogue_model():
 
 
 def test_no_series_name_keeps_model_name_as_model():
-    from app.data.catalogues.ingest import _to_catalogue_dict, _co2_standard_from_year
+    from app.data.catalogues.ingest import _co2_standard_from_year, _to_catalogue_dict
 
     rows = [_vw("VW", "VW001", "Golf TDI", "VW Golf 8 2.0 TDI", "D", 32000.0, date(2025, 1, 1), 130.0, 110.0)]
     canonical_rows = apply_mapping(rows, VW_HEADER, VW_MAPPING, "vw.xlsx", "Cjenik")
@@ -618,7 +616,7 @@ _BMW_FULLNAME_MAPPING = _mapping(
 
 
 def test_bmw_banner_variant_keeps_price_distinguishing_fullname():
-    from app.data.catalogues.ingest import _to_catalogue_dict, _co2_standard_from_year
+    from app.data.catalogues.ingest import _co2_standard_from_year, _to_catalogue_dict
 
     # Two 116d rows, same series + badge + date, but different body (3- vs
     # 5-door) and different price. The door token in full_name must survive into

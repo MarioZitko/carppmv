@@ -14,10 +14,10 @@ to get subtly wrong and weren't exercised by either example.
 from datetime import date
 
 import pytest
+from pydantic import ValidationError
 
 from app.ppmv.engine import _depreciation_percent, _months_between, calculate_ppmv
 from app.ppmv.schemas import FuelType, PPMVRequest
-
 
 # ---------------------------------------------------------------------------
 # Shared parameters for reduction tests — Audi A5 40 TDI (same as the
@@ -179,7 +179,7 @@ class TestElectricExemption:
         assert breakdown.final_ppmv == 0.0
 
     def test_electric_schema_rejects_nonzero_co2(self):
-        with pytest.raises(Exception):
+        with pytest.raises(ValidationError):
             PPMVRequest(
                 price_eur=50000.0,
                 co2_g_km=120.0,

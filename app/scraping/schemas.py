@@ -23,3 +23,8 @@ class ListingData(BaseModel):
     scraper: str | None = None  # which extractor/fetcher produced this
     emission_class: str | None = None  # e.g. "Euro6d-TEMP"
     vin: str | None = None  # chassis/VIN number, when the source site exposes it
+    # True/False when the source states it, None when it does not expose the
+    # distinction. Drives is_new_vehicle in the PPMV call: depreciation
+    # (Tablica 1) applies only to used vehicles, so getting this wrong
+    # under-taxes a new car.
+    is_new: bool | None = None

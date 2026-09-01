@@ -35,3 +35,47 @@ asyncio_mode = "auto"
 markers = [
     "integration: requires real DB + OPENROUTER_API_KEY (skip in CI)",
 ]
+
+[tool.ruff]
+# The codebase informally sits under ~100 chars; 110 gives the long
+# domain-comment blocks a little headroom without letting lines sprawl.
+line-length = 110
+target-version = "py312"
+
+[tool.ruff.lint]
+# Ruff ships with only E4/E7/E9 + F enabled by default, which silently skips
+# whole categories (unsorted imports, mutable/bound-variable bugs, deprecated
+# stdlib calls). These are the families worth enforcing here:
+#   E,W  pycodestyle    F   pyflakes (unused/undefined names)
+#   I    import sorting  UP  pyupgrade (modern Python 3.12 idioms)
+#   B    bugbear (real bug classes, e.g. closures not binding loop vars)
+#   SIM  simplifiable constructs   RET  needless returns/assignments
+select = ["E", "W", "F", "I", "UP", "B", "SIM", "RET"]
+
+ignore = [
+    # FastAPI's `x = Depends(...)` / `Query(...)` in argument defaults IS the
+    # framework's idiom, not the mutable-default bug B008 exists to catch.
+    "B008",
+    # Would rewrite every `class X(str, Enum)` to `StrEnum`. Those enums back
+    # SQLAlchemy columns and Pydantic fields, and StrEnum changes what str()/
+    # f-strings render (`mobile.de` instead of `ScrapeSite.MOBILE_DE`) — a
+    # serialization change across the DB and API layers for no functional gain.
+    "UP042",
+    # Collapsing an if/else into a ternary usually costs a line of explanation.
+    # Several of ours (e.g. parsing.py's separator logic) are clearer long.
+    "SIM108",
+]
+
+[tool.ruff.lint.isort]
+# Without this, an aliased member (`Enum as SAEnum`) gets hoisted into its own
+# second `from sqlalchemy import (...)` block instead of staying in the list.
+combine-as-imports = true
+
+[tool.ruff.lint.per-file-ignores]
+# Ingestion/migration CLIs print progress to stdout by design, and their
+# argparse blocks are naturally long.
+"scripts/*" = ["E501"]
+# Table-style fixtures (one call per case, aligned like data rows) are easier
+# to scan across than wrapped — the length is the point, not an accident.
+"tests/*" = ["E501"]
+"app/data/catalogues/*" = ["E501"]

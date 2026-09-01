@@ -20,22 +20,46 @@ from app.scraping.schemas import ListingData
 
 _STEALTH = Stealth()
 
+# AutoScout24's fuelCategory.raw code space, enumerated live off
+# autoscout24.com/lst?atype=C&fuel=<code> (the codes are the site's own search
+# filter values). The raw code is locale-invariant — only the sibling
+# `formatted` string is translated ("Elektro/Diesel" / "Electric/Diesel" /
+# "Elektro/Dizel"), which is why nothing here matches on display text.
+#
+# Hybrids map to their *combustion* fuel rather than a "hybrid" value on
+# purpose: the PPMV table is selected by (CO2Standard, FuelType) in
+# ppmv/engine.py, and a bare "hybrid" cannot select one — it would abort the
+# whole calculation in calculate/router.py. FuelType.PETROL's docstring already
+# states it covers LPG/CNG/other non-diesel per Tablice 3/6, so the gas fuels
+# fold into petrol too. Consequence to be aware of: a hybrid persists to
+# Listing.fuel_type as petrol/diesel even though the DB enum has a `hybrid`
+# member. The plug-in EAER reduction is a separate engine input
+# (eaer_city_range_km) that no scraper wires up yet.
+#
+# "H" is Hydrogen, not hybrid — there is no PPMV table for it, so it maps to
+# None (no tax number) rather than silently being taxed as something else.
 _FUEL_MAP: dict[str, str] = {
-    # AutoScout24 fuel keys (from __NEXT_DATA__ fuel.key or fuel.id)
-    "d": "diesel",
-    "b": "petrol",
-    "e": "electric",
-    "h": "hybrid",
-    "lpg": "lpg",
-    "cng": "cng",
-    # Full strings also seen
+    "b": "petrol",  # Gasoline
+    "d": "diesel",  # Diesel
+    "e": "electric",  # Electric
+    "2": "petrol",  # Electric/Gasoline hybrid
+    "3": "diesel",  # Electric/Diesel hybrid
+    "l": "petrol",  # LPG
+    "c": "petrol",  # CNG
+    "m": "petrol",  # Ethanol
+    # Full strings, seen on the older fuel.key / fuel.id shapes.
     "diesel": "diesel",
     "petrol": "petrol",
+    "gasoline": "petrol",
     "benzin": "petrol",
     "electric": "electric",
-    "hybrid": "hybrid",
-    "plug-in hybrid": "hybrid",
-    "mild hybrid": "hybrid",
+    "lpg": "petrol",
+    "cng": "petrol",
+    # Bare "hybrid" carries no parent-fuel signal; petrol is the conservative
+    # read (non-diesel) and beats returning None, which would abort PPMV.
+    "hybrid": "petrol",
+    "plug-in hybrid": "petrol",
+    "mild hybrid": "petrol",
 }
 
 
@@ -163,6 +187,21 @@ def _parse_co2(listing: dict) -> float | None:
     return None
 
 
+def _parse_is_new(listing: dict) -> bool | None:
+    """offerType is "N" (new) or "U" (used) — a locale-invariant code, verified
+    identical across the .de/.com/.it/.fr/.hr domains. Returns None for any
+    other value (demo/pre-registered stock uses further codes) so the caller
+    falls back to today's used-vehicle assumption rather than guessing."""
+    val = listing.get("offerType")
+    if isinstance(val, str):
+        code = val.strip().upper()
+        if code == "N":
+            return True
+        if code == "U":
+            return False
+    return None
+
+
 def _parse_first_registration(listing: dict) -> str | None:
     for key in (
         "firstRegistrationDateRaw",
@@ -259,6 +298,15 @@ def _parse_vin(listing: dict) -> str | None:
     return None
 
 
+def _nested_name(listing: dict, key: str) -> str | None:
+    """__NEXT_DATA__ gives make/model either as a bare string or as a
+    {"name": ...} object depending on the listing; accept both."""
+    val = listing.get(key)
+    if isinstance(val, dict):
+        val = val.get("name")
+    return val if isinstance(val, str) else None
+
+
 def _parse_title(listing: dict) -> str | None:
     for key in ("imgAltText", "title", "name", "shortTitle"):
         val = listing.get(key)
@@ -266,8 +314,8 @@ def _parse_title(listing: dict) -> str | None:
             return val.strip()
     # Assemble from make + model + version
     parts = [
-        listing.get("make", {}).get("name") if isinstance(listing.get("make"), dict) else listing.get("make"),
-        listing.get("model", {}).get("name") if isinstance(listing.get("model"), dict) else listing.get("model"),
+        _nested_name(listing, "make"),
+        _nested_name(listing, "model"),
         _parse_variant(listing),
     ]
     assembled = " ".join(p for p in parts if isinstance(p, str) and p.strip())
@@ -352,4 +400,5 @@ class AutoScout24Extractor:
             brand=_parse_brand(listing),
             model=_parse_model_name(listing),
             vin=_parse_vin(listing),
+            is_new=_parse_is_new(listing),
         )

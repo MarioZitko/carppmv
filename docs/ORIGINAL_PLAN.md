@@ -1,5 +1,14 @@
 # Master Plan v7 — Croatian Car-Import Platform (consolidated, supersedes v1-v6)
 
+> **HISTORICAL — the original build-order decision record (was `Car Import
+> Taxes Plan.md` at the repo root). Kept for the *why*, not the *what*: the
+> build order, the deferral calls and the scraping-feasibility findings still
+> explain how the project got its shape.**
+>
+> Its current-state claims are out of date — mobile.de moved from Playwright
+> Firefox to an Apify actor, and catalogue ingestion is no longer deferred.
+> For where things actually stand, see [PROJECT_STRUCTURE.md](PROJECT_STRUCTURE.md).
+
 > This is the single authoritative doc. Delete MASTER_PLAN.md through v6, PPMV_app_context.md, and the scraping-feasibility doc from the project — everything confirmed in them is folded in below.
 
 ---

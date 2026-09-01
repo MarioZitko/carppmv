@@ -1,0 +1,1497 @@
+{
+ "additionalFuel": [
+  {
+   "co2emissionInGramPerKmWithFallback": {
+    "formatted": null,
+    "isFallback": null,
+    "raw": null
+   },
+   "consumptionCombined": {
+    "formatted": "- (kWh/100 km)",
+    "isFallback": false,
+    "raw": null
+   },
+   "formatted": "Strom",
+   "raw": 12
+  }
+ ],
+ "allFuelTypes": [
+  {
+   "formatted": "Diesel",
+   "raw": 7
+  }
+ ],
+ "auxiliaryPower": null,
+ "axleSpread": "",
+ "batteryChargingTime": {
+  "formatted": null,
+  "raw": null
+ },
+ "batteryOwnershipType": {
+  "formatted": null,
+  "raw": null
+ },
+ "bodyColor": "Grau",
+ "bodyColorOriginal": "Skyscraper Grau",
+ "bodyColorRaw": "Grey",
+ "bodyType": "Kombi",
+ "brakeType": "",
+ "cabinAxleDistance": "",
+ "carpassMileageUrl": null,
+ "chassisManufacturerName": "",
+ "co2emissionInGramPerKmWithFallback": {
+  "formatted": "- (g/km)",
+  "isFallback": false,
+  "raw": null
+ },
+ "controlModuleName": "",
+ "costModel": {
+  "co2CostsAverage": "3.185 € (bei einem angenommenen mittleren durchschnittlichen CO₂-Preis von 143 €/t)",
+  "co2CostsHigh": "4.917 € (bei einem angenommenen hohen durchschnittlichen CO₂-Preis von 220 €/t)",
+  "co2CostsLow": "1.341 € (bei einem angenommenen niedrigen durchschnittlichen CO₂-Preis von 60 €/t)",
+  "consumptionCosts": "1.377 €/Jahr",
+  "consumptionCostsYear": "2025",
+  "fuelPrice": "1,6100 €/l (Jahresdurchschnitt 2025)",
+  "vehicleTax": "309 €/Jahr"
+ },
+ "cylinderCapacity": "1.995 cm³",
+ "cylinders": 4,
+ "damageConditions": [],
+ "differentialRatio": "",
+ "displacementInCCM": "1.995 cm³",
+ "driveTrain": "Heck",
+ "electricRangeCity": {
+  "formatted": null,
+  "raw": null
+ },
+ "electricRangeWithFallback": {
+  "formatted": null,
+  "raw": null
+ },
+ "engineCoolingSystem": "",
+ "engineCount": null,
+ "engineHours": "",
+ "engineManufacturerName": "",
+ "engineMountingType": null,
+ "environmentBImSchV35": {
+  "co2EfficiencyClass": "Green",
+  "description": null,
+  "formatted": "4 (Grün)",
+  "isFallback": false,
+  "label": "Green"
+ },
+ "environmentEuDirective": {
+  "co2EfficiencyClass": "EURO6d",
+  "description": null,
+  "formatted": "Euro 6d",
+  "isFallback": false,
+  "label": "EURO6d"
+ },
+ "environmentPkwEnVKV": null,
+ "equipment": {
+  "comfortAndConvenience": [
+   {
+    "categoryId": "comfortAndConvenience",
+    "categoryName": "Komfort",
+    "id": "3-Zonen-Klimaautomatik"
+   },
+   {
+    "categoryId": "comfortAndConvenience",
+    "categoryName": "Komfort",
+    "id": "Armlehne"
+   },
+   {
+    "categoryId": "comfortAndConvenience",
+    "categoryName": "Komfort",
+    "id": "Berganfahrassistent"
+   },
+   {
+    "categoryId": "comfortAndConvenience",
+    "categoryName": "Komfort",
+    "id": "Einparkhilfe"
+   },
+   {
+    "categoryId": "comfortAndConvenience",
+    "categoryName": "Komfort",
+    "id": "Einparkhilfe Sensoren hinten"
+   },
+   {
+    "categoryId": "comfortAndConvenience",
+    "categoryName": "Komfort",
+    "id": "Einparkhilfe Sensoren vorne"
+   },
+   {
+    "categoryId": "comfortAndConvenience",
+    "categoryName": "Komfort",
+    "id": "Elektrische Fensterheber"
+   },
+   {
+    "categoryId": "comfortAndConvenience",
+    "categoryName": "Komfort",
+    "id": "Elektrische Heckklappe"
+   },
+   {
+    "categoryId": "comfortAndConvenience",
+    "categoryName": "Komfort",
+    "id": "Elektrische Seitenspiegel"
+   },
+   {
+    "categoryId": "comfortAndConvenience",
+    "categoryName": "Komfort",
+    "id": "Getönte Scheiben"
+   },
+   {
+    "categoryId": "comfortAndConvenience",
+    "categoryName": "Komfort",
+    "id": "Head-up display"
+   },
+   {
+    "categoryId": "comfortAndConvenience",
+    "categoryName": "Komfort",
+    "id": "Lederlenkrad"
+   },
+   {
+    "categoryId": "comfortAndConvenience",
+    "categoryName": "Komfort",
+    "id": "Lichtsensor"
+   },
+   {
+    "categoryId": "comfortAndConvenience",
+    "categoryName": "Komfort",
+    "id": "Multifunktionslenkrad"
+   },
+   {
+    "categoryId": "comfortAndConvenience",
+    "categoryName": "Komfort",
+    "id": "Navigationssystem"
+   },
+   {
+    "categoryId": "comfortAndConvenience",
+    "categoryName": "Komfort",
+    "id": "Regensensor"
+   },
+   {
+    "categoryId": "comfortAndConvenience",
+    "categoryName": "Komfort",
+    "id": "Sitzheizung"
+   },
+   {
+    "categoryId": "comfortAndConvenience",
+    "categoryName": "Komfort",
+    "id": "Start/Stop-Automatik"
+   },
+   {
+    "categoryId": "comfortAndConvenience",
+    "categoryName": "Komfort",
+    "id": "Tempomat"
+   }
+  ],
+  "entertainmentAndMedia": [
+   {
+    "categoryId": "entertainmentAndMedia",
+    "categoryName": "Unterhaltung/Media",
+    "id": "Bluetooth"
+   },
+   {
+    "categoryId": "entertainmentAndMedia",
+    "categoryName": "Unterhaltung/Media",
+    "id": "Bordcomputer"
+   },
+   {
+    "categoryId": "entertainmentAndMedia",
+    "categoryName": "Unterhaltung/Media",
+    "id": "DAB-Radio"
+   },
+   {
+    "categoryId": "entertainmentAndMedia",
+    "categoryName": "Unterhaltung/Media",
+    "id": "Freisprecheinrichtung"
+   },
+   {
+    "categoryId": "entertainmentAndMedia",
+    "categoryName": "Unterhaltung/Media",
+    "id": "MP3"
+   },
+   {
+    "categoryId": "entertainmentAndMedia",
+    "categoryName": "Unterhaltung/Media",
+    "id": "Radio"
+   },
+   {
+    "categoryId": "entertainmentAndMedia",
+    "categoryName": "Unterhaltung/Media",
+    "id": "USB"
+   },
+   {
+    "categoryId": "entertainmentAndMedia",
+    "categoryName": "Unterhaltung/Media",
+    "id": "Volldigitales Kombiinstrument"
+   }
+  ],
+  "extras": [
+   {
+    "categoryId": "extras",
+    "categoryName": "Extras",
+    "id": "Alufelgen"
+   },
+   {
+    "categoryId": "extras",
+    "categoryName": "Extras",
+    "id": "Dachreling"
+   },
+   {
+    "categoryId": "extras",
+    "categoryName": "Extras",
+    "id": "Gepäckraumabtrennung"
+   },
+   {
+    "categoryId": "extras",
+    "categoryName": "Extras",
+    "id": "Innenspiegel automatisch abblendend"
+   },
+   {
+    "categoryId": "extras",
+    "categoryName": "Extras",
+    "id": "Partikelfilter"
+   },
+   {
+    "categoryId": "extras",
+    "categoryName": "Extras",
+    "id": "Schaltwippen"
+   },
+   {
+    "categoryId": "extras",
+    "categoryName": "Extras",
+    "id": "Sportsitze"
+   },
+   {
+    "categoryId": "extras",
+    "categoryName": "Extras",
+    "id": "Sprachsteuerung"
+   },
+   {
+    "categoryId": "extras",
+    "categoryName": "Extras",
+    "id": "Touchscreen"
+   }
+  ],
+  "safetyAndSecurity": [
+   {
+    "categoryId": "safetyAndSecurity",
+    "categoryName": "Sicherheit",
+    "id": "ABS"
+   },
+   {
+    "categoryId": "safetyAndSecurity",
+    "categoryName": "Sicherheit",
+    "id": "Abstandswarner"
+   },
+   {
+    "categoryId": "safetyAndSecurity",
+    "categoryName": "Sicherheit",
+    "id": "Beifahrerairbag"
+   },
+   {
+    "categoryId": "safetyAndSecurity",
+    "categoryName": "Sicherheit",
+    "id": "ESP"
+   },
+   {
+    "categoryId": "safetyAndSecurity",
+    "categoryName": "Sicherheit",
+    "id": "Fahrerairbag"
+   },
+   {
+    "categoryId": "safetyAndSecurity",
+    "categoryName": "Sicherheit",
+    "id": "Geschwindigkeits-begrenzungsanlage"
+   },
+   {
+    "categoryId": "safetyAndSecurity",
+    "categoryName": "Sicherheit",
+    "id": "Isofix"
+   },
+   {
+    "categoryId": "safetyAndSecurity",
+    "categoryName": "Sicherheit",
+    "id": "Kopfairbag"
+   },
+   {
+    "categoryId": "safetyAndSecurity",
+    "categoryName": "Sicherheit",
+    "id": "LED-Scheinwerfer"
+   },
+   {
+    "categoryId": "safetyAndSecurity",
+    "categoryName": "Sicherheit",
+    "id": "LED-Tagfahrlicht"
+   },
+   {
+    "categoryId": "safetyAndSecurity",
+    "categoryName": "Sicherheit",
+    "id": "Müdigkeitswarnsystem"
+   },
+   {
+    "categoryId": "safetyAndSecurity",
+    "categoryName": "Sicherheit",
+    "id": "Notbremsassistent"
+   },
+   {
+    "categoryId": "safetyAndSecurity",
+    "categoryName": "Sicherheit",
+    "id": "Notrufsystem"
+   },
+   {
+    "categoryId": "safetyAndSecurity",
+    "categoryName": "Sicherheit",
+    "id": "Reifendruckkontrollsystem"
+   },
+   {
+    "categoryId": "safetyAndSecurity",
+    "categoryName": "Sicherheit",
+    "id": "Seitenairbag"
+   },
+   {
+    "categoryId": "safetyAndSecurity",
+    "categoryName": "Sicherheit",
+    "id": "Servolenkung"
+   },
+   {
+    "categoryId": "safetyAndSecurity",
+    "categoryName": "Sicherheit",
+    "id": "Spurhalteassistent"
+   },
+   {
+    "categoryId": "safetyAndSecurity",
+    "categoryName": "Sicherheit",
+    "id": "Tagfahrlicht"
+   },
+   {
+    "categoryId": "safetyAndSecurity",
+    "categoryName": "Sicherheit",
+    "id": "Traktionskontrolle"
+   },
+   {
+    "categoryId": "safetyAndSecurity",
+    "categoryName": "Sicherheit",
+    "id": "Verkehrszeichenerkennung"
+   },
+   {
+    "categoryId": "safetyAndSecurity",
+    "categoryName": "Sicherheit",
+    "id": "Wegfahrsperre"
+   },
+   {
+    "categoryId": "safetyAndSecurity",
+    "categoryName": "Sicherheit",
+    "id": "Zentralverriegelung"
+   }
+  ]
+ },
+ "extendedLength": "",
+ "exteriorMaterial": "",
+ "firstRegistrationDate": "03/2023",
+ "firstRegistrationDateRaw": "2023-03-01",
+ "flooringMaterial": "",
+ "frameType": "",
+ "fridgeCapacity": "",
+ "fridgePowerType": "",
+ "frontAxleWeightRating": "",
+ "fuelCapacity": "",
+ "fuelCategory": {
+  "formatted": "Elektro/Diesel",
+  "raw": "3"
+ },
+ "fuelConsumptionCombined": {
+  "formatted": "- (l/100 km)",
+  "isFallback": false,
+  "raw": null
+ },
+ "fuelConsumptionExtraUrban": {
+  "formatted": null,
+  "raw": null
+ },
+ "fuelConsumptionUrban": {
+  "formatted": null,
+  "raw": null
+ },
+ "fuelDeliveryType": "",
+ "gears": 8,
+ "grossVehicleWeight": null,
+ "hadAccident": null,
+ "hasCarRegistration": false,
+ "hasFullServiceHistory": true,
+ "hasParticleFilter": true,
+ "headCount": null,
+ "hsnTsn": "0005/DDH",
+ "hullMaterial": null,
+ "imgAltText": "BMW 318 d Touring + GARANTIE + 1.HAND Grau",
+ "isCabinClean": false,
+ "isRental": false,
+ "lastBeltServiceDate": null,
+ "lastTechnicalServiceDate": null,
+ "legalCategories": [
+  "Gebraucht"
+ ],
+ "legalCategoriesRaw": [
+  "UsedVehicle"
+ ],
+ "licensePlate": null,
+ "loadHeight": null,
+ "loadLength": null,
+ "loadVolume": null,
+ "loadWidth": null,
+ "make": "BMW",
+ "makeId": 13,
+ "marketingDescription": "",
+ "maximumTowingWeight": null,
+ "mileageInKm": "172.004 km",
+ "mileageInKmRaw": 172004,
+ "model": "318",
+ "modelGenerationId": 28,
+ "modelGroup": "3er",
+ "modelGroupIds": [
+  100038
+ ],
+ "modelId": 1640,
+ "modelOrModelLineId": 1640,
+ "modelVariantId": 106,
+ "modelVersionCustom": null,
+ "modelVersionInput": "d Touring + GARANTIE + 1.HAND",
+ "motorTypeId": 117,
+ "motorTypeName": "318d",
+ "newDriverSuitable": null,
+ "newInspection": false,
+ "nextVehicleSafetyInspection": "03/2026",
+ "noOfPreviousOwners": 1,
+ "nonSmoking": false,
+ "numberOfAxles": null,
+ "numberOfBeds": null,
+ "numberOfDoors": 5,
+ "numberOfSeats": 5,
+ "offerType": "U",
+ "originalMarket": "Deutsche Ausführung",
+ "paintType": "Metallic",
+ "payload": null,
+ "powerInHp": "150 PS",
+ "powerInKw": "110 kW",
+ "price": {
+  "isConditionalPrice": false,
+  "isVatLabelLegallyRequired": false,
+  "netPriceWithVatLabel": "€ 14.865 exkl. MwSt.",
+  "priceEvaluation": 1,
+  "priceFormatted": "€ 17.690",
+  "priceSuperscriptString": "1",
+  "vatLabel": "inkl. MwSt."
+ },
+ "prices": {
+  "dealer": {
+   "category": 1,
+   "evaluationRanges": [
+    {
+     "category": 0,
+     "maximum": 15600,
+     "minimum": null
+    },
+    {
+     "category": 1,
+     "maximum": 18400,
+     "minimum": 15601
+    },
+    {
+     "category": 2,
+     "maximum": 19400,
+     "minimum": 18401
+    },
+    {
+     "category": 3,
+     "maximum": 21100,
+     "minimum": 19401
+    },
+    {
+     "category": 4,
+     "maximum": 23200,
+     "minimum": 21101
+    },
+    {
+     "category": 5,
+     "maximum": 24900,
+     "minimum": 23201
+    },
+    {
+     "category": 6,
+     "maximum": null,
+     "minimum": 24901
+    }
+   ],
+   "isCategoryAbsent": false,
+   "median": 19400,
+   "negotiable": false,
+   "netPrice": null,
+   "netPriceRaw": null,
+   "onRequestOnly": false,
+   "price": "€ 17.690",
+   "priceRaw": 17690,
+   "taxDeductible": true,
+   "vatRate": 19
+  },
+  "error": null,
+  "isFinalPrice": false,
+  "popupUrl": "https://www.autoscout24.com/priceevaluation/price-label-explanation-page/2a8cccf1-6704-494f-9d16-fb752ac43e8c?culture=de-DE",
+  "public": {
+   "category": 1,
+   "evaluationRanges": [
+    {
+     "category": 0,
+     "maximum": 15600,
+     "minimum": null
+    },
+    {
+     "category": 1,
+     "maximum": 18400,
+     "minimum": 15601
+    },
+    {
+     "category": 2,
+     "maximum": 19400,
+     "minimum": 18401
+    },
+    {
+     "category": 3,
+     "maximum": 21100,
+     "minimum": 19401
+    },
+    {
+     "category": 4,
+     "maximum": 23200,
+     "minimum": 21101
+    },
+    {
+     "category": 5,
+     "maximum": 24900,
+     "minimum": 23201
+    },
+    {
+     "category": 6,
+     "maximum": null,
+     "minimum": 24901
+    }
+   ],
+   "isCategoryAbsent": false,
+   "median": 19400,
+   "negotiable": false,
+   "netPrice": "€ 14.865",
+   "netPriceRaw": 14865,
+   "onRequestOnly": false,
+   "price": "€ 17.690",
+   "priceRaw": 17690,
+   "taxDeductible": true,
+   "vatRate": 19
+  },
+  "suggestedRetail": null
+ },
+ "primaryFuel": {
+  "formatted": "Diesel",
+  "raw": 7
+ },
+ "productionYear": "2023",
+ "rawCylinderCapacity": 1995,
+ "rawData": {
+  "alloyWheelInches": null,
+  "bodyColor": {
+   "formatted": "Grau",
+   "raw": "Grey"
+  },
+  "bodyColorOriginal": "Skyscraper Grau",
+  "bodyType": {
+   "formatted": "Kombi",
+   "raw": "StationWagon"
+  },
+  "classification": {
+   "germanHsnTsn": {
+    "formatted": "0005/DDH"
+   },
+   "make": {
+    "formatted": "BMW",
+    "raw": 13
+   },
+   "model": {
+    "formatted": "318",
+    "raw": 1640
+   },
+   "modelGeneration": {
+    "formatted": "G20/G21/G80/G81",
+    "raw": 28
+   },
+   "modelGroups": [
+    {
+     "formatted": "3er",
+     "raw": 100038
+    }
+   ],
+   "modelVariant": {
+    "formatted": "Touring",
+    "raw": 106
+   },
+   "modelVersionCustom": null,
+   "modelVersionInput": "d Touring + GARANTIE + 1.HAND",
+   "modelYear": null,
+   "motorType": {
+    "formatted": "318d",
+    "raw": 117
+   },
+   "trimLine": {
+    "raw": 479990
+   },
+   "type": "Car"
+  },
+  "condition": {
+   "carpassMileageUrl": null,
+   "damage": {
+    "accidentFree": null,
+    "damageConditions": [],
+    "hasRepairedDamages": null,
+    "isCurrentlyDamaged": null,
+    "isRoadworthy": true
+   },
+   "firstRegistrationDate": {
+    "formatted": "03/2023",
+    "raw": "2023-03-01"
+   },
+   "isCabinClean": null,
+   "mileageInKm": {
+    "formatted": "172.004 km",
+    "raw": 172004
+   },
+   "newInspection": false,
+   "nonSmoking": false,
+   "numberOfPreviousOwnersExtended": {
+    "formatted": "1 Fahrzeughalter",
+    "raw": 1
+   }
+  },
+  "costModel": {
+   "co2Costs": {
+    "average": {
+     "accumulated": {
+      "formatted": "3.185 €",
+      "raw": 3184.875
+     },
+     "basePrice": {
+      "formatted": "143 €/t",
+      "raw": 142.5
+     }
+    },
+    "high": {
+     "accumulated": {
+      "formatted": "4.917 €",
+      "raw": 4917
+     },
+     "basePrice": {
+      "formatted": "220 €/t",
+      "raw": 220
+     }
+    },
+    "low": {
+     "accumulated": {
+      "formatted": "1.341 €",
+      "raw": 1341
+     },
+     "basePrice": {
+      "formatted": "60 €/t",
+      "raw": 60
+     }
+    }
+   },
+   "consumptionCosts": {
+    "formatted": "1.377 €/Jahr",
+    "raw": 1376.55
+   },
+   "consumptionCostsYear": {
+    "formatted": "2025",
+    "raw": "2025-01-01"
+   },
+   "energyPrice": null,
+   "fuelPrice": {
+    "formatted": "1,6100 €/l",
+    "raw": 1.61
+   },
+   "timeFrame": {
+    "end": {
+     "formatted": "2036",
+     "raw": "2036-01-01"
+    },
+    "start": {
+     "formatted": "2027",
+     "raw": "2027-01-01"
+    }
+   },
+   "vehicleTax": {
+    "formatted": "309 €/Jahr",
+    "raw": 309
+   }
+  },
+  "emptyWeight": {
+   "formatted": "1.735 kg"
+  },
+  "engine": {
+   "cylinderCapacity": {
+    "formatted": "1.995 cm³",
+    "raw": 1995,
+    "unit": "ccm"
+   },
+   "driveTrain": {
+    "formatted": "Heck"
+   },
+   "engineDisplacementInCCM": {
+    "formatted": "1.995 cm³",
+    "raw": 1995
+   },
+   "numberOfCylinders": 4,
+   "numberOfGears": 8,
+   "power": {
+    "hp": {
+     "formatted": "150 PS",
+     "raw": 150
+    },
+    "kw": {
+     "formatted": "110 kW",
+     "raw": 110
+    }
+   },
+   "transmissionType": {
+    "formatted": "Automatik",
+    "raw": "Automatic"
+   }
+  },
+  "engineHours": null,
+  "environment": {
+   "environmentLabelsWithFallback": [
+    {
+     "description": null,
+     "formatted": "4 (Grün)",
+     "isFallback": false,
+     "label": "Green",
+     "norm": "BImSchV_35"
+    },
+    {
+     "description": null,
+     "formatted": "Euro 6d",
+     "isFallback": false,
+     "label": "EURO6d",
+     "norm": "EU_Directive_70_220_EEC_LDV"
+    }
+   ],
+   "particulateFilter": true
+  },
+  "equipment": {
+   "as24": [
+    {
+     "equipmentCategory": {
+      "formatted": "Komfort",
+      "raw": "comfortAndConvenience"
+     },
+     "id": {
+      "formatted": "3-Zonen-Klimaautomatik",
+      "raw": 242
+     }
+    },
+    {
+     "equipmentCategory": {
+      "formatted": "Komfort",
+      "raw": "comfortAndConvenience"
+     },
+     "id": {
+      "formatted": "Armlehne",
+      "raw": 134
+     }
+    },
+    {
+     "equipmentCategory": {
+      "formatted": "Komfort",
+      "raw": "comfortAndConvenience"
+     },
+     "id": {
+      "formatted": "Berganfahrassistent",
+      "raw": 137
+     }
+    },
+    {
+     "equipmentCategory": {
+      "formatted": "Komfort",
+      "raw": "comfortAndConvenience"
+     },
+     "id": {
+      "formatted": "Einparkhilfe",
+      "raw": 40
+     }
+    },
+    {
+     "equipmentCategory": {
+      "formatted": "Komfort",
+      "raw": "comfortAndConvenience"
+     },
+     "id": {
+      "formatted": "Einparkhilfe Sensoren hinten",
+      "raw": 129
+     }
+    },
+    {
+     "equipmentCategory": {
+      "formatted": "Komfort",
+      "raw": "comfortAndConvenience"
+     },
+     "id": {
+      "formatted": "Einparkhilfe Sensoren vorne",
+      "raw": 128
+     }
+    },
+    {
+     "equipmentCategory": {
+      "formatted": "Komfort",
+      "raw": "comfortAndConvenience"
+     },
+     "id": {
+      "formatted": "Elektrische Fensterheber",
+      "raw": 13
+     }
+    },
+    {
+     "equipmentCategory": {
+      "formatted": "Komfort",
+      "raw": "comfortAndConvenience"
+     },
+     "id": {
+      "formatted": "Elektrische Heckklappe",
+      "raw": 139
+     }
+    },
+    {
+     "equipmentCategory": {
+      "formatted": "Komfort",
+      "raw": "comfortAndConvenience"
+     },
+     "id": {
+      "formatted": "Elektrische Seitenspiegel",
+      "raw": 121
+     }
+    },
+    {
+     "equipmentCategory": {
+      "formatted": "Komfort",
+      "raw": "comfortAndConvenience"
+     },
+     "id": {
+      "formatted": "Getönte Scheiben",
+      "raw": 54
+     }
+    },
+    {
+     "equipmentCategory": {
+      "formatted": "Komfort",
+      "raw": "comfortAndConvenience"
+     },
+     "id": {
+      "formatted": "Head-up display",
+      "raw": 123
+     }
+    },
+    {
+     "equipmentCategory": {
+      "formatted": "Komfort",
+      "raw": "comfortAndConvenience"
+     },
+     "id": {
+      "formatted": "Lederlenkrad",
+      "raw": 142
+     }
+    },
+    {
+     "equipmentCategory": {
+      "formatted": "Komfort",
+      "raw": "comfortAndConvenience"
+     },
+     "id": {
+      "formatted": "Lichtsensor",
+      "raw": 126
+     }
+    },
+    {
+     "equipmentCategory": {
+      "formatted": "Komfort",
+      "raw": "comfortAndConvenience"
+     },
+     "id": {
+      "formatted": "Multifunktionslenkrad",
+      "raw": 114
+     }
+    },
+    {
+     "equipmentCategory": {
+      "formatted": "Komfort",
+      "raw": "comfortAndConvenience"
+     },
+     "id": {
+      "formatted": "Navigationssystem",
+      "raw": 23
+     }
+    },
+    {
+     "equipmentCategory": {
+      "formatted": "Komfort",
+      "raw": "comfortAndConvenience"
+     },
+     "id": {
+      "formatted": "Regensensor",
+      "raw": 127
+     }
+    },
+    {
+     "equipmentCategory": {
+      "formatted": "Komfort",
+      "raw": "comfortAndConvenience"
+     },
+     "id": {
+      "formatted": "Sitzheizung",
+      "raw": 34
+     }
+    },
+    {
+     "equipmentCategory": {
+      "formatted": "Komfort",
+      "raw": "comfortAndConvenience"
+     },
+     "id": {
+      "formatted": "Start/Stop-Automatik",
+      "raw": 113
+     }
+    },
+    {
+     "equipmentCategory": {
+      "formatted": "Komfort",
+      "raw": "comfortAndConvenience"
+     },
+     "id": {
+      "formatted": "Tempomat",
+      "raw": 38
+     }
+    },
+    {
+     "equipmentCategory": {
+      "formatted": "Unterhaltung/Media",
+      "raw": "entertainmentAndMedia"
+     },
+     "id": {
+      "formatted": "Bluetooth",
+      "raw": 122
+     }
+    },
+    {
+     "equipmentCategory": {
+      "formatted": "Unterhaltung/Media",
+      "raw": "entertainmentAndMedia"
+     },
+     "id": {
+      "formatted": "Bordcomputer",
+      "raw": 41
+     }
+    },
+    {
+     "equipmentCategory": {
+      "formatted": "Unterhaltung/Media",
+      "raw": "entertainmentAndMedia"
+     },
+     "id": {
+      "formatted": "DAB-Radio",
+      "raw": 138
+     }
+    },
+    {
+     "equipmentCategory": {
+      "formatted": "Unterhaltung/Media",
+      "raw": "entertainmentAndMedia"
+     },
+     "id": {
+      "formatted": "Freisprecheinrichtung",
+      "raw": 124
+     }
+    },
+    {
+     "equipmentCategory": {
+      "formatted": "Unterhaltung/Media",
+      "raw": "entertainmentAndMedia"
+     },
+     "id": {
+      "formatted": "MP3",
+      "raw": 43
+     }
+    },
+    {
+     "equipmentCategory": {
+      "formatted": "Unterhaltung/Media",
+      "raw": "entertainmentAndMedia"
+     },
+     "id": {
+      "formatted": "Radio",
+      "raw": 10
+     }
+    },
+    {
+     "equipmentCategory": {
+      "formatted": "Unterhaltung/Media",
+      "raw": "entertainmentAndMedia"
+     },
+     "id": {
+      "formatted": "USB",
+      "raw": 161
+     }
+    },
+    {
+     "equipmentCategory": {
+      "formatted": "Unterhaltung/Media",
+      "raw": "entertainmentAndMedia"
+     },
+     "id": {
+      "formatted": "Volldigitales Kombiinstrument",
+      "raw": 224
+     }
+    },
+    {
+     "equipmentCategory": {
+      "formatted": "Extras",
+      "raw": "extras"
+     },
+     "id": {
+      "formatted": "Alufelgen",
+      "raw": 15
+     }
+    },
+    {
+     "equipmentCategory": {
+      "formatted": "Extras",
+      "raw": "extras"
+     },
+     "id": {
+      "formatted": "Dachreling",
+      "raw": 27
+     }
+    },
+    {
+     "equipmentCategory": {
+      "formatted": "Extras",
+      "raw": "extras"
+     },
+     "id": {
+      "formatted": "Gepäckraumabtrennung",
+      "raw": 226
+     }
+    },
+    {
+     "equipmentCategory": {
+      "formatted": "Extras",
+      "raw": "extras"
+     },
+     "id": {
+      "formatted": "Innenspiegel automatisch abblendend",
+      "raw": 225
+     }
+    },
+    {
+     "equipmentCategory": {
+      "formatted": "Extras",
+      "raw": "extras"
+     },
+     "id": {
+      "formatted": "Schaltwippen",
+      "raw": 151
+     }
+    },
+    {
+     "equipmentCategory": {
+      "formatted": "Extras",
+      "raw": "extras"
+     },
+     "id": {
+      "formatted": "Sportsitze",
+      "raw": 117
+     }
+    },
+    {
+     "equipmentCategory": {
+      "formatted": "Extras",
+      "raw": "extras"
+     },
+     "id": {
+      "formatted": "Sprachsteuerung",
+      "raw": 156
+     }
+    },
+    {
+     "equipmentCategory": {
+      "formatted": "Extras",
+      "raw": "extras"
+     },
+     "id": {
+      "formatted": "Touchscreen",
+      "raw": 159
+     }
+    },
+    {
+     "equipmentCategory": {
+      "formatted": "Sicherheit",
+      "raw": "safetyAndSecurity"
+     },
+     "id": {
+      "formatted": "ABS",
+      "raw": 1
+     }
+    },
+    {
+     "equipmentCategory": {
+      "formatted": "Sicherheit",
+      "raw": "safetyAndSecurity"
+     },
+     "id": {
+      "formatted": "Abstandswarner",
+      "raw": 232
+     }
+    },
+    {
+     "equipmentCategory": {
+      "formatted": "Sicherheit",
+      "raw": "safetyAndSecurity"
+     },
+     "id": {
+      "formatted": "Beifahrerairbag",
+      "raw": 3
+     }
+    },
+    {
+     "equipmentCategory": {
+      "formatted": "Sicherheit",
+      "raw": "safetyAndSecurity"
+     },
+     "id": {
+      "formatted": "ESP",
+      "raw": 42
+     }
+    },
+    {
+     "equipmentCategory": {
+      "formatted": "Sicherheit",
+      "raw": "safetyAndSecurity"
+     },
+     "id": {
+      "formatted": "Fahrerairbag",
+      "raw": 2
+     }
+    },
+    {
+     "equipmentCategory": {
+      "formatted": "Sicherheit",
+      "raw": "safetyAndSecurity"
+     },
+     "id": {
+      "formatted": "Geschwindigkeits-begrenzungsanlage",
+      "raw": 227
+     }
+    },
+    {
+     "equipmentCategory": {
+      "formatted": "Sicherheit",
+      "raw": "safetyAndSecurity"
+     },
+     "id": {
+      "formatted": "Isofix",
+      "raw": 125
+     }
+    },
+    {
+     "equipmentCategory": {
+      "formatted": "Sicherheit",
+      "raw": "safetyAndSecurity"
+     },
+     "id": {
+      "formatted": "Kopfairbag",
+      "raw": 46
+     }
+    },
+    {
+     "equipmentCategory": {
+      "formatted": "Sicherheit",
+      "raw": "safetyAndSecurity"
+     },
+     "id": {
+      "formatted": "LED-Scheinwerfer",
+      "raw": 140
+     }
+    },
+    {
+     "equipmentCategory": {
+      "formatted": "Sicherheit",
+      "raw": "safetyAndSecurity"
+     },
+     "id": {
+      "formatted": "LED-Tagfahrlicht",
+      "raw": 141
+     }
+    },
+    {
+     "equipmentCategory": {
+      "formatted": "Sicherheit",
+      "raw": "safetyAndSecurity"
+     },
+     "id": {
+      "formatted": "Müdigkeitswarnsystem",
+      "raw": 146
+     }
+    },
+    {
+     "equipmentCategory": {
+      "formatted": "Sicherheit",
+      "raw": "safetyAndSecurity"
+     },
+     "id": {
+      "formatted": "Notbremsassistent",
+      "raw": 148
+     }
+    },
+    {
+     "equipmentCategory": {
+      "formatted": "Sicherheit",
+      "raw": "safetyAndSecurity"
+     },
+     "id": {
+      "formatted": "Notrufsystem",
+      "raw": 149
+     }
+    },
+    {
+     "equipmentCategory": {
+      "formatted": "Sicherheit",
+      "raw": "safetyAndSecurity"
+     },
+     "id": {
+      "formatted": "Reifendruckkontrollsystem",
+      "raw": 150
+     }
+    },
+    {
+     "equipmentCategory": {
+      "formatted": "Sicherheit",
+      "raw": "safetyAndSecurity"
+     },
+     "id": {
+      "formatted": "Seitenairbag",
+      "raw": 32
+     }
+    },
+    {
+     "equipmentCategory": {
+      "formatted": "Sicherheit",
+      "raw": "safetyAndSecurity"
+     },
+     "id": {
+      "formatted": "Servolenkung",
+      "raw": 12
+     }
+    },
+    {
+     "equipmentCategory": {
+      "formatted": "Sicherheit",
+      "raw": "safetyAndSecurity"
+     },
+     "id": {
+      "formatted": "Spurhalteassistent",
+      "raw": 157
+     }
+    },
+    {
+     "equipmentCategory": {
+      "formatted": "Sicherheit",
+      "raw": "safetyAndSecurity"
+     },
+     "id": {
+      "formatted": "Tagfahrlicht",
+      "raw": 115
+     }
+    },
+    {
+     "equipmentCategory": {
+      "formatted": "Sicherheit",
+      "raw": "safetyAndSecurity"
+     },
+     "id": {
+      "formatted": "Traktionskontrolle",
+      "raw": 31
+     }
+    },
+    {
+     "equipmentCategory": {
+      "formatted": "Sicherheit",
+      "raw": "safetyAndSecurity"
+     },
+     "id": {
+      "formatted": "Verkehrszeichenerkennung",
+      "raw": 162
+     }
+    },
+    {
+     "equipmentCategory": {
+      "formatted": "Sicherheit",
+      "raw": "safetyAndSecurity"
+     },
+     "id": {
+      "formatted": "Wegfahrsperre",
+      "raw": 26
+     }
+    },
+    {
+     "equipmentCategory": {
+      "formatted": "Sicherheit",
+      "raw": "safetyAndSecurity"
+     },
+     "id": {
+      "formatted": "Zentralverriegelung",
+      "raw": 17
+     }
+    }
+   ]
+  },
+  "fuels": {
+   "additional": [
+    {
+     "co2emissionInGramPerKmWithFallback": null,
+     "consumption": {
+      "combinedWithFallback": {
+       "formatted": "- (kWh/100 km)",
+       "isFallback": false,
+       "raw": null
+      }
+     },
+     "type": {
+      "formatted": "Strom",
+      "raw": 12
+     }
+    }
+   ],
+   "allFuelTypes": [
+    {
+     "formatted": "Diesel",
+     "raw": 7
+    }
+   ],
+   "battery": null,
+   "electricRangeCity": null,
+   "electricRangeWithFallback": null,
+   "fuelCategory": {
+    "formatted": "Elektro/Diesel",
+    "raw": "3"
+   },
+   "isPluginHybrid": null,
+   "primary": {
+    "co2emissionInGramPerKmWithFallback": {
+     "formatted": "- (g/km)",
+     "isFallback": false,
+     "raw": null
+    },
+    "consumption": {
+     "combinedWithFallback": {
+      "formatted": "- (l/100 km)",
+      "isFallback": false,
+      "raw": null
+     },
+     "extraUrban": null,
+     "urban": null
+    },
+    "type": {
+     "formatted": "Diesel",
+     "raw": 7
+    }
+   },
+   "wltp": null
+  },
+  "grossVehicleWeight": null,
+  "hasCarRegistration": {
+   "raw": false
+  },
+  "interior": {
+   "numberOfSeats": 5,
+   "upholstery": {
+    "formatted": "Teilleder"
+   },
+   "upholsteryColor": {
+    "formatted": "Schwarz"
+   }
+  },
+  "legalCategories": [
+   {
+    "formatted": "Gebraucht",
+    "raw": "UsedVehicle"
+   }
+  ],
+  "loadHeight": null,
+  "loadLength": null,
+  "loadVolume": null,
+  "loadWidth": null,
+  "maintenance": {
+   "hasFullServiceHistory": {
+    "raw": true
+   },
+   "lastBeltServiceDate": null,
+   "lastTechnicalServiceDate": null,
+   "nextVehicleSafetyInspection": {
+    "formatted": "03/2026"
+   }
+  },
+  "maximumTowingWeight": null,
+  "newDriverSuitable": null,
+  "numberOfAxles": {
+   "formatted": "- (Anzahl Achsen)",
+   "raw": null
+  },
+  "numberOfBeds": {
+   "formatted": "- (Anzahl der Schlafplätze)",
+   "raw": null
+  },
+  "numberOfDoors": 5,
+  "originalMarket": {
+   "formatted": "Deutsche Ausführung"
+  },
+  "paintType": {
+   "formatted": "Metallic"
+  },
+  "payload": null,
+  "productionDate": {
+   "formatted": "01/2023",
+   "raw": "2023-01-01"
+  },
+  "totalHeight": null,
+  "totalLength": null,
+  "totalWidth": null,
+  "usageState": "U",
+  "wheelBase": null
+ },
+ "rawDisplacementInCCM": 1995,
+ "rawPowerInHp": 150,
+ "rawPowerInKw": 110,
+ "rearAxleWeightRating": "",
+ "skiStanceWidth": "",
+ "slideOutCount": null,
+ "steeringType": null,
+ "totalHeight": null,
+ "totalLength": null,
+ "totalWidth": null,
+ "trackDimension": "",
+ "transmissionType": "Automatik",
+ "trimLineId": 479990,
+ "type": "Car",
+ "upholstery": "Teilleder",
+ "upholsteryColor": "Schwarz",
+ "variant": "Touring",
+ "wasteTankCapacity": "",
+ "waterTankCapacity": "",
+ "weight": "1.735 kg",
+ "wheelBase": null,
+ "wltp": null
+}

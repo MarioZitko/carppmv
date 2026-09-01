@@ -54,7 +54,13 @@ async def search_catalogue(
     variant: str | None = Query(None),
     fuel_type: str | None = Query(None),
     power_kw: float | None = Query(None),
-    year: int | None = Query(None, description="First-registration year, used to prefer the catalogue price/CO2 period valid around that year"),
+    year: int | None = Query(
+        None,
+        description=(
+            "First-registration year, used to prefer the catalogue "
+            "price/CO2 period valid around that year"
+        ),
+    ),
     session: AsyncSession = Depends(get_db_session),
 ) -> CatalogueSearchResponse:
     """Fuzzy-search the catalogue by brand + free-text model/variant.

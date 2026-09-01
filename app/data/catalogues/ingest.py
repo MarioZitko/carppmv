@@ -22,17 +22,15 @@ from pathlib import Path
 import httpx
 from sqlalchemy import text
 from sqlalchemy.dialects.postgresql import insert as pg_insert
-from sqlalchemy.pool import NullPool
 
 from app.catalogue import mapping_store
 from app.catalogue.brands import FOLDER_BRANDS, snap_brand
 from app.catalogue.canonical_schema import CanonicalRow, FuelCategory, apply_mapping
 from app.catalogue.llm_mapper import map_sheet_columns
-from app.catalogue.matching import build_match_key, _derive_fuel_family
+from app.catalogue.matching import _derive_fuel_family, build_match_key
 from app.data.catalogues.parse_date import parse_valid_from
-from app.db.models import CO2Standard, Catalogue, FuelType
-from app.db.session import engine, AsyncSessionLocal, create_async_engine
-from app.core.config import get_settings
+from app.db.models import Catalogue, CO2Standard, FuelType
+from app.db.session import AsyncSessionLocal
 
 MANIFEST_PATH = Path(__file__).parent / "manifest.jsonl"
 
@@ -366,7 +364,7 @@ async def _resolve_mapping(
                 map_sheet_columns(header_row, sample_rows, timeout_seconds=LLM_TIMEOUT_SECONDS),
                 timeout=LLM_TIMEOUT_SECONDS * 2 + 5,
             )
-        except (asyncio.TimeoutError, httpx.HTTPError) as exc:
+        except (TimeoutError, httpx.HTTPError) as exc:
             # Transient — a property of the network, not the layout. Skip it for
             # this run but DON'T persist, so the next run retries it for free.
             print(f"[WARN] {label} — transient mapping error, will retry next run: {_short_error(exc)}")

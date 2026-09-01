@@ -2,10 +2,10 @@
 
 from fastapi import APIRouter
 
+from app.core.exceptions import ScrapingError
 from app.scraping.engines import SITE_ENGINE_MAP
 from app.scraping.extractors.autobid_de import AutobidDeExtractor
 from app.scraping.schemas import ListingData
-from app.core.exceptions import ScrapingError
 
 router = APIRouter()
 

@@ -6,7 +6,14 @@ on:
   workflow_dispatch: {}
 
 jobs:
+  # Gate: a red test suite must not reach production. Reuses ci.yml rather
+  # than duplicating the steps, so the checks that run on a PR are exactly
+  # the ones that guard the deploy.
+  ci:
+    uses: ./.github/workflows/ci.yml
+
   deploy:
+    needs: ci
     runs-on: ubuntu-latest
     steps:
       - name: Deploy over SSH

@@ -412,7 +412,9 @@ class MatchResult:
     candidates: list[ScoredCandidate]  # ranked best-first; empty when NO_MATCH
 
 
-def _ramp_adjustment(diff: float, tolerance: float, penalty_gap: float, bonus: float, penalty: float) -> float:
+def _ramp_adjustment(
+    diff: float, tolerance: float, penalty_gap: float, bonus: float, penalty: float
+) -> float:
     """Shared shape for the power/CO2/year disambiguators: +bonus within
     tolerance, -penalty beyond penalty_gap, linear ramp between the two so the
     mid band isn't left flat (see POWER_* tuning-knob comment for why a flat
@@ -453,8 +455,13 @@ def _score_one(
         # fixed, while staying safe for every other brand: a genuinely
         # wrong-model candidate's variant text (spec/trim detail) doesn't carry
         # the other model's letter/number either, so the guard still fires.
-        model_score = fuzz.token_set_ratio(normalize_text(query_model), normalize_text(cand.model)) if cand.model else 0.0
-        variant_score = fuzz.token_set_ratio(normalize_text(query_model), normalize_text(cand.variant)) if cand.variant else 0.0
+        query_norm = normalize_text(query_model)
+
+        def field_score(text: str | None) -> float:
+            return fuzz.token_set_ratio(query_norm, normalize_text(text)) if text else 0.0
+
+        model_score = field_score(cand.model)
+        variant_score = field_score(cand.variant)
         combined_score = max(model_score, variant_score)
 
         q_digits = _leading_digits(query_model)
@@ -516,7 +523,9 @@ def _score_one(
     if listing_power_kw is not None and cand.power_kw is not None:
         diff = abs(listing_power_kw - cand.power_kw)
         power_confirmed = diff <= POWER_TOLERANCE_KW
-        _accumulate(_ramp_adjustment(diff, POWER_TOLERANCE_KW, POWER_PENALTY_GAP_KW, POWER_BONUS, POWER_PENALTY))
+        _accumulate(
+            _ramp_adjustment(diff, POWER_TOLERANCE_KW, POWER_PENALTY_GAP_KW, POWER_BONUS, POWER_PENALTY)
+        )
 
     if listing_co2_g_km is not None and cand.co2_g_km is not None:
         diff = abs(listing_co2_g_km - cand.co2_g_km)
@@ -526,7 +535,9 @@ def _score_one(
     if year is not None and cand.valid_from is not None:
         diff = abs(year - cand.valid_from.year)
         year_confirmed = diff <= YEAR_TOLERANCE_YEARS
-        _accumulate(_ramp_adjustment(diff, YEAR_TOLERANCE_YEARS, YEAR_PENALTY_GAP_YEARS, YEAR_BONUS, YEAR_PENALTY))
+        _accumulate(
+            _ramp_adjustment(diff, YEAR_TOLERANCE_YEARS, YEAR_PENALTY_GAP_YEARS, YEAR_BONUS, YEAR_PENALTY)
+        )
 
     score = max(0.0, min(100.0, base + bonus) - penalty)
 

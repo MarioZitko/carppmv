@@ -11,22 +11,22 @@ from fastapi.responses import JSONResponse
 
 class PPMVError(Exception):
     """Base class for all PPMV-domain errors."""
- 
- 
+
+
 class InvalidCO2Value(PPMVError):
     """CO2 value falls outside every known eco bracket for the
     applicable standard (NEDC/WLTP) and fuel type."""
- 
- 
+
+
 class InvalidPriceValue(PPMVError):
     """Price falls outside every known value bracket."""
- 
- 
+
+
 class UnsupportedVehicleCategory(PPMVError):
     """Vehicle category/fuel/standard combination is recognized but not
     yet implemented (e.g. motorcycles, or a table not yet transcribed)."""
- 
- 
+
+
 class ScrapingError(Exception):
     """Base class for all scraping-domain errors."""
 

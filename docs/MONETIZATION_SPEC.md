@@ -1,5 +1,10 @@
 # Monetization Implementation Spec
 
+> **STATUS: §1 (carVertical) is live** — see
+> `frontend/components/CarVerticalCard.tsx` and `frontend/.env.example`.
+> §2 (AdSense) is still a deferred decision, gated on content pages and
+> traffic, and is the reason this doc is still here.
+
 ## 1. carVertical Affiliate (primary)
 
 ### How it works

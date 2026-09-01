@@ -94,10 +94,14 @@ mode. Each site uses a different fetch engine:
 
 | Site | Engine | Notes |
 |---|---|---|
-| autobid.de | `httpx` | No browser needed |
-| njuškalo | Playwright Chromium | Works on single pages |
-| AutoScout24 | Playwright Chromium | Works on single pages |
-| mobile.de | Playwright **Firefox** | Chromium blocked by Akamai |
+| autobid.de | `httpx` | Server-rendered, no browser needed. CO2 not exposed pre-login. |
+| njuškalo | Playwright Chromium | JS-rendered |
+| AutoScout24 | Playwright Chromium | Parses the `__NEXT_DATA__` JSON blob |
+| mobile.de | **Apify actor** | Akamai Bot Manager blocks direct browser fetches outright |
+
+mobile.de therefore sits behind a guard stack (per-IP rate limit, Cloudflare
+Turnstile, a TTL cache and a daily spend cap) rather than a local extractor —
+see [`docs/MOBILE_DE_APIFY_SPEC.md`](docs/MOBILE_DE_APIFY_SPEC.md).
 
 Sweep/bulk scraping is out of scope for now. njuškalo and mobile.de block
 automated sweeps with bot-detection that requires Apify actors to bypass —
@@ -109,16 +113,22 @@ that cost/infrastructure decision is deferred.
 
 ```
 app/
-  core/          # config (pydantic-settings), exceptions, shared types
+  core/          # config (pydantic-settings), exceptions, rate limits, Turnstile
   ppmv/          # tax engine, tables, schemas, router — the main feature
-  scraping/      # per-site extractors, fetch-engine config, schemas
-  catalogue/     # catalogue ingestion from brand Excel files (deferred)
-  profitability/ # import profitability calculator (deferred)
-  db/            # SQLAlchemy models (Catalogue, ScrapeRun, Listing), session
+  calculate/     # POST /calculate — the endpoint the frontend actually calls
+  scraping/      # per-site extractors, Apify fetcher, guard stack, persistence
+  catalogue/     # fuzzy listing→catalogue matching + Excel ingestion pipeline
+  data/          # offline catalogue ingestion CLI + source files
+  profitability/ # import profitability calculator (deferred, empty package)
+  db/            # SQLAlchemy models + session
   main.py        # FastAPI app factory
-tests/
-  test_ppmv_engine.py   # 13 unit tests incl. Audi A5 regression
+frontend/        # Next.js — PPMV calculator page (live), Profitability (shell)
+tests/           # 243 tests incl. the official Audi A5 regression
 ```
+
+See [`docs/PROJECT_STRUCTURE.md`](docs/PROJECT_STRUCTURE.md) for the
+file-by-file view and current status, and [`CLAUDE.md`](CLAUDE.md) for
+architecture and conventions.
 
 ---
 
@@ -142,12 +152,18 @@ scraped listings are persisted for later use.
 ## Development
 
 ```bash
-# Run tests (13 unit tests, all pure functions, no DB needed)
-uv run pytest tests/ -v
+# Tests — 243 of them, about half a second, no DB needed
+uv run pytest tests/ -m "not integration" -q
 
-# Lint
-uv run ruff check app/ tests/
+# Lint / typecheck
+uv run ruff check app/ tests/ scripts/
+cd frontend && npx tsc --noEmit && npm run lint
 ```
+
+Those four commands are exactly what CI runs
+([`.github/workflows/ci.yml`](.github/workflows/ci.yml)); the deploy workflow
+requires them to pass before it ships. Tests marked
+`@pytest.mark.integration` need a real database and an `OPENROUTER_API_KEY`.
 
 Python ≥ 3.12 required. Dependencies managed with [uv](https://docs.astral.sh/uv/).
 
@@ -163,8 +179,8 @@ OOM guard when running Playwright.
 
 ## Deployment
 
-The full stack (Postgres, backend, frontend, Caddy reverse proxy) ships as a
-single `docker-compose.yml` for a self-hosted VPS:
+The stack (Postgres, backend, frontend) ships as a single
+`docker-compose.yml` for a self-hosted VPS:
 
 ```bash
 cp .env.example .env   # fill in real values, see below
@@ -173,10 +189,11 @@ docker compose up -d --build
 
 - [`Dockerfile`](Dockerfile) — FastAPI backend with Playwright/Chromium.
 - [`frontend/Dockerfile`](frontend/Dockerfile) — Next.js standalone build.
-- [`Caddyfile`](Caddyfile) — reverse proxy with automatic HTTPS; requires a
-  domain pointed at the VPS (Let's Encrypt can't issue certs for bare IPs).
 - [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml) — SSHes into
-  the VPS and redeploys on every push to `main`.
+  the VPS and redeploys on every push to `main`, once CI passes.
+
+Compose binds everything to localhost (`8011` backend, `3011` frontend); a
+reverse proxy on the host terminates HTTPS and forwards to those ports.
 
 See **[DEPLOYMENT.md](DEPLOYMENT.md)** for the full step-by-step guide:
 buying a domain, provisioning the VPS, environment configuration, and setting
