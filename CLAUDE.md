@@ -224,12 +224,19 @@ group — some groups bundle several marques, see `FOLDER_BRANDS` in
   directly (`docs/PROJECT_STRUCTURE.md` has the command) rather than
   trusting a checked-in list, which drifts the moment a brand is loaded.
 
-### Wikipedia CO2 crawl (`app/wikipedia/`)
+### Wikipedia CO2 pipeline (`app/wikipedia/`)
 
 Offline/batch pipeline (like catalogue ingestion — never in the `/calculate`
 request path) that fills the CO2 gap for vehicles the catalogue doesn't cover.
-Full design in `docs/WIKIPEDIA_CO2_PLAN.md`; **Phases 0 and 1 are implemented,
-Phases 2–5 are not**.
+Full design in `docs/WIKIPEDIA_CO2_PLAN.md`; **Phases 0–3 are implemented,
+Phases 4–5 are not**. Two CLIs: `crawl` (Phase 0/1, fetches wikitext) and
+`extract` (Phase 2/3, turns it into validated engine rows).
+
+**Phase 2 deliberately does not write to Postgres.** Phase 4's upsert into
+`WikipediaEngineData` is gated behind a human review of the Phase 2.5 accuracy
+spot-check, so extraction output lands in `data/wikipedia/` instead. Don't
+"finish the job" by wiring it into the DB without that review — a wrongly
+extracted CO2 range is exactly the silent-corruption case the gate exists for.
 
 `python -m app.wikipedia.crawl [--brand X] [--dry-run] [--refresh] [--report out.json]`
 crawls de.wikipedia per brand — brand article → model-list section → model
@@ -260,6 +267,40 @@ article wikitext, cached in `WikipediaRawArticle`.
 - `llm_sections.py` — Phase 1 fallback only, triggered by the plan's explicit
   rule (zero matched sections, or fewer than 5 qualifying links). Same
   enum-constrained-schema + post-hoc guard pattern as `catalogue/llm_mapper.py`.
+
+Phase 2/3 (`python -m app.wikipedia.extract [--brand X] [--dry-run]
+[--concurrency N] [--limit N] [--sample N] [--report out.json]`):
+
+- `tables.py` — pure, DB-free, unit-tested. Picks which tables get an LLM call:
+  scopes to the anchor's section, then **prefilters on a CO2 token per table**
+  (only ~30% of the corpus's 3,942 tables carry one; the rest are spec tables
+  with no emissions row, or crashtest/sales tables). The filter is per table,
+  never per article — CO2 often sits in one table of several.
+- `llm_tables.py` — **one call per table**, never per article. The prompt makes
+  the model name the table's ORIENTATION before extracting, because the corpus
+  contains both shapes in bulk: normal (one row per variant) and transposed
+  (one column per variant, attributes down the left). Returns an array of
+  variants, since one table yields many. It is never asked to estimate a CO2
+  value — null is a correct answer, and the prompt says so explicitly.
+- `extraction_store.py` — the determinism cache, mirroring `section_store.py`.
+  **Only results that found a CO2 value are cached**; an all-null result is
+  re-asked next run, because caching a flaky false-null would be permanent
+  silent coverage loss on a table that really does carry emissions data.
+- `validation.py` — Phase 3, pure and mechanical. Failing rows go to a review
+  queue, never silently dropped or silently inserted. Null CO2 passes cleanly
+  (it is an expected outcome, not an error); a bare `YYYY` production period is
+  accepted, because demanding `YYYY-MM` would make the model invent months.
+- `extract.py` — the orchestrator, plus the Phase 2.5 gate artifacts: a
+  brand-stratified spot-check sample, an orientation cross-check against
+  `tables.guess_orientation`, and a regex tripwire flagging any table that
+  returned no CO2 while its wikitext contains `\d{2,3} g/km`.
+
+`guess_orientation` is a cross-check on the model, never an override. Its rule
+is content-based — which axis carries the German attribute vocabulary
+(Bauzeitraum/Hubraum/Leistung…) — because both markup shortcuts were tried and
+failed: `!` header cells alone miss the very common bold-data-cell
+"Kenngrößen" style, and "first cell is bold" fires on normal tables that bold
+their variant name.
 
 **Run `--dry-run` over the full scope before any real crawl when brands
 change** — it costs ~175 requests and 2 minutes and catches wrong brand

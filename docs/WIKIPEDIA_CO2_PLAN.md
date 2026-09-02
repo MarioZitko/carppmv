@@ -1,8 +1,13 @@
 # Wikipedia CO2 Estimation Pipeline — Implementation Plan
 
-> Status: **Phase 0 and Phase 1 implemented** (`app/wikipedia/`, CLI
-> `python -m app.wikipedia.crawl`) and run for the 10 in-scope brands.
-> Phases 2–5 are design only, not implemented. Supplements MASTER_PLAN_v7.md — does not
+> Status: **Phases 0–3 implemented** (`app/wikipedia/`). Phase 0/1 crawl:
+> `python -m app.wikipedia.crawl`, run for all 38 in-scope brands. Phase 2/3
+> extraction + validation: `python -m app.wikipedia.extract`.
+> **Phases 4–5 are design only, not implemented** — Phase 4's upsert is gated
+> behind a manual review of the Phase 2.5 accuracy spot-check, so Phase 2
+> currently writes to `data/wikipedia/table_extractions.json`, not Postgres.
+>
+> Supplements MASTER_PLAN_v7.md — does not
 > replace the catalogue as the primary CO2 source. This fills the CO2 gap for
 > vehicles not in the catalogue (or not yet ingested). No vehicle-age cutoff is
 > assumed — coverage depends on what each individual Wikipedia article actually
@@ -345,6 +350,13 @@ below before a single row was stored. Do this when adding brands.
 
 ## Phase 2 — LLM table extraction (DeepSeek V4 Flash)
 
+Implemented in `app/wikipedia/tables.py` (pure table selection), `llm_tables.py`
+(the call), `extraction_store.py` (the determinism cache + output artifact) and
+`extract.py` (the CLI). Amendments 6–9 above are implemented, not just noted:
+the prompt makes the model name the table's orientation before extracting, the
+schema is `{"orientation": …, "variants": [ … ]}`, and tables are prefiltered by
+CO2 token per table.
+
 **Input:** for each cached article (Phase 0), extract wikitext tables
 (`mwparserfromhell`, `filter_tags(matches=lambda t: t.tag == 'table')` or
 equivalent) — scoped to the relevant section when an anchor was recorded in Phase
@@ -385,6 +397,16 @@ wikitext of the source table and the source article URL/anchor (§0 non-negotiab
 requirement) — this is what makes a bad extraction traceable and fixable later
 rather than silently poisoning downstream matches.
 
+**Determinism cache (amendment, same discipline Phase 1 needed).** Phase 0
+proved the LLM is not deterministic at temperature 0. `extraction_store.py`
+persists per-table results keyed by a content hash of (heading path + table
+wikitext) — but **only results that actually found a CO2 value**. A result whose
+variants all came back null CO2 is deliberately left uncached and re-asked on
+the next run: caching a false null would turn one flaky call into permanent,
+silent coverage loss on a table that really does carry emissions data, which is
+precisely the failure mode the Phase 2.5 spot-check exists to catch. Mirrors
+`section_store.py`'s rule of never caching an empty verdict.
+
 ---
 
 ## Phase 3 — Mechanical validation (no LLM)
@@ -401,6 +423,36 @@ Run on every Phase 2 output row before it's eligible for upsert:
 Rows failing these checks go to a review queue (flagged, not silently discarded
 and not silently inserted) — same "confirm unless certain" posture as your
 existing catalogue matcher.
+
+Implemented in `app/wikipedia/validation.py` (pure, DB-free, unit-tested in
+`tests/test_wikipedia_validation.py`); `extract.py` runs it over every variant
+and splits the output into `valid_rows` and `review_queue`.
+
+Two decisions worth not re-litigating:
+- **A bare year is a valid production period.** The schema says `YYYY-MM`, but
+  German tables frequently print only a year, and rejecting those would push the
+  model to invent a month — which §0's no-estimation rule forbids. Validation
+  accepts `YYYY` and `YYYY-MM`, and Phase 4/5 must handle both.
+- **`co2_min == co2_max == 0` passes.** A battery-electric row inside an
+  otherwise combustion table legitimately states 0 g/km; the lower plausible
+  bound is 0, not 1.
+
+### Phase 2.5 — accuracy spot-check (gate before Phase 4)
+
+Extraction can fail silently — a wrong orientation reading produces
+well-formed, plausible, wrong rows that no mechanical check catches. So
+`extract.py` emits three things for human review before any upsert is allowed:
+
+1. a stratified spot-check sample (`--sample N`), spread across brands first and
+   orientations second, each entry carrying the extracted JSON, the raw table
+   wikitext and the source URL — the three things needed to hand-check a row;
+2. an orientation cross-check: the model's own per-table verdict against
+   `tables.guess_orientation`, with an agreement rate. Divergence is the signal
+   that one of the two is systematically wrong;
+3. a **regex tripwire**: any table that returned no CO2 at all while its
+   wikitext contains CO2-shaped text (`\d{2,3}\s*g/km`). These are surfaced as
+   their own list and never auto-corrected — the point is to expose prompt or
+   schema blind spots, not to paper over them.
 
 ---
 
