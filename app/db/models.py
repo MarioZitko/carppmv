@@ -24,6 +24,7 @@ from sqlalchemy import (
     ForeignKey,
     Integer,
     String,
+    Text,
     UniqueConstraint,
     func,
 )
@@ -241,3 +242,71 @@ class ApifyEvent(Base):
     status: Mapped[str] = mapped_column(String(16))
     cost_usd: Mapped[float] = mapped_column(Float, default=0.0)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+
+
+class WikipediaFetchStatus(str, Enum):
+    OK = "ok"
+    NOT_FOUND = "not_found"
+    ERROR = "error"
+
+
+class WikipediaRawArticle(Base):
+    """Raw de.wikipedia wikitext cached by the Phase 0 crawl
+    (app/wikipedia/crawl.py), one row per (brand, article, anchor) model
+    reference found in a brand article's model-list section.
+
+    Offline/batch only — nothing in the /calculate request path reads this.
+    It exists so Phase 2's table extraction runs against cached wikitext
+    instead of re-hitting Wikipedia, and so a killed crawl resumes rather
+    than re-fetching (see the resumability requirement in
+    docs/WIKIPEDIA_CO2_PLAN.md §Phase 0).
+
+    anchor is set when the brand article linked into a *section* of a shared
+    article (e.g. "Opel Agila#Agila A (Typ 0HAF68, 2000-2007)") — the
+    generation's data lives in that section, not on its own page. Two anchors
+    into one article are two rows: wikitext is fetched once per unique title
+    but stored per row, so Phase 2 can process a row standalone without a
+    join back to a separate article table.
+
+    anchor_key exists only to make the unique constraint work: Postgres
+    treats NULLs as distinct, so a nullable anchor column alone would let
+    duplicate anchor-less rows through. It mirrors anchor with "" for None
+    and is never read as data.
+    """
+
+    __tablename__ = "wikipedia_raw_articles"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+
+    # Catalogue.brand value this article was crawled for (e.g. "Mercedes-Benz").
+    brand: Mapped[str] = mapped_column(String(64), index=True)
+    # de.wikipedia title AFTER redirect resolution (the title the wikitext is of).
+    article_title: Mapped[str] = mapped_column(String(512), index=True)
+    anchor: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    anchor_key: Mapped[str] = mapped_column(String(512), default="")
+
+    # Null when fetch_status is not_found/error — the row still records the
+    # attempt, which is what makes coverage auditable after the run.
+    wikitext: Mapped[str | None] = mapped_column(Text, nullable=True)
+    fetch_status: Mapped[WikipediaFetchStatus] = mapped_column(
+        SAEnum(WikipediaFetchStatus, native_enum=False)
+    )
+    # Populated on error/not_found (API error code, HTTP status, exception text).
+    error_message: Mapped[str | None] = mapped_column(String(1024), nullable=True)
+    fetched_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    __table_args__ = (
+        UniqueConstraint(
+            "brand", "article_title", "anchor_key", name="uq_wikipedia_raw_article"
+        ),
+    )
+
+    @property
+    def source_url(self) -> str:
+        """Provenance URL (§0 of the plan) — article plus section anchor."""
+        base = "https://de.wikipedia.org/wiki/" + self.article_title.replace(" ", "_")
+        return f"{base}#{self.anchor.replace(' ', '_')}" if self.anchor else base
+
+    def __repr__(self) -> str:
+        frag = f"#{self.anchor}" if self.anchor else ""
+        return f"<WikipediaRawArticle {self.brand} {self.article_title}{frag} {self.fetch_status}>"

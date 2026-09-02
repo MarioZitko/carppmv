@@ -1,0 +1,58 @@
+{
+  "18f756b0269748b5da796e4b13a30706ae007027": {
+    "article_title": "Peugeot",
+    "brand": "Peugeot",
+    "headings": [
+      "Automobile"
+    ],
+    "reasoning": "The heading 'Automobile' is a direct enumeration of Peugeot's vehicle models (French for 'cars'), which is the standard section listing the manufacturer's cars in German automotive articles."
+  },
+  "46a33be690aed6fa27c7de2301272fd0cf4f42c8": {
+    "article_title": "Mercedes-Benz-Pkw",
+    "brand": "Mercedes-Benz",
+    "headings": [
+      "Produktlinien"
+    ],
+    "reasoning": "In a German car manufacturer article, 'Produktlinien' (product lines) is a common heading for the section that enumerates the vehicle models. The other headings are either history, naming conventions, timelines, or references, not model lists."
+  },
+  "68dc44bc8ced29108dc4398e3bd532eeffeae690": {
+    "article_title": "Cupra",
+    "brand": "Cupra",
+    "headings": [
+      "Fahrzeugmarke Cupra"
+    ],
+    "reasoning": "In a short brand article, 'Fahrzeugmarke <name>' is the section that lists the manufacturer's vehicle models."
+  },
+  "91ab789fa0dfb94cdd96f62b51e12d6db8909916": {
+    "article_title": "Liste von Maserati-Serienfahrzeugen",
+    "brand": "Maserati",
+    "headings": [
+      "Auflistung"
+    ],
+    "reasoning": "The article is titled 'Liste von Maserati-Serienfahrzeugen', and the heading 'Auflistung' is explicitly the listing section that enumerates the vehicle models, as per the instruction that in a 'Liste von …' article this heading IS the list."
+  },
+  "9abb1486628389059c4d6e0f4b5f699a5ecb97bd": {
+    "article_title": "Toyota",
+    "brand": "Toyota",
+    "headings": [
+      "Verkaufsbezeichnungen (Mitteleuropa)"
+    ],
+    "reasoning": "This heading explicitly lists the model names sold by Toyota in Central Europe, matching the criteria for a vehicle model enumeration section."
+  },
+  "ca763a614bd9224837d002b8b89bc85c842b0dae": {
+    "article_title": "MG (chinesische Automarke)",
+    "brand": "MG",
+    "headings": [
+      "Fahrzeuge"
+    ],
+    "reasoning": "\"Fahrzeuge\" is explicitly listed as a heading that enumerates vehicle models in German automotive articles. The other headings (Markengeschichte, Verkaufszahlen, etc.) are not model lists."
+  },
+  "f02c96306688029a1d96ae9048ed30a28d64c3a3": {
+    "article_title": "Nissan",
+    "brand": "Nissan",
+    "headings": [
+      "Verkaufsbezeichnungen"
+    ],
+    "reasoning": "\"Verkaufsbezeichnungen\" is listed as a level-2 heading in this Nissan article. According to the rules, in German automotive articles this heading introduces the enumerated list of models sold by the manufacturer, not just naming conventions."
+  }
+}

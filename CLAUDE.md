@@ -224,6 +224,52 @@ group — some groups bundle several marques, see `FOLDER_BRANDS` in
   directly (`docs/PROJECT_STRUCTURE.md` has the command) rather than
   trusting a checked-in list, which drifts the moment a brand is loaded.
 
+### Wikipedia CO2 crawl (`app/wikipedia/`)
+
+Offline/batch pipeline (like catalogue ingestion — never in the `/calculate`
+request path) that fills the CO2 gap for vehicles the catalogue doesn't cover.
+Full design in `docs/WIKIPEDIA_CO2_PLAN.md`; **Phases 0 and 1 are implemented,
+Phases 2–5 are not**.
+
+`python -m app.wikipedia.crawl [--brand X] [--dry-run] [--refresh] [--report out.json]`
+crawls de.wikipedia per brand — brand article → model-list section → model
+article wikitext, cached in `WikipediaRawArticle`.
+
+- `client.py` — the Wikimedia policy layer: required descriptive User-Agent
+  with contact (a default library UA lands in a stricter rate-limit tier),
+  bot-password login (`action=clientlogin` is refused for bot passwords, so
+  `action=login` is the working path; the session is verified via
+  `meta=userinfo`), **hard concurrency ceiling of 3**, ~1s per-worker
+  throttle, 429 backoff. Existence/redirect questions batch 50 titles per
+  request; `action=parse&prop=wikitext` does not batch.
+- `sections.py` — pure, DB-free, unit-tested. Section matching is the fuzzy
+  substring `"modell"`, not a whitelist (a whitelist missed Volvo's real
+  heading). A `#anchor` link means the generation lives in a *section* of a
+  shared article, so `(article_title, anchor)` is the stored unit.
+- `brand_articles.py` — brand → candidate de.wikipedia articles, plus the
+  crawl scope (`PHASE_0_BRANDS` = all catalogue brands bar `EXCLUDED_BRANDS`).
+  Candidates, not one title, because the bare marque name often isn't the
+  marque article ("Fiat" is a disambiguation, "Mercedes-Benz" is a
+  vehicle-type routing page, "BMW" is the corporate article, "MG Rover Group"
+  redirects to *Rover*). `extra_articles` covers a marque split across two
+  articles (MG: modern Chinese + historical British).
+- `section_store.py` — persisted Phase 1 verdicts
+  (`section_classifications.json`), mirroring `catalogue/mapping_store.py`.
+  The LLM proved non-deterministic at temperature 0, so without this the
+  review queue changes between runs. Only non-empty verdicts are cached.
+- `llm_sections.py` — Phase 1 fallback only, triggered by the plan's explicit
+  rule (zero matched sections, or fewer than 5 qualifying links). Same
+  enum-constrained-schema + post-hoc guard pattern as `catalogue/llm_mapper.py`.
+
+**Run `--dry-run` over the full scope before any real crawl when brands
+change** — it costs ~175 requests and 2 minutes and catches wrong brand
+articles, LLM misclassifications and over-broad index-following before
+anything is written.
+
+Resumable by design: an already-cached `ok` row is never re-fetched, so an
+interrupted crawl restarts cheaply. `--refresh` is the escape hatch for when a
+brand's *source article* mapping changed and its old rows are now wrong.
+
 ### Database (`app/db/models.py`)
 
 - `Catalogue` — one priced variant for one validity period, unique on

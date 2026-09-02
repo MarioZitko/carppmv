@@ -39,6 +39,24 @@ class Settings(BaseSettings):
     rate_limit_per_ip_hour: int = 10
     rate_limit_per_ip_day: int = 30
 
+    # de.wikipedia crawl (app/wikipedia/, offline batch — never in the
+    # /calculate request path). Wikimedia's User-Agent policy requires a
+    # descriptive UA with a reachable contact; a default library UA is
+    # routed into a stricter rate-limit tier, so this is not etiquette.
+    wiki_api_url: str = "https://de.wikipedia.org/w/api.php"
+    wiki_contact_email: str = "mariozitkovic@gmail.com"
+    wiki_user_agent_product: str = "kalkulatoruvoza-co2-crawler/1.0"
+    wiki_site_url: str = "https://kalkulatoruvoza.com"
+    # Bot-password credentials (Special:BotPasswords). Optional: the crawler
+    # runs anonymously without them, just at the lower concurrency/rate tier.
+    wiki_bot_username: str = ""
+    wiki_bot_password: str = ""
+    # Hard ceiling, not a perf knob — 3 is the authenticated concurrency limit
+    # in Wikimedia's API etiquette guidance. Do not raise.
+    wiki_max_concurrency: int = 3
+    # Seconds each worker waits between its own requests.
+    wiki_throttle_seconds: float = 1.0
+
 
 @lru_cache
 def get_settings() -> Settings:
