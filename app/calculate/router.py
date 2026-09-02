@@ -6,6 +6,10 @@ Pipeline:
   3. Catalogue matcher always runs (when brand is known) → fills CO2 when
      missing, and always surfaces ranked candidates so the user can pick a
      different catalogue row (different price/CO2) than the auto-picked one.
+  3b. Wikipedia CO2 lookup — last resort, hint only. Runs only when steps 2
+     and 3 both failed to produce a CO2 value. Its answer NEVER feeds step 4
+     and never changes co2_source; it rides along in `wikipedia_hint` for the
+     UI to show next to the manual CO2 field.
   4. Run PPMV engine
   5. Return CalculateResponse
 
@@ -30,6 +34,7 @@ from app.calculate.schemas import (
     Confidence,
     MatchStatusStr,
     ParsedFields,
+    WikipediaCo2Hint,
 )
 from app.catalogue.display import format_variant_display
 from app.catalogue.matching import MatchStatus, find_match
@@ -45,6 +50,8 @@ from app.scraping.parsing import parse_listing_date
 from app.scraping.persistence import record_scrape_outcome
 from app.scraping.schemas import ListingData
 from app.scraping.site_registry import EXTRACTORS, SITE_TO_SCRAPE_SITE, detect_site
+from app.wikipedia.browse import clean_query
+from app.wikipedia.co2_lookup import WikipediaCo2Estimate, resolve_co2_from_wikipedia
 
 log = logging.getLogger(__name__)
 
@@ -123,6 +130,10 @@ class _Resolution:
     debug: dict | None = None
     match_status: MatchStatusStr = "not_attempted"
     candidates: list[CatalogueCandidate] = field(default_factory=list)
+    #: Set only by the last-resort Wikipedia tier, and only when co2_g_km is
+    #: still None after scraping and the catalogue. Never read by anything
+    #: that decides the tax.
+    wikipedia_hint: WikipediaCo2Hint | None = None
 
     def require_manual_co2(self, warning: str) -> None:
         """Drop the CO2 we have (if any) and ask the user for it instead."""
@@ -144,6 +155,7 @@ class _Resolution:
             debug=self.debug,
             match_status=self.match_status,
             candidates=self.candidates,
+            wikipedia_hint=self.wikipedia_hint,
         )
 
 
@@ -229,14 +241,37 @@ async def _apply_catalogue_match(
     state.match_status = match_result.status.value
     state.candidates = [_to_candidate(c.row, c.score) for c in match_result.candidates]
 
+    row = match_result.matched if match_result.status == MatchStatus.AUTO_MATCHED else None
+
+    # Fuel from the matched row when the listing didn't state one. autobid.de
+    # exposes neither CO2 nor fuel pre-login, so its listings arrived with
+    # fuel_type None — and an unknown fuel aborts the whole calculation, which
+    # is how a car the catalogue had matched *exactly* ("Audi A3 Sportback 1.2
+    # TFSI Attraction / Benzin / 1.2l / 77 kW", auto-matched, CO2 114) still
+    # produced no number at all.
+    #
+    # Trusting the row for fuel is not a new leap of faith: this is the same
+    # auto-matched row whose CO2 we already take below, and fuel is the coarser
+    # of the two facts. Done before the CO2 early-return, because a listing can
+    # state CO2 and still omit fuel.
+    if row is not None and not state.parsed.fuel_type and row.fuel_type:
+        state.parsed.fuel_type = row.fuel_type
+
     if state.co2_g_km is not None:
         return  # listing already had CO2; the candidates are just for override
 
-    if match_result.status != MatchStatus.AUTO_MATCHED or not match_result.matched:
+    # An auto-matched row is not automatically a *useful* row. Nothing in
+    # matching.py's accept rule (top score >= ACCEPT_SCORE, and the near-tied
+    # rows agreeing on price) requires the row to carry a CO2 value, so
+    # `matched` can arrive with co2_g_km None. Every catalogue row has one
+    # today, which makes this latent rather than live — but taking `matched` on
+    # faith set co2_source="catalogue" while co2_g_km stayed None, which reads
+    # to every consumer as "we found it", skipped the manual-entry warning, and
+    # left the user with no CO2 and no prompt to supply one.
+    if row is None or row.co2_g_km is None:
         state.require_manual_co2("CO2 vrijednost nije moguće automatski odrediti — unesite je ručno.")
         return
 
-    row = match_result.matched
     state.co2_g_km = row.co2_g_km
     state.co2_source = "catalogue"
     state.parsed.co2_g_km = row.co2_g_km
@@ -251,6 +286,121 @@ async def _apply_catalogue_match(
                 "catalogue_id": row.catalogue_id,
             }
         }
+
+
+def _to_wikipedia_hint(estimate: WikipediaCo2Estimate) -> WikipediaCo2Hint:
+    """Project the frozen dataclass onto the response schema.
+
+    The bare `co2_min`/`co2_max` of the dataclass and the DB column become the
+    unit-suffixed names the schema layer uses everywhere else; this is the only
+    place the two spellings meet.
+    """
+    return WikipediaCo2Hint(
+        co2_min_g_km=estimate.co2_min,
+        co2_max_g_km=estimate.co2_max,
+        source_url=estimate.source_url,
+        brand=estimate.brand,
+        model_article_title=estimate.model_article_title,
+    )
+
+
+def _wikipedia_model_text(listing: ListingData) -> str | None:
+    """The `model` string to hand the Wikipedia matcher.
+
+    It wants the model name plus the engine designation ("Golf 1.6 TDI",
+    "320d") and explicitly does NOT want the dealer trim blob — trim and body
+    words appear nowhere in a de.wikipedia table and only dilute the text
+    score. Both `model` and `variant` go in because the engine designation is
+    reliably somewhere across the two, but the result is cleaned first:
+
+    1. Brand tokens are dropped. The brand is already the matcher's SQL filter
+       and is stripped from the candidate side of the comparison, so "Audi" in
+       the query is pure dilution.
+    2. Body-style and trim words are dropped.
+    3. Repeats are collapsed. Several sites restate the model inside the
+       variant ("A3" + "Audi A3 Sportback ..."), which double-counts a token
+       that carries no extra information.
+
+    Cleaning only ever *removes* tokens, so it cannot invent a match; the worst
+    case is the same declined lookup as before.
+
+    Measured over 500 random catalogue rows with known CO2, cleaning is a wash:
+
+        model + variant, cleaned     35.8% answered, 55.3% of answers correct
+        model + variant, raw         36.2% answered, 55.2% of answers correct
+        model alone                  38.4% answered, 50.5% of answers correct
+
+    That benchmark is a poor proxy for this specific fix and is kept only for
+    continuity with the earlier measurement. Catalogue variant strings are
+    spec sheets ("... / Diesel / 2.0l / 110 kW/150 KS / 4-Vrata"), so their
+    noise is units and gearbox words rather than the body-and-trim wording this
+    list targets; stripping that spec noise too was tried and moved the number
+    by nothing at all. Real listing titles are where the difference shows:
+    autobid.de's Audi A3 Sportback 1,2 TFSI "Attraction" went from a declined
+    lookup to 123-132 g/km, because its variant field is the whole title.
+
+    Model alone still answers most often, and still least accurately — extra
+    answers bought by dropping the engine designation are disproportionately
+    wrong ones, which is the wrong trade for a value the user is meant to check
+    against a COC.
+    """
+    raw = " ".join(p for p in (listing.model, listing.variant) if p)
+    if not raw.strip():
+        return None
+    # If cleaning removed everything (a listing whose variant is nothing but
+    # trim words), fall back to the raw text rather than querying for "".
+    return clean_query(raw, brand=listing.brand) or raw
+
+
+async def _apply_wikipedia_hint(
+    state: _Resolution,
+    session: AsyncSession,
+    listing: ListingData,
+    reg_date: date | None,
+) -> None:
+    """Step 3b — the last-resort CO2 tier, reached only when steps 2 and 3 both
+    came up empty.
+
+    Hint only, and structurally so: it writes `state.wikipedia_hint` and
+    nothing else. `co2_g_km` stays None, `co2_source` stays whatever
+    `require_manual_co2` set it to, and the value therefore cannot reach
+    `calculate_ppmv` — the guard below this call returns before the engine is
+    ever invoked. That is docs/WIKIPEDIA_CO2_PLAN.md §0, which is
+    non-negotiable: coverage is ~39% and only 57% of answers contain the true
+    value, so it is a "check your COC" prompt, not a tax input.
+
+    **No warning is appended here.** `require_manual_co2` has already added the
+    one CO2 warning this response gets, and a second one would both duplicate
+    it and frame a *successful* extra lookup as another thing that went wrong.
+
+    Failures are swallowed. This tier is strictly additive — the user gets the
+    same manual-entry response with or without it — so a DB hiccup in a hint
+    must never turn a working 200 into a 500. Same posture as
+    scraping/persistence.py, and distinct from the domain exceptions that
+    core/exceptions.py maps: there is no HTTP status that would improve here.
+    """
+    model = _wikipedia_model_text(listing)
+    try:
+        estimate = await resolve_co2_from_wikipedia(
+            brand=listing.brand,
+            model=model,
+            # parsed.fuel_type, not listing.fuel_type: the catalogue step may
+            # have supplied a fuel the listing itself never stated, and fuel is
+            # one of this matcher's hard filters.
+            fuel=state.parsed.fuel_type,
+            power_kw=listing.power_kw,
+            date=reg_date,
+            # Reuse the request's open session. Omitting it makes the resolver
+            # open a second AsyncSessionLocal of its own, which inside a
+            # request handler is a needless extra pool connection.
+            session=session,
+        )
+    except Exception:  # noqa: BLE001 — see docstring; a hint must not 500
+        log.exception("Wikipedia CO2 hint lookup failed for %s", listing.source_url)
+        return
+
+    if estimate is not None:
+        state.wikipedia_hint = _to_wikipedia_hint(estimate)
 
 
 @router.post("/calculate", response_model=CalculateResponse)
@@ -286,7 +436,17 @@ async def calculate(
     if listing.brand:
         await _apply_catalogue_match(state, session, listing, reg_date)
 
-    fuel_type = _parse_fuel(listing.fuel_type)
+        # Step 3b. `state.co2_g_km is None` here is exactly "the listing had no
+        # CO2 and the catalogue did not supply one" — the only two things that
+        # can have written it at this point are the listing itself and the
+        # catalogue branch above. Nothing else in the pipeline has run yet, so
+        # this needs no extra bookkeeping to stay in sync with those two tiers.
+        if state.co2_g_km is None:
+            await _apply_wikipedia_hint(state, session, listing, reg_date)
+
+    # parsed.fuel_type rather than listing.fuel_type — an auto-matched
+    # catalogue row may have filled it in above.
+    fuel_type = _parse_fuel(state.parsed.fuel_type)
 
     # Zero/negative CO2 is only meaningful for electric vehicles (which are
     # exempt anyway); for anything else it's a scrape artefact, not a reading.
@@ -299,7 +459,10 @@ async def calculate(
         return state.respond()
     if fuel_type is None:
         return state.respond(
-            warning=f"Nepoznata vrsta goriva {listing.fuel_type!r} — izračun PPMV-a preskočen."
+            warning=(
+                f"Nepoznata vrsta goriva {state.parsed.fuel_type!r} — "
+                "izračun PPMV-a preskočen."
+            )
         )
     if reg_date is None:
         return state.respond(

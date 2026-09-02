@@ -113,16 +113,35 @@ export default function Home() {
 		setForm((prev) => ({ ...prev, ...patch }));
 	}
 
-	function applyCandidate(candidate: CatalogueCandidate, scroll = true) {
+	function applyCandidate(
+		candidate: CatalogueCandidate,
+		scroll = true,
+		// Set by the auto-preselect below when the backend returned a Wikipedia
+		// CO2 hint. A hint means neither the listing nor an accepted catalogue
+		// match produced a CO2 value, so silently filling the field from an
+		// *unconfirmed* candidate would contradict the note sitting right under
+		// it ("we don't know this — check your COC") with a number that looks
+		// like we do. Price and fuel still apply: those are the candidate's
+		// real contribution and are not what the hint is about. An explicit
+		// click on a row is the user's own decision and always fills CO2.
+		skipCo2 = false,
+	) {
 		setSelectedCatalogueId(candidate.catalogue_id);
-		patchForm({
+		// Keys are omitted rather than set back to their current value: `form`
+		// is captured from the render that created this closure, and
+		// handleUrlSubmit calls patchForm immediately before this, so reading
+		// `form.co2`/`form.fuelType` here would write a stale value back over
+		// the patch that just landed.
+		const patch: Partial<VehicleFormValues> = {
 			priceEur: String(candidate.price_eur),
-			co2: candidate.co2_g_km !== null ? String(candidate.co2_g_km) : form.co2,
-			fuelType:
-				candidate.fuel_type === "diesel" || candidate.fuel_type === "petrol"
-					? candidate.fuel_type
-					: form.fuelType,
-		});
+		};
+		if (!skipCo2 && candidate.co2_g_km !== null) {
+			patch.co2 = String(candidate.co2_g_km);
+		}
+		if (candidate.fuel_type === "diesel" || candidate.fuel_type === "petrol") {
+			patch.fuelType = candidate.fuel_type;
+		}
+		patchForm(patch);
 		setPriceAnchorToken((t) => t + 1);
 		// Picking a candidate is the last step before the price/PPMV becomes
 		// meaningful, so jump straight to it instead of leaving the user to
@@ -196,7 +215,7 @@ export default function Home() {
 			// confident enough to auto-accept it. The user can still pick a
 			// different row from the list if the guess is wrong.
 			if (data.candidates.length > 0) {
-				applyCandidate(data.candidates[0], false);
+				applyCandidate(data.candidates[0], false, data.wikipedia_hint !== null);
 			}
 		} catch (err) {
 			setUrlError(describeUrlError(err));
@@ -329,7 +348,21 @@ export default function Home() {
 						</div>
 					)}
 
-					<VehicleForm values={form} onChange={patchForm} />
+					<VehicleForm
+						values={form}
+						onChange={patchForm}
+						co2Hint={urlResult?.wikipedia_hint}
+						co2Lookup={
+							urlResult?.parsed.brand
+								? {
+										brand: urlResult.parsed.brand,
+										query: [urlResult.parsed.model, urlResult.parsed.variant]
+											.filter(Boolean)
+											.join(" "),
+									}
+								: null
+						}
+					/>
 				</div>
 
 				<div

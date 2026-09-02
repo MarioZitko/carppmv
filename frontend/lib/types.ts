@@ -41,6 +41,44 @@ export interface CatalogueSearchResponse {
   candidates: CatalogueCandidate[];
 }
 
+/** Last-resort CO2 range from de.wikipedia, shown as an explicitly unconfirmed
+ * hint. Present only when neither the listing nor the catalogue produced a CO2
+ * value AND the Wikipedia corpus had a confident answer — null in every other
+ * case, which is the majority of the time. `co2_source` stays
+ * "manual_required" whenever this is set: it is a cross-check against the
+ * vehicle's COC document, never a value to calculate a tax from. */
+export interface WikipediaCo2Hint {
+  co2_min_g_km: number;
+  co2_max_g_km: number;
+  source_url: string;
+  brand: string;
+  model_article_title: string;
+}
+
+/** One engine row from the Wikipedia browser (GET /wikipedia/engines).
+ * Carries no score on purpose — the user picks their own engine off the list,
+ * and a relevance number would read as "how sure we are this is your car". */
+export interface WikipediaEngineRow {
+  model_article_title: string;
+  engine_code: string | null;
+  power_kw: number | null;
+  displacement_cc: number | null;
+  fuel_type: string | null;
+  production_start: string | null;
+  production_end: string | null;
+  co2_min: number | null;
+  co2_max: number | null;
+  source_url: string;
+}
+
+export interface WikipediaEngineSearchResponse {
+  brand: string;
+  /** False when the marque isn't in the corpus at all — different from "brand
+   * exists but this query matched nothing", and worth saying differently. */
+  brand_known: boolean;
+  rows: WikipediaEngineRow[];
+}
+
 export interface CalculateResponse {
   ppmv_eur: number | null;
   parsed: ParsedFields;
@@ -50,6 +88,7 @@ export interface CalculateResponse {
   debug: Record<string, unknown> | null;
   match_status: MatchStatus;
   candidates: CatalogueCandidate[];
+  wikipedia_hint: WikipediaCo2Hint | null;
 }
 
 export interface PPMVRequest {

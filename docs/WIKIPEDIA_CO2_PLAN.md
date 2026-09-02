@@ -20,11 +20,33 @@
 
 - **`de.wikipedia.org` is the source** — best structured engine-spec table coverage,
   language of the article is irrelevant since only numbers/codes/dates are extracted.
-- **Never auto-fills the tax calculation.** New `co2_source: "wikipedia_estimate"`
-  value. When only this tier is available, `/calculate` still returns
-  `manual_required` — the range is shown in the UI as a hint only
+- **Never auto-fills the tax calculation.** When only this tier is available,
+  `/calculate` returns `co2_source: "manual_required"` exactly as it did before
+  this pipeline existed, and the range rides alongside in a separate nullable
+  field, `CalculateResponse.wikipedia_hint` (`co2_min_g_km`, `co2_max_g_km`,
+  `source_url`, `brand`, `model_article_title`). The UI shows it as a hint only
   ("we estimate 99–116 g/km for this engine — check your COC and enter the exact
-  value"). This was decided explicitly and must not be silently relaxed later.
+  value"). The estimate never reaches `calculate_ppmv`. This was decided
+  explicitly and must not be silently relaxed later.
+
+  > **Correction (2026-09-02, at wiring time).** This bullet originally
+  > specified a fourth `co2_source` value, `"wikipedia_estimate"`, *and* that
+  > `/calculate` keep returning `manual_required` for the same case. Those two
+  > requirements contradict each other — one field cannot hold both values — so
+  > the enum-value approach was considered and rejected in favour of the
+  > additive sibling field described above.
+  >
+  > The reasoning, beyond resolving the contradiction: a fourth enum value is a
+  > breaking contract change at a field **the frontend does not read at all**
+  > (`co2_source`, `confidence` and `match_status` are declared in
+  > `frontend/lib/types.ts` and used nowhere — confidence reaches the user only
+  > through `CandidatesList`'s score badge and `Co2HintNote`). It would buy no
+  > behaviour at the only consumer while obliging every current and future
+  > backend consumer to learn a value it would then have to treat identically to
+  > `manual_required` anyway. A nullable sibling field is purely additive: no
+  > existing branch changes meaning, and "manual_required still means
+  > manual_required" stays true. See `app/calculate/schemas.py`, where the same
+  > reasoning is recorded on the enum itself.
 - **Null CO2 is a valid, expected outcome for any row, regardless of vehicle
   age — this is a per-row fact, not an age-based rule.** No assumption about
   which eras have CO2 data is baked into the pipeline anywhere. Phase 0/2 run

@@ -58,15 +58,26 @@ page calls. It's a pipeline, not a thin CRUD handler:
    source quirks. mobile.de is special-cased (see below).
 3. **Catalogue match** (`app/catalogue/matching.py::find_match`) always
    runs when the listing's brand is known. It fills CO2 when the listing
-   doesn't expose it, and *always* returns ranked candidates so the
-   frontend can let the user override the auto-pick with a different
+   doesn't expose it *and* the auto-matched row actually carries one —
+   nothing in the accept rule (score + price agreement) requires a CO2
+   value, so `matched.co2_g_km is None` is checked explicitly rather than
+   inferred from AUTO_MATCHED. It *always* returns ranked candidates so
+   the frontend can let the user override the auto-pick with a different
    priced row.
+3b. **Wikipedia CO2 hint** (`app/wikipedia/co2_lookup.py`) — last resort,
+   reached only when steps 2 and 3 both produced no CO2. Fills
+   `wikipedia_hint`, never `co2_g_km`; see the Phase 5 notes below.
 4. **Tax calculation** (`app/ppmv/engine.py::calculate_ppmv`) — pure
    function, no I/O.
 5. Return `CalculateResponse` with the breakdown, parsed fields,
-   `co2_source` (`scraped` | `catalogue` | `manual_required`), and
-   `match_status`/`candidates` so the frontend can show a confidence UI
-   instead of a silent black box.
+   `co2_source` (`scraped` | `catalogue` | `manual_required`),
+   `match_status`/`candidates`, and `wikipedia_hint`.
+
+   Note what the frontend actually reads: **`co2_source`, `confidence` and
+   `match_status` are declared in `frontend/lib/types.ts` and used
+   nowhere**. Confidence reaches the user only through `CandidatesList`'s
+   per-row score badge and, for the last tier, `Co2HintNote`. Don't assume
+   a `match_status`-driven UI exists — it doesn't.
 
 `POST /ppmv/calculate` (app/ppmv/router.py) bypasses scraping/catalogue
 entirely — specs in, tax out — and is what the manual-entry form and the
@@ -231,7 +242,9 @@ request path) that fills the CO2 gap for vehicles the catalogue doesn't cover.
 Full design in `docs/WIKIPEDIA_CO2_PLAN.md`; **all five phases are
 implemented**. Three CLIs: `crawl` (Phase 0/1, fetches wikitext), `extract`
 (Phase 2/3, turns it into validated engine rows) and `upsert` (Phase 4, loads
-them into Postgres). Phase 5 is a library function, not a CLI.
+them into Postgres). Phase 5 is a library function, not a CLI — and, since
+the `/calculate` wiring, the one part of this pipeline that runs inside a
+request.
 
 **Phase 2 still writes to `data/wikipedia/`, not Postgres** — Phase 4 reads
 that artifact. The Phase 2.5 spot-check gate in front of the upsert was
@@ -333,11 +346,12 @@ corrects CO2 ordering, re-runs Phase 3 validation and batch-upserts into
   already held that a later run rules ineligible, which an upsert alone cannot
   do.
 
-Phase 5 (`co2_lookup.resolve_co2_from_wikipedia`) is a library function, not a
-CLI, and shares **no tuning constants** with `catalogue/matching.py` — that
-matcher reconciles free-text variant blobs, this one matches exact engine
-numbers. `rank_candidates()` is pure and DB-free; the async wrapper takes an
-optional session so a future live call needs no restructuring. Read the
+Phase 5 (`co2_lookup.resolve_co2_from_wikipedia`) shares **no tuning
+constants** with `catalogue/matching.py` — that matcher reconciles free-text
+variant blobs, this one matches exact engine numbers. `rank_candidates()` is
+pure and DB-free; the async wrapper takes an optional session, and
+`/calculate` passes the request's own so no second `AsyncSessionLocal` is
+opened mid-request. Read the
 constants' comments before touching them; each records the wrong answer it was
 introduced to stop. Two are easy to break by "simplifying":
 
@@ -349,9 +363,32 @@ introduced to stop. Two are easy to break by "simplifying":
   designators the candidate pool actually uses, because BMW's X-range articles
   are titled by chassis code and "X3" appears nowhere in them.
 
-Measured against 1,200 catalogue rows with known CO2: 38.8% answered, 57% of
-those containing the true value (p90 miss 20 g/km). That is why §0 forbids this
-tier from auto-filling — it is a "check your COC" hint, never a tax input.
+Measured against 500 random catalogue rows with known CO2 (re-run 2026-09-02,
+passing model+variant as the query text): **36.2% answered, 55.2% of those
+containing the true value** — i.e. roughly one in five vehicles gets an answer
+that is actually right. An earlier 1,200-row run recorded 38.8%/57% (p90 miss
+20 g/km); the two agree within sampling noise. There is no checked-in
+benchmark script for either, so re-measuring means writing one.
+
+That hit rate is why §0 forbids this tier from auto-filling — it is a "check
+your COC" hint, never a tax input. It is wired into `/calculate` as a fourth
+tier that writes **only** `CalculateResponse.wikipedia_hint`:
+
+- It runs only when the listing had no CO2 *and* the catalogue produced none.
+- `co2_source` stays `manual_required` — deliberately **not** the
+  `wikipedia_estimate` enum value `docs/WIKIPEDIA_CO2_PLAN.md` §0 asks for.
+  That same section also requires `/calculate` to keep returning
+  `manual_required` for this case, and one field cannot do both; a sibling
+  field keeps "manual_required means manual_required" true for every
+  consumer. **The plan document is stale on this point; this file is right.**
+- Its value never reaches `calculate_ppmv` — the missing-CO2 guard returns
+  before the engine is invoked.
+- It appends no warning (`require_manual_co2` already added the single CO2
+  warning) and swallows its own exceptions: a hint must never turn a working
+  200 into a 500.
+- Query text is `listing.model + listing.variant`. Model alone answers
+  slightly more often (38.4%) but less accurately (50.5%); see
+  `_wikipedia_model_text`'s docstring for the measured trade.
 
 **Run `--dry-run` over the full scope before any real crawl when brands
 change** — it costs ~175 requests and 2 minutes and catches wrong brand
@@ -406,7 +443,11 @@ subsystems configured.
 
 ### Frontend (`frontend/`)
 
-Next.js app. `app/page.tsx` is the PPMV calculator (the live product);
+Next.js app. `components/` holds the UI the calculator is actually built
+from — `CandidatesList` (catalogue picker + score badges), `VehicleForm`
+(the manual-entry fields), `Co2HintNote` (the Wikipedia range, styled to
+read as provisional rather than confident) and `ParsedFieldsCard`.
+`app/page.tsx` is the PPMV calculator (the live product);
 `app/profitability/page.tsx` is a shell with no backend yet
 (`app/profitability/` on the backend is an empty stub — deferred, not
 broken). `lib/api.ts` is the only place that calls the backend — thin
@@ -425,7 +466,12 @@ of the Pydantic schemas, not generated).
   `sha256(salt + ip)` via `app/core/ip.py::client_ip_hash`.
 - **Matching's "confirm unless certain" policy is intentional product
   behavior**, not a missing feature — resist the urge to "just always
-  auto-pick the top match."
+  auto-pick the top match." Note this holds on the **backend only**:
+  `frontend/app/page.tsx` auto-applies `candidates[0]`'s price and fuel on
+  every URL submit regardless of `match_status`. The one carve-out is CO2
+  when a `wikipedia_hint` is present — filling the field from an unconfirmed
+  candidate would contradict the "we don't know this" note rendered directly
+  beneath it.
 - **`normalize_text`/`build_match_key` in `matching.py` must stay
   deterministic and side-effect-free** — the same function normalizes
   both the stored `match_key` at ingestion time and the query at lookup

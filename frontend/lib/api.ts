@@ -1,4 +1,4 @@
-import { ApiError, CalculateResponse, CatalogueSearchResponse, PPMVRequest, PPMVResponse } from "./types";
+import { ApiError, CalculateResponse, CatalogueSearchResponse, PPMVRequest, PPMVResponse, WikipediaEngineSearchResponse } from "./types";
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
 
@@ -94,4 +94,20 @@ export function searchCatalogue(params: {
   if (params.year) qs.set("year", String(params.year));
   if (params.powerKw) qs.set("power_kw", String(params.powerKw));
   return request<CatalogueSearchResponse>(`/catalogue/search?${qs.toString()}`, { method: "GET" });
+}
+
+/** GET /wikipedia/engines — every Wikipedia engine row for a brand, optionally
+ * narrowed by free-text model/engine designation. Backs the engine picker,
+ * which is how a user resolves ties the matcher can't (an Audi A2 "1.4" at
+ * 55 kW is both a 142 g/km petrol and a 116 g/km diesel). */
+export function searchWikipediaEngines(params: {
+  brand: string;
+  q?: string;
+}): Promise<WikipediaEngineSearchResponse> {
+  const qs = new URLSearchParams();
+  qs.set("brand", params.brand);
+  if (params.q) qs.set("q", params.q);
+  return request<WikipediaEngineSearchResponse>(`/wikipedia/engines?${qs.toString()}`, {
+    method: "GET",
+  });
 }

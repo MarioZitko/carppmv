@@ -13,6 +13,7 @@ from app.db.models import Base
 from app.db.session import engine
 from app.ppmv.router import router as ppmv_router
 from app.scraping.router import router as scraping_router
+from app.wikipedia.router import router as wikipedia_router
 
 log = logging.getLogger(__name__)
 
@@ -58,6 +59,7 @@ def create_app() -> FastAPI:
     app.include_router(scraping_router, prefix="/scrape", tags=["scraping"])
     app.include_router(calculate_router, tags=["calculate"])
     app.include_router(catalogue_router, prefix="/catalogue", tags=["catalogue"])
+    app.include_router(wikipedia_router, prefix="/wikipedia", tags=["wikipedia"])
 
     return app
 

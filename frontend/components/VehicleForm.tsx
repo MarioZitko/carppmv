@@ -4,12 +4,23 @@ import { useState } from "react";
 import { Tooltip } from "@/components/Tooltip";
 import { ToggleSwitch } from "@/components/ToggleSwitch";
 import { DateInput } from "@/components/DateInput";
+import { Co2HintNote } from "@/components/Co2HintNote";
+import { Co2EnginesModal, co2Of, formatCo2 } from "@/components/Co2EnginesModal";
 import { VehicleFormValues } from "@/lib/vehicleForm";
-import { FuelType } from "@/lib/types";
+import { FuelType, WikipediaCo2Hint, WikipediaEngineRow } from "@/lib/types";
 
 interface Props {
 	values: VehicleFormValues;
 	onChange: (patch: Partial<VehicleFormValues>) => void;
+	/** Last-resort CO2 estimate, shown under the CO2 field as an explicitly
+	 * unconfirmed hint. Never written into `values.co2` — the field stays the
+	 * user's to fill. */
+	co2Hint?: WikipediaCo2Hint | null;
+	/** Brand + seed text for the engine picker. Present whenever the listing
+	 * gave us a brand — including when `co2Hint` is null, which is the majority
+	 * case and precisely when picking is most useful: the automatic lookup
+	 * declined, but the corpus may still hold the right engine. */
+	co2Lookup?: { brand: string; query: string } | null;
 }
 
 /** Controlled vehicle-detail form — the single source of truth for the specs
@@ -18,7 +29,31 @@ interface Props {
  * can both drive it and trigger a live recalculation. First registration date
  * comes prefilled straight from the parsed listing (see page.tsx) — still a
  * plain editable date field in case the parse got it wrong. */
-export function VehicleForm({ values, onChange }: Props) {
+export function VehicleForm({ values, onChange, co2Hint, co2Lookup }: Props) {
+	const [pickerOpen, setPickerOpen] = useState(false);
+	// A variant the user picked themselves overrides the automatic guess. That
+	// guess is often a union of tied variants (an Audi A2 "1.4" at 55 kW reads
+	// 116–142 because petrol and diesel are indistinguishable without a fuel
+	// type); once they've told us which engine it is, showing the union again
+	// would be actively misleading.
+	const [picked, setPicked] = useState<WikipediaEngineRow | null>(null);
+
+	function selectEngine(row: WikipediaEngineRow) {
+		setPicked(row);
+		setPickerOpen(false);
+		const value = co2Of(row);
+		if (value !== null) onChange({ co2: String(value) });
+	}
+
+	const shownHint: WikipediaCo2Hint | null | undefined = picked
+		? {
+				co2_min_g_km: picked.co2_min ?? picked.co2_max ?? 0,
+				co2_max_g_km: picked.co2_max ?? picked.co2_min ?? 0,
+				source_url: picked.source_url,
+				brand: co2Lookup?.brand ?? "",
+				model_article_title: picked.model_article_title,
+			}
+		: co2Hint;
 	// Gates the red error border: a pristine, untouched field shouldn't look
 	// like the user did something wrong before they've even reached it.
 	const [touched, setTouched] = useState<Record<string, boolean>>({});
@@ -100,6 +135,29 @@ export function VehicleForm({ values, onChange }: Props) {
 						onBlur={() => markTouched("co2")}
 						disabled={values.fuelType === "electric"}
 					/>
+					{values.fuelType !== "electric" && (
+						<>
+							<Co2HintNote
+								hint={shownHint}
+								engineCode={picked?.engine_code}
+								onBrowse={co2Lookup ? () => setPickerOpen(true) : undefined}
+							/>
+							{!shownHint && co2Lookup && (
+								<button
+									type="button"
+									onClick={() => setPickerOpen(true)}
+									className="mt-1.5 text-xs text-[var(--primary)] hover:underline"
+								>
+									Odaberi motor (Wikipedia CO2)
+								</button>
+							)}
+							{picked && formatCo2(picked).includes("–") && (
+								<p className="mt-1 text-xs text-[var(--text-soft)]">
+									Upisana je sredina raspona — prilagodite ako znate točnu vrijednost.
+								</p>
+							)}
+						</>
+					)}
 				</div>
 
 				<div>
@@ -171,6 +229,15 @@ export function VehicleForm({ values, onChange }: Props) {
 					)}
 				</div>
 			</div>
+
+			{co2Lookup && pickerOpen && (
+				<Co2EnginesModal
+					onClose={() => setPickerOpen(false)}
+					onSelect={selectEngine}
+					brand={co2Lookup.brand}
+					initialQuery={co2Lookup.query}
+				/>
+			)}
 		</div>
 	);
 }
