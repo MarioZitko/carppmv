@@ -228,15 +228,17 @@ group — some groups bundle several marques, see `FOLDER_BRANDS` in
 
 Offline/batch pipeline (like catalogue ingestion — never in the `/calculate`
 request path) that fills the CO2 gap for vehicles the catalogue doesn't cover.
-Full design in `docs/WIKIPEDIA_CO2_PLAN.md`; **Phases 0–3 are implemented,
-Phases 4–5 are not**. Two CLIs: `crawl` (Phase 0/1, fetches wikitext) and
-`extract` (Phase 2/3, turns it into validated engine rows).
+Full design in `docs/WIKIPEDIA_CO2_PLAN.md`; **all five phases are
+implemented**. Three CLIs: `crawl` (Phase 0/1, fetches wikitext), `extract`
+(Phase 2/3, turns it into validated engine rows) and `upsert` (Phase 4, loads
+them into Postgres). Phase 5 is a library function, not a CLI.
 
-**Phase 2 deliberately does not write to Postgres.** Phase 4's upsert into
-`WikipediaEngineData` is gated behind a human review of the Phase 2.5 accuracy
-spot-check, so extraction output lands in `data/wikipedia/` instead. Don't
-"finish the job" by wiring it into the DB without that review — a wrongly
-extracted CO2 range is exactly the silent-corruption case the gate exists for.
+**Phase 2 still writes to `data/wikipedia/`, not Postgres** — Phase 4 reads
+that artifact. The Phase 2.5 spot-check gate in front of the upsert was
+reviewed and cleared on 2026-09-02; it remains a *process* gate, so a future
+re-extraction that changes the corpus needs the spot-check read again before
+re-upserting. A wrongly extracted CO2 range is exactly the silent-corruption
+case the gate exists for.
 
 `python -m app.wikipedia.crawl [--brand X] [--dry-run] [--refresh] [--report out.json]`
 crawls de.wikipedia per brand — brand article → model-list section → model
@@ -302,6 +304,55 @@ failed: `!` header cells alone miss the very common bold-data-cell
 "Kenngrößen" style, and "first cell is bold" fires on normal tables that bold
 their variant name.
 
+Phase 4 (`python -m app.wikipedia.upsert [--brand X] [--dry-run]
+[--report out.json]`) — reads the extraction store, cross-checks the brand,
+corrects CO2 ordering, re-runs Phase 3 validation and batch-upserts into
+`wikipedia_engine_data`. Three things in it are load-bearing:
+
+- `brand_check.py` — **the crawl brand is not authoritative.** Phase 0 files an
+  article under whichever brand article linked to it, and brand articles link
+  to other marques' rebadges: 28 Opel Zafira variants under Subaru (the
+  Traviq), Lexus ES/GS/IS under Toyota, Dacia Logan under Nissan. The title's
+  longest marque prefix is read through `catalogue/brands.py` (reused, not
+  reimplemented — a second brand vocabulary would drift) and the row is either
+  confirmed, re-filed under the marque the title names, or — when no marque is
+  recognisable, as in the four-marque `Eurovan (PSA/Fiat)` article — held out
+  of every brand's pool. `crawl_brand` is kept so a re-filing is auditable.
+- The unique key is `(source_fingerprint, variant_index)`, deliberately not the
+  spec-shaped key the plan named. Spec columns cannot separate a table's manual
+  and automatic rows — the Phase 2 schema has no gearbox field — so that key
+  silently collapsed 757 rows, 409 of them with conflicting CO2.
+- `co2_min > co2_max` is swapped *before* validation and flagged in
+  `source_order_corrected`, so the fix is traceable rather than silent — but a
+  swap that yields an implausibly wide range is *disbelieved* and the row goes
+  to review instead. `Audi A3 8V / 30 g-tron`'s wikitext really does read
+  "114–12 g/km" (a dropped digit in the Wikipedia source, not an extraction
+  bug); swapping it would manufacture a 12–114 range out of a typo. Width alone
+  is not an error signal — real rows span a whole production era — only width
+  *plus* needing a swap is. `prune_review_rows` then deletes anything the table
+  already held that a later run rules ineligible, which an upsert alone cannot
+  do.
+
+Phase 5 (`co2_lookup.resolve_co2_from_wikipedia`) is a library function, not a
+CLI, and shares **no tuning constants** with `catalogue/matching.py` — that
+matcher reconciles free-text variant blobs, this one matches exact engine
+numbers. `rank_candidates()` is pure and DB-free; the async wrapper takes an
+optional session so a future live call needs no restructuring. Read the
+constants' comments before touching them; each records the wrong answer it was
+introduced to stop. Two are easy to break by "simplifying":
+
+- **Near-ties are merged into a wider range, but only within one article.**
+  Merging is correct for a range-valued answer; across articles it produced a
+  confident 121-149 g/km for a BMW X3 by unioning an X1, X2, X3 and X4 that
+  all share the "xDrive20d" badge and 140 kW.
+- **The designator guard** (A4 vs A5, C 220 d vs E 220 d) fires only on
+  designators the candidate pool actually uses, because BMW's X-range articles
+  are titled by chassis code and "X3" appears nowhere in them.
+
+Measured against 1,200 catalogue rows with known CO2: 38.8% answered, 57% of
+those containing the true value (p90 miss 20 g/km). That is why §0 forbids this
+tier from auto-filling — it is a "check your COC" hint, never a tax input.
+
 **Run `--dry-run` over the full scope before any real crawl when brands
 change** — it costs ~175 requests and 2 minutes and catches wrong brand
 articles, LLM misclassifications and over-broad index-following before
@@ -324,6 +375,10 @@ brand's *source article* mapping changed and its old rows are now wrong.
   attempt (success and failure) across all four sites. Persistence failures
   here are logged and swallowed — this is observability, not the product
   path, and must never break the actual response.
+- `WikipediaEngineData` — one engine variant extracted from a de.wikipedia
+  spec table, unique on `(source_fingerprint, variant_index)`. `brand` is the
+  *cross-checked* brand and is what Phase 5 filters on; `crawl_brand` records
+  what the crawl thought and is never a matching filter.
 - `ListingCache` — TTL cache keyed by `"{site}:{external_id}"`, currently
   used only by the mobile.de/Apify path.
 - `ApifyEvent` — one row per mobile.de request outcome, for rate-limit

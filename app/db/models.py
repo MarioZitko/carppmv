@@ -17,6 +17,7 @@ from enum import Enum
 
 from sqlalchemy import (
     JSON,
+    Boolean,
     Date,
     DateTime,
     Enum as SAEnum,
@@ -310,3 +311,108 @@ class WikipediaRawArticle(Base):
     def __repr__(self) -> str:
         frag = f"#{self.anchor}" if self.anchor else ""
         return f"<WikipediaRawArticle {self.brand} {self.article_title}{frag} {self.fetch_status}>"
+
+
+class WikipediaBrandCheck(str, Enum):
+    """Verdict of the crawl-brand vs. article-title cross-check (Phase 4).
+
+    The crawl brand alone is NOT authoritative: the Phase 0 crawl files a row
+    under the brand whose article linked to it, and brand articles link to
+    other marques' rebadges. The real cases in the corpus are a Subaru-filed
+    "Opel Zafira" (the Traviq rebadge, 28 variants), Toyota-filed "Lexus
+    ES/GS/IS", Nissan-filed "Dacia Logan"/"Renault Symbol", and a Peugeot-filed
+    "Eurovan (PSA/Fiat)" multi-marque van platform article.
+    """
+
+    #: article title's marque prefix agrees with the crawl brand
+    CONFIRMED = "confirmed"
+    #: title names a DIFFERENT known marque; the row was re-filed under it
+    REFILED = "refiled"
+    #: title carries no recognisable marque prefix — cannot confirm or deny
+    UNVERIFIED = "unverified"
+
+
+class WikipediaEngineData(Base):
+    """One engine variant extracted from a de.wikipedia spec table
+    (docs/WIKIPEDIA_CO2_PLAN.md §Phase 4), upserted by app/wikipedia/upsert.py.
+
+    Read only by app/wikipedia/co2_lookup.py (Phase 5). This is a CO2 *hint*
+    tier, never an auto-fill: §0 of the plan requires /calculate to keep
+    returning manual_required when this is the only source available.
+
+    Identity (`source_fingerprint`, `variant_index`) rather than the spec
+    columns: the Phase 2 schema has no gearbox/drivetrain field, so a table's
+    "2.0 TDI 103 kW manual / 153 g" and "2.0 TDI 103 kW automatic / 159 g" rows
+    are byte-identical on every spec column and would collapse under a
+    spec-shaped key — 757 of 8,895 rows did, 409 of those groups carrying
+    genuinely different CO2. The fingerprint is a content hash of the source
+    table, so re-running extraction re-derives the same key (idempotent upsert)
+    and two brands that crawled the same article converge on one row instead of
+    duplicating.
+
+    `brand` is the EFFECTIVE brand after the title cross-check, and is what
+    Phase 5 filters on. `crawl_brand` keeps what the crawl thought, so a
+    re-filing is auditable rather than silent.
+    """
+
+    __tablename__ = "wikipedia_engine_data"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+
+    # Cross-checked brand — see WikipediaBrandCheck. Phase 5 filters on this.
+    brand: Mapped[str] = mapped_column(String(64), index=True)
+    # Brand the Phase 0 crawl filed the article under. Provenance only; never
+    # used as a matching filter, precisely because it is the untrustworthy one.
+    crawl_brand: Mapped[str] = mapped_column(String(64), index=True)
+    brand_check: Mapped[WikipediaBrandCheck] = mapped_column(
+        SAEnum(WikipediaBrandCheck, native_enum=False), index=True
+    )
+
+    model_article_title: Mapped[str] = mapped_column(String(512), index=True)
+    # Section path the table sat under ("Technische Daten > Ottomotoren").
+    # Carries the fuel context and the NEDC/WLTP distinction the table itself
+    # often states only in its heading.
+    heading_context: Mapped[str] = mapped_column(String(512), default="")
+
+    engine_code: Mapped[str | None] = mapped_column(String(256), nullable=True)
+    # "YYYY" or "YYYY-MM" as printed. German tables frequently give only a year
+    # and forcing a month would mean inventing one (plan §Phase 3).
+    production_start: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    production_end: Mapped[str | None] = mapped_column(String(16), nullable=True)
+
+    displacement_cc: Mapped[float | None] = mapped_column(Float, nullable=True)
+    power_kw: Mapped[float | None] = mapped_column(Float, nullable=True)
+    fuel_type: Mapped[str | None] = mapped_column(String(32), nullable=True)
+
+    # Null is a valid, expected outcome (plan §0) — the table simply had no
+    # emissions row. Phase 5 reports "no estimate available" for such a row
+    # rather than showing an empty range.
+    co2_min: Mapped[float | None] = mapped_column(Float, nullable=True)
+    co2_max: Mapped[float | None] = mapped_column(Float, nullable=True)
+    # True when the source gave co2_min > co2_max and the upsert swapped them.
+    # Traceable rather than silent — 53 rows in the first run.
+    source_order_corrected: Mapped[bool] = mapped_column(Boolean, default=False)
+
+    # Provenance (plan §0, non-negotiable): the exact table and the URL.
+    source_url: Mapped[str] = mapped_column(String(1024))
+    source_wikitext_snippet: Mapped[str] = mapped_column(Text)
+    # sha1 of the source table's wikitext (app/wikipedia/tables.py) + the
+    # variant's position within that table's extraction.
+    source_fingerprint: Mapped[str] = mapped_column(String(64), index=True)
+    variant_index: Mapped[int] = mapped_column(Integer)
+
+    upserted_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+    __table_args__ = (
+        UniqueConstraint(
+            "source_fingerprint", "variant_index", name="uq_wikipedia_engine_row"
+        ),
+    )
+
+    def __repr__(self) -> str:
+        return (
+            f"<WikipediaEngineData {self.brand} {self.model_article_title} "
+            f"{self.engine_code!r} {self.power_kw}kW {self.co2_min}-{self.co2_max}>"
+        )

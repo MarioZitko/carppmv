@@ -1,11 +1,12 @@
 # Wikipedia CO2 Estimation Pipeline — Implementation Plan
 
-> Status: **Phases 0–3 implemented** (`app/wikipedia/`). Phase 0/1 crawl:
+> Status: **Phases 0–5 implemented** (`app/wikipedia/`). Phase 0/1 crawl:
 > `python -m app.wikipedia.crawl`, run for all 38 in-scope brands. Phase 2/3
-> extraction + validation: `python -m app.wikipedia.extract`.
-> **Phases 4–5 are design only, not implemented** — Phase 4's upsert is gated
-> behind a manual review of the Phase 2.5 accuracy spot-check, so Phase 2
-> currently writes to `data/wikipedia/table_extractions.json`, not Postgres.
+> extraction + validation: `python -m app.wikipedia.extract`. Phase 4 upsert:
+> `python -m app.wikipedia.upsert` — the Phase 2.5 spot-check gate was reviewed
+> and cleared on 2026-09-02, and 8,738 rows across 37 brands are in
+> `wikipedia_engine_data`. Phase 5 matching: `co2_lookup.resolve_co2_from_wikipedia`.
+> Phase 2 still writes `data/wikipedia/table_extractions.json`; Phase 4 reads it.
 >
 > Supplements MASTER_PLAN_v7.md — does not
 > replace the catalogue as the primary CO2 source. This fills the CO2 gap for
@@ -458,51 +459,182 @@ well-formed, plausible, wrong rows that no mechanical check catches. So
 
 ## Phase 4 — Upsert into `WikipediaEngineData`
 
-Same batch-sorted-upsert pattern as `app/data/catalogues/ingest.py` (sort by
-unique-constraint columns before insert, to avoid Postgres deadlocks under
-concurrent writes).
+Implemented in `app/wikipedia/upsert.py` (the CLI + the batch sorted upsert)
+and `app/wikipedia/brand_check.py` (the brand cross-check). Same
+batch-sorted-upsert pattern as `app/data/catalogues/ingest.py` — sort by the
+unique-constraint columns before insert, retry once on a deadlock.
 
-**Schema:**
+Input is the Phase 2 extraction store, not the run report: it is keyed by table
+fingerprint and carries the wikitext and source URL. Tables whose variants all
+returned null CO2 are absent from it by design and are correctly absent here
+too — a row with no CO2 gives Phase 5 nothing.
+
+**Schema** (as planned, plus four columns the run made necessary):
 ```
-brand, model_article_title, engine_code, production_start, production_end,
-displacement_cc, power_kw, fuel_type, co2_min, co2_max,
-source_url, source_wikitext_snippet
+brand, crawl_brand, brand_check, model_article_title, heading_context,
+engine_code, production_start, production_end, displacement_cc, power_kw,
+fuel_type, co2_min, co2_max, source_order_corrected,
+source_url, source_wikitext_snippet, source_fingerprint, variant_index
 ```
-**Unique constraint:** `(brand, model_article_title, engine_code, production_start)`
+
+### Three amendments made against the real data
+
+1. **The unique constraint is `(source_fingerprint, variant_index)`**, not the
+   planned `(brand, model_article_title, engine_code, production_start)`. That
+   key collapses 757 of 8,895 rows and 409 of the collapsed groups carry
+   genuinely different CO2. It is not fixable by adding spec columns: the
+   Phase 2 schema has no gearbox or drivetrain field, so a table's
+   "2.0 TDI · 103 kW · manual · 153 g" and "…automatic · 159 g" rows are
+   identical on every column the planned key could use (adding power_kw,
+   displacement_cc *and* fuel_type still collapses 313 rows, 98 conflicting).
+   Keying on provenance keeps every distinct measurement, stays idempotent
+   (the fingerprint is a content hash), and still converges two brands that
+   crawled the same article onto one row.
+
+2. **`brand` is cross-checked, not taken from the crawl.** The crawl files an
+   article under whichever brand article linked to it, and brand articles link
+   to other marques' rebadges — 28 Opel Zafira variants under Subaru (the
+   Traviq), Lexus ES/GS/IS under Toyota, Dacia Logan and Renault Symbol under
+   Nissan, a four-marque `Eurovan (PSA/Fiat)` under Peugeot. `brand_check.py`
+   reads the longest marque prefix of the article title through the existing
+   `catalogue/brands.py` vocabulary and returns one of three verdicts:
+   CONFIRMED (589/599 article pairs), REFILED (6 — the row moves to the marque
+   the title names, which is how Lexus became a brand in this table), or
+   UNVERIFIED (2 — no recognisable marque, held out of every pool and queued
+   for review). `crawl_brand` is kept alongside so a re-filing is auditable.
+
+3. **`co2_min > co2_max` is swapped at upsert and flagged** — unless the swap
+   is not believable. The correction runs *before* validation so a row whose
+   only defect was the ordering becomes eligible, and `source_order_corrected`
+   records that it happened. 48 rows in the first run.
+
+   The 49th is the reason for `WIDE_CORRECTED_RANGE_G_KM`. `Audi A3 8V` /
+   `30 g-tron` has wikitext that literally reads **`114–12 g/km`** — a dropped
+   digit on 124 in the German Wikipedia source, sitting between neighbours
+   reading 129–150 and 144–159. Extraction was faithful; the *source* is wrong.
+   Swapping does not recover a range there, it manufactures a plausible-looking
+   12–114 out of a typo, and 12 g/km matches neither the car's CNG (~88–99) nor
+   its petrol (~115–120) mode. So the rule is: **a cell that needs swapping AND
+   yields an implausibly wide range is a corrupt cell, not a backwards range**
+   — the correction is refused and the row goes to review. The threshold sits
+   in an empty band: every legitimate correction is ≤28 g/km, the outlier is
+   102. Note that width alone is *not* an error signal — plenty of untouched
+   rows legitimately span a model's whole production era (VW Sharan I 2.8 VR6,
+   283–326) — it is only suspicious in combination with needing a swap.
+
+4. **`prune_review_rows` deletes rows the table holds that a later run rules
+   ineligible.** An upsert only inserts and updates, so without this a row that
+   was eligible on an earlier run would sit in the table indefinitely carrying
+   stale values — which is exactly what happened to the g-tron row when the
+   rule above was added. Scoped to the review queue's own keys, never
+   "everything not eligible", so a `--brand`-filtered run cannot delete other
+   brands' rows.
+
+**First run:** 8,738 rows across 37 brands; review queue 40 (18 Phase 3
+validation failures — all unparseable `production_end` strings like `04/2024`
+and `2011/2013`; 20 rows held for an unverifiable brand; 1 implausible
+correction; 1 Phase 2.5 tripwire table). Nothing in the review queue is
+upserted.
 
 ---
 
 ## Phase 5 — Matching function
 
-`resolve_co2_from_wikipedia(brand, model, fuel, power_kw, date) -> {co2_min,
-co2_max, source_url} | None`
+Implemented in `app/wikipedia/co2_lookup.py`.
 
-This is a **new, separate matching subsystem** from `catalogue/matching.py` — same
-general shape (fuzzy filter → score → accept/reject policy) but different
-disambiguators, since Wikipedia rows are keyed by engine spec, not by variant text.
-Do not reuse `catalogue/matching.py`'s tuning constants as-is; they were tuned for
-a different data shape (customs variant text vs. engine-spec numeric matching).
+```python
+resolve_co2_from_wikipedia(brand, model, fuel, power_kw, date, *,
+                           displacement_cc=None, session=None)
+    -> WikipediaCo2Estimate | None
+```
 
-**Required before this phase is built, not left implicit** (per your own
-CLAUDE.md's warning that a wrong auto-picked value "silently corrupts the whole
-tax result"):
-- Explicit disambiguator list and priority order (likely: brand exact match
-  (hard filter) → production date range contains vehicle's registration date
-  (hard filter) → power_kw proximity → displacement_cc proximity → fuel_type
-  match)
-- Explicit `ACCEPT_SCORE` / `ACCEPT_MARGIN`-equivalent constants, with the same
-  "confirm unless certain" policy: return null result (not a guess) when no
-  candidate is clearly best
-- Return the CO2 **range**, never collapse to a point value, and always attach
-  `source_url` so the UI hint can link back to the Wikipedia article
+Split the same way `catalogue/matching.py` is: `rank_candidates()` is pure and
+DB-free (unit-tested), `resolve_co2_from_wikipedia()` is the thin async layer.
+It takes an optional `session`, so calling it live on a catalogue-match miss
+later needs no restructuring. It shares **no tuning constants** with the
+catalogue matcher — different evidence (exact engine numbers vs. free-text
+variant blobs) needs different arithmetic.
 
-**Design as a standalone, directly-callable function** (not tightly coupled to
-the batch ingestion script) — this keeps the door open to later calling it live
-on a catalogue-match cache-miss, without a rebuild, per the earlier discussion
-of batch-now/live-later architecture. Not required for this build, just don't
-architect it in a way that forecloses it.
+**Hard filters** (drop, never score): cross-checked brand equality and
+`brand_check != unverified` → production period contains the registration date
+→ fuel not contradicted → power within `POWER_DROP_KW` → model text above
+`MODEL_FLOOR` → the row actually has a CO2 value.
 
----
+**Score, 100 points:** model text 50 (`token_set_ratio` over article title +
+engine code, brand prefix stripped) · power proximity 30 · displacement 12 ·
+fuel 8. Minus `DESIGNATOR_MISMATCH_PENALTY` 25 when the candidate names a
+different model line.
+
+**Accept:** top ≥ `ACCEPT_SCORE` 80, everything within `ACCEPT_MARGIN` 5
+merged into one range, refused if that range exceeds `MAX_ACCEPT_RANGE_G_KM`
+30 or spans more than one article.
+
+### Design points that cost a real wrong answer to find
+
+- **Near-ties are merged, not chosen between — but only within one article.**
+  Merging is right for a range-valued answer (the tied rows are usually the
+  same engine under NEDC and WLTP), and it is the reason this matcher does not
+  copy the catalogue's "reject when candidates disagree" rule. Across articles
+  it is catastrophic: `BMW X3 xDrive20d, 140 kW` ties F39 (an X2), F25 (the
+  X3), F26 (an X4) and G02 at 80.9–82.0, because BMW's whole X range shares
+  the badge and the power and de.wikipedia titles those articles by chassis
+  code. Unmerged they are ambiguity; merged they were a confident-looking
+  121–149 g/km that described none of the four cars.
+- **A model-designator guard is required.** `token_set_ratio` cannot see the
+  difference between "A4" and "A5" or "C 220 d" and "E 220 d" and scored them
+  within a point of each other. The penalty is sized so `100 - penalty <
+  ACCEPT_SCORE`: a designator conflict makes auto-acceptance arithmetically
+  impossible while still leaving the row visible as a candidate. It fires only
+  on designators the candidate pool actually uses — "X3" appears nowhere in
+  BMW's chassis-code-titled pool, and convicting every BMW row of
+  not-being-an-X3 would reject the brand on a token the corpus has no opinion
+  about.
+- **Period grace is asymmetric** (3 months before start, 18 after end).
+  Registering a car after production ended is ordinary; before it started is
+  not. Symmetric 12/12 pulled a facelift row into a pre-facelift car's answer.
+- **Strip the marque prefix by the title's own spelling, not the canonical
+  brand's.** de.wikipedia writes "VW Golf VII"; stripping "volkswagen" leaves
+  "vw" in every haystack, which diluted a real query's ratio from 86 to 77 and
+  pushed correct answers under the accept threshold.
+
+### Measured behaviour
+
+Back-tested against 1,200 random catalogue rows, which carry a known CO2:
+**38.8% answered, 61.2% null.** Of the answered, **57% contain the catalogue's
+true value**; miss distance p50 6 g/km, p90 20 g/km, and only 0.5% of all rows
+miss by more than 25.
+
+Containment by score band is what sets `ACCEPT_SCORE`:
+
+| band | n | contains | p90 miss |
+|---|---|---|---|
+| 85–90 | 244 | 45% | 21 |
+| 80–85 | 524 | **63%** | 21 |
+| 75–80 | 207 | 43% | 17 |
+| 70–75 | 140 | **21%** | 39 |
+| 65–70 | 100 | 26% | 63 |
+
+Quality falls off a cliff below 75 — both containment and the tail of the miss
+distribution — so 80 is where the threshold belongs.
+
+**Do not read 57% as an error rate.** Most misses are the correct model and
+engine with a different measurement basis: Wikipedia states the German base
+variant, the catalogue states a specific Croatian-market trim. That gap is
+precisely why §0 forbids this tier from ever auto-filling `co2_g_km`; it is a
+"check your COC" hint, and it is presented as a range for the same reason.
+
+### Known coverage gaps (fail to null, never to a wrong answer)
+
+- **BMW X-range and other chassis-code-titled models.** The corpus titles them
+  "BMW G01"/"F25", a listing says "X3", and no shared token exists. Queries
+  that supply the badge instead ("320d", "C 220 d", "xDrive20d" with enough
+  other signal) work fine.
+- **Audi B9-generation diesels**, whose `engine_code` is an internal code
+  ("DEUA") rather than "2.0 TDI", leaving nothing for the text to match.
+- **Trim-heavy query text.** Croatian dealer wording ("Comfortline",
+  "Limuzina", "Dynamique") costs ~10 points and can push a correctly-ranked
+  top candidate under the threshold. Callers should pass the model plus the
+  engine designation, not the whole variant blob — see the function docstring.
 
 ## Estimated time & cost
 
