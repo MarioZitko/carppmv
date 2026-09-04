@@ -71,12 +71,45 @@ export interface WikipediaEngineRow {
   source_url: string;
 }
 
+/** One de.wikipedia article, as the picker's first screen lists it.
+ *
+ * Carries recognition aids rather than just a title, because these articles are
+ * named by chassis code — "BMW G20", "Mercedes-Benz Baureihe 205" — and nobody
+ * reads a logbook and thinks "G20". The years and the engine badges inside the
+ * generation are what a person matches their own car against. */
+export interface WikipediaModelRow {
+  model_article_title: string;
+  variant_count: number;
+  production_start: string | null;
+  /** Null means "still in production" as often as "unknown". */
+  production_end: string | null;
+  sample_engine_codes: string[];
+  co2_min: number | null;
+  co2_max: number | null;
+  source_url: string;
+}
+
+export interface WikipediaModelListResponse {
+  brand: string;
+  brand_known: boolean;
+  /** Ranked, never filtered — the case this screen exists for is the one where
+   * matching got it wrong, so every model stays reachable. */
+  models: WikipediaModelRow[];
+  ignored_terms: string[];
+}
+
 export interface WikipediaEngineSearchResponse {
   brand: string;
   /** False when the marque isn't in the corpus at all — different from "brand
    * exists but this query matched nothing", and worth saying differently. */
   brand_known: boolean;
   rows: WikipediaEngineRow[];
+  /** Query words no returned row matched. The backend ignores a word the
+   * corpus has never heard of rather than returning nothing, so this is how
+   * the user learns which part of what they typed went unanswered — the
+   * difference between "these are your engine's rows" and "these are the
+   * closest thing we hold, and we dropped the bit that said GT". */
+  ignored_terms: string[];
 }
 
 export interface CalculateResponse {

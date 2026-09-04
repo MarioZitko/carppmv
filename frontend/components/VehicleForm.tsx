@@ -124,40 +124,37 @@ export function VehicleForm({ values, onChange, co2Hint, co2Lookup }: Props) {
 
 				<div>
 					<label className={label} htmlFor="vf-co2">CO2 (g/km)</label>
-					<input
-						id="vf-co2"
-						className={co2Missing && touched.co2 ? errInput : input}
-						type="number"
-						min="0"
-						step="1"
-						value={values.fuelType === "electric" ? "0" : values.co2}
-						onChange={(e) => onChange({ co2: e.target.value })}
-						onBlur={() => markTouched("co2")}
-						disabled={values.fuelType === "electric"}
-					/>
-					{values.fuelType !== "electric" && (
-						<>
+					{/* `relative` is what lets the Wikipedia hint live inside the
+					    field and open its detail as an overlay. Both are outside
+					    the layout flow, so this cell stays exactly as tall as the
+					    CIJENA and VRSTA GORIVA cells beside it and the date row
+					    below never moves — which the old block-below-the-input
+					    version could not manage. */}
+					<div className="relative">
+						<input
+							id="vf-co2"
+							className={`${co2Missing && touched.co2 ? errInput : input} ${
+								values.fuelType !== "electric" && (shownHint || co2Lookup)
+									? "pr-28"
+									: ""
+							}`}
+							type="number"
+							min="0"
+							step="1"
+							value={values.fuelType === "electric" ? "0" : values.co2}
+							onChange={(e) => onChange({ co2: e.target.value })}
+							onBlur={() => markTouched("co2")}
+							disabled={values.fuelType === "electric"}
+						/>
+						{values.fuelType !== "electric" && (
 							<Co2HintNote
 								hint={shownHint}
 								engineCode={picked?.engine_code}
 								onBrowse={co2Lookup ? () => setPickerOpen(true) : undefined}
+								midpointApplied={!!picked && formatCo2(picked).includes("–")}
 							/>
-							{!shownHint && co2Lookup && (
-								<button
-									type="button"
-									onClick={() => setPickerOpen(true)}
-									className="mt-1.5 text-xs text-[var(--primary)] hover:underline"
-								>
-									Odaberi motor (Wikipedia CO2)
-								</button>
-							)}
-							{picked && formatCo2(picked).includes("–") && (
-								<p className="mt-1 text-xs text-[var(--text-soft)]">
-									Upisana je sredina raspona — prilagodite ako znate točnu vrijednost.
-								</p>
-							)}
-						</>
-					)}
+						)}
+					</div>
 				</div>
 
 				<div>
@@ -236,6 +233,7 @@ export function VehicleForm({ values, onChange, co2Hint, co2Lookup }: Props) {
 					onSelect={selectEngine}
 					brand={co2Lookup.brand}
 					initialQuery={co2Lookup.query}
+					registered={values.regDate || null}
 				/>
 			)}
 		</div>

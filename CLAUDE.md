@@ -363,6 +363,69 @@ introduced to stop. Two are easy to break by "simplifying":
   designators the candidate pool actually uses, because BMW's X-range articles
   are titled by chassis code and "X3" appears nowhere in them.
 
+**The picker (`app/wikipedia/browse.py`, `GET /wikipedia/models` +
+`GET /wikipedia/engines`) is a different job from Phase 5 and shares only
+`normalize_text` with it.** Phase 5 asks "which engine is this vehicle?" and
+declines when unsure; this asks "what does Wikipedia have for this car at all?"
+and is deliberately permissive — the person reading the list decides, so there
+is no accept threshold, no auto-pick and no score in the response.
+
+**It is a two-step drill-down — model, then engine — and that shape is the
+point.** Free-text matching over a listing blob cannot always be trusted to
+have found the right car, and *nothing in its result says when it hasn't*: a
+3-series Gran Turismo has no article in the corpus, so the closest honest answer
+is a different body of the same era, offered with no visible difference from a
+correct one. Ranking harder cannot fix that; only the person holding the logbook
+can. So `GET /models` groups the brand's rows by article and lets them choose,
+and `GET /engines?article=...` then filters *exactly* to that choice. What is
+left for free text — telling engines apart inside one generation — is the job
+the corpus does reliably. Three properties are load-bearing:
+
+- **The model list ranks but never filters** (`group_models` appends the
+  unmatched remainder). The engine list may filter, because by then the user has
+  told us the generation. Filtering the model list would strand the Gran Turismo
+  user on one confidently wrong option.
+- **`article` is an exact filter, not a ranking hint**, and it outranks the date
+  scope. It carries an explicit human choice; a fuzzy reading of that would be
+  worse than none.
+- **Model rows carry recognition aids, not just titles.** de.wikipedia names
+  these articles by chassis code ("BMW G20", "Mercedes-Benz Baureihe 205") and
+  nobody reads a logbook and thinks "G20", so a row shows the production years
+  and the shortest distinct engine badges inside it.
+
+Underneath both steps, three ranking rules, each fixing a measured regression:
+
+- **Best-coverage ranking, not all-or-nothing.** The first version dropped a
+  row as soon as any query token matched nothing, which was fatal for the
+  listing text this endpoint is actually given: `320d xDrive GT
+  Sport-Automatic "Sport Line"` and `Golf 1.6 TDI Comfortline DSG` both
+  returned zero rows while `320d` returned fourteen. Rows are now tiered by how
+  many query tokens they match, and a word the corpus has never heard of is
+  ignored rather than fatal. Growing `QUERY_NOISE_TOKENS` is not the fix — the
+  tail of trim names is unbounded, and that vocabulary is shared with
+  `calculate/router.py::_wikipedia_model_text`.
+- **`ignored_terms` is load-bearing, not decoration.** Because ranking now
+  always returns something, a row can be offered for a car the corpus does not
+  hold. The 3-series Gran Turismo is the standing case: there is no F34 article
+  at all, so "GT" matches nothing and what comes back is a different body of
+  the same era. Reporting the dropped word is the only thing that makes that
+  visible.
+- **`registered` scopes the pool *before* ranking, never after.** A 2016 "320d
+  xDrive" query ranked first and filtered second returns nothing, because the
+  only xDrive rows in the corpus are a 2019+ G20; scoped first it settles for
+  "320d" and returns the correct-era F30. An over-narrow date is abandoned
+  rather than obeyed — a mistyped year costs relevance, never the whole list.
+  The UI also makes the scope visible and switchable (the year chip in
+  `Co2EnginesModal`), because a silently narrowed model list rebuilds the same
+  trap: a user whose parsed date is a year out would see their car missing with
+  nothing saying why.
+
+IDF weighting inside a tier is computed over the *current* pool, which is
+deliberate (it answers which typed word discriminates among the rows being
+shown) and bounded: the tier is picked by matched-token count before any weight
+applies, so a row matching two tokens can never be displaced by one matching a
+single rare token.
+
 Measured against 500 random catalogue rows with known CO2 (re-run 2026-09-02,
 passing model+variant as the query text): **36.2% answered, 55.2% of those
 containing the true value** — i.e. roughly one in five vehicles gets an answer
@@ -446,7 +509,26 @@ subsystems configured.
 Next.js app. `components/` holds the UI the calculator is actually built
 from — `CandidatesList` (catalogue picker + score badges), `VehicleForm`
 (the manual-entry fields), `Co2HintNote` (the Wikipedia range, styled to
-read as provisional rather than confident) and `ParsedFieldsCard`.
+read as provisional rather than confident), `Co2EnginesModal` (the engine
+picker, and the only modal in the app — its overlay/Escape/positioning are
+bespoke and inlined, there is no shared `Modal` to reuse) and
+`ParsedFieldsCard`.
+
+`Co2EnginesModal` is a two-step drill-down with a breadcrumb header — model
+list, then that model's engines. The brand crumb is a real button, not a label:
+on a phone it is the only way back to step one, and leaving that to the
+browser's back gesture (which closes the page, not the step) turns a two-step
+modal into a trap.
+
+`Co2HintNote` renders **inside** the CO2 field: a muted chip in the input's
+trailing edge, and an absolutely-positioned popover for the detail. Both are
+outside the layout flow on purpose. An earlier version was a block below the
+input, and because that input is one cell of a three-column grid, the block
+stretched the whole row and pushed the date fields down the page. Anything
+added here has to stay out of flow or the grid rhythm breaks again. The two
+actions inside it are deliberately unalike — "Promijeni motor" is a filled
+in-app control, the source link is muted with an external-link glyph — because
+as two identical lines of blue text they were indistinguishable.
 `app/page.tsx` is the PPMV calculator (the live product);
 `app/profitability/page.tsx` is a shell with no backend yet
 (`app/profitability/` on the backend is an empty stub — deferred, not

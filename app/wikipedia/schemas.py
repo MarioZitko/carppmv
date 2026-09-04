@@ -33,3 +33,42 @@ class WikipediaEngineSearchResponse(BaseModel):
     #: from "brand exists, this query matched nothing", and worth telling apart.
     brand_known: bool
     rows: list[WikipediaEngineRow]
+    #: Query words no returned row matched. The search deliberately ignores a
+    #: word the corpus has never heard of rather than returning nothing, so
+    #: this is how the caller learns which part of what they typed went
+    #: unanswered — and it is the only thing standing between a user and
+    #: quietly accepting a row for a body variant we do not actually hold
+    #: (a 3-series "GT" being the standing example). Empty on a clean match.
+    ignored_terms: list[str] = []
+
+
+class WikipediaModelRow(BaseModel):
+    """One de.wikipedia article, as the picker's first screen lists it.
+
+    Carries the recognition aids rather than just the title, because these
+    articles are named by chassis code — "BMW G20", "Mercedes-Benz Baureihe
+    205" — and almost nobody reads a logbook and thinks "G20". The years and
+    the engine badges inside the generation are what a person actually matches
+    their own car against.
+    """
+
+    model_article_title: str
+    #: How many engine variants sit inside, so a one-variant stub is visibly
+    #: different from a full generation.
+    variant_count: int
+    production_start: str | None
+    #: None also means "still in production", not only "unknown" — a generation
+    #: with a current variant has no end, and showing its newest stated end
+    #: would read as discontinued.
+    production_end: str | None
+    sample_engine_codes: list[str]
+    co2_min: float | None
+    co2_max: float | None
+    source_url: str
+
+
+class WikipediaModelListResponse(BaseModel):
+    brand: str
+    brand_known: bool
+    models: list[WikipediaModelRow]
+    ignored_terms: list[str] = []

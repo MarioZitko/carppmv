@@ -1,4 +1,4 @@
-import { ApiError, CalculateResponse, CatalogueSearchResponse, PPMVRequest, PPMVResponse, WikipediaEngineSearchResponse } from "./types";
+import { ApiError, CalculateResponse, CatalogueSearchResponse, PPMVRequest, PPMVResponse, WikipediaEngineSearchResponse, WikipediaModelListResponse } from "./types";
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
 
@@ -100,13 +100,36 @@ export function searchCatalogue(params: {
  * narrowed by free-text model/engine designation. Backs the engine picker,
  * which is how a user resolves ties the matcher can't (an Audi A2 "1.4" at
  * 55 kW is both a 142 g/km petrol and a 116 g/km diesel). */
+/** GET /wikipedia/models — the picker's first step: which generation is it? */
+export function searchWikipediaModels(params: {
+  brand: string;
+  q?: string;
+  registered?: string | null;
+}): Promise<WikipediaModelListResponse> {
+  const qs = new URLSearchParams();
+  qs.set("brand", params.brand);
+  if (params.q) qs.set("q", params.q);
+  if (params.registered) qs.set("registered", params.registered);
+  return request<WikipediaModelListResponse>(`/wikipedia/models?${qs.toString()}`, {
+    method: "GET",
+  });
+}
+
 export function searchWikipediaEngines(params: {
   brand: string;
   q?: string;
+  /** Exact model_article_title from the model step. */
+  article?: string | null;
+  /** ISO date. Scopes the list to generations that could plausibly have been
+   * registered then — the difference between offering a 2019 G20 and the
+   * 2016 F30 the listing is actually about. */
+  registered?: string | null;
 }): Promise<WikipediaEngineSearchResponse> {
   const qs = new URLSearchParams();
   qs.set("brand", params.brand);
   if (params.q) qs.set("q", params.q);
+  if (params.article) qs.set("article", params.article);
+  if (params.registered) qs.set("registered", params.registered);
   return request<WikipediaEngineSearchResponse>(`/wikipedia/engines?${qs.toString()}`, {
     method: "GET",
   });
