@@ -111,6 +111,11 @@ export function CarVerticalCard({ vin }: { vin?: string | null }) {
 					Provjeri povijest vozila →
 				</a>
 			</div>
+			<p className="mt-3 text-xs text-[var(--text-soft)]">
+				Kalkulator uvoza koristi partnerski (affiliate) link prema
+				carVertical — ako kliknete i kupite provjeru, možemo dobiti
+				proviziju.
+			</p>
 		</div>
 	);
 }

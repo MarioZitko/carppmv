@@ -112,9 +112,24 @@ export default function RootLayout({
 				<footer className="border-t border-[var(--border)] mt-16">
 					<div className="mx-auto max-w-6xl px-4 sm:px-6 py-6 space-y-4">
 						<div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 text-xs text-[var(--text-soft)]">
-							<p>
-								Ovo je procjena — uvijek provjerite konačan iznos u službenom
-								carinskom rješenju.
+							<p className="flex flex-wrap items-center gap-x-1">
+								<span>
+									Ovo je procjena — uvijek provjerite konačan iznos u
+									službenom carinskom rješenju.
+								</span>
+								<Link
+									href="/privatnost"
+									className="underline hover:text-[var(--text)] transition-colors"
+								>
+									Privatnost
+								</Link>
+								<span aria-hidden="true">·</span>
+								<Link
+									href="/kolacici"
+									className="underline hover:text-[var(--text)] transition-colors"
+								>
+									Kolačići
+								</Link>
 							</p>
 							<p>
 								Izradio{" "}

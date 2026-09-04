@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { UrlInputForm } from "@/components/UrlInputForm";
 import { CatalogueSearchForm } from "@/components/CatalogueSearchForm";
 import { CandidatesList } from "@/components/CandidatesList";
@@ -10,6 +11,7 @@ import { MobilePriceBar } from "@/components/MobilePriceBar";
 import { PPMVBreakdownCard } from "@/components/PPMVBreakdownCard";
 import { CarVerticalCard } from "@/components/CarVerticalCard";
 import { ParsedFieldsCard } from "@/components/ParsedFieldsCard";
+import { FaqList, FaqSchema, type FaqItem } from "@/components/Faq";
 import { ApiTimeoutError, calculateFromUrl, calculateFromSpecs } from "@/lib/api";
 import { normalizeUrl } from "@/lib/format";
 import { guessFuelType, toIsoDate, todayIso } from "@/lib/fuel";
@@ -75,6 +77,60 @@ function describePpmvError(err: unknown): string {
 	}
 	return "Izračun trenutno nije dostupan — pokušajte ponovno za trenutak.";
 }
+
+const FAQ_ITEMS: FaqItem[] = [
+	{
+		question: "Što je PPMV?",
+		answer:
+			"Posebni porez na motorna vozila (PPMV) plaća se pri prvoj registraciji vozila u Hrvatskoj. Iznos ovisi o vrijednosti vozila (VN/PC komponenta) i njegovim CO2 emisijama (ON/EN komponenta), uz umanjenje za starost vozila prema propisanoj tablici amortizacije.",
+	},
+	{
+		question: "Trebam li platiti PPMV ako uvozim vozilo iz EU?",
+		answer:
+			"Da. PPMV je nacionalni porez na registraciju vozila i plaća se bez obzira odakle vozilo dolazi — iz EU ili izvan nje. Carinska pristojba i PDV su druga priča: te se stavke naplaćuju samo pri uvozu iz zemalja izvan EU, budući da unutar jedinstvenog tržišta EU nema carine.",
+	},
+	{
+		question: "Odakle da znam CO2 vrijednost svog vozila?",
+		answer:
+			"Najpouzdaniji izvor je COC dokument (Certificate of Conformity) vozila. Kad zalijepite link oglasa, kalkulator prvo pokuša pročitati CO2 izravno s oglasa; ako ga nema, pretražuje internu bazu službenih cjenika Carinske uprave po marki, modelu i izvedbi. Kad ni to ne uspije, nudi orijentacijski raspon prikupljen s Wikipedije — to je samo smjernica za usporedbu s COC dokumentom, nikad se automatski ne koristi u samom izračunu.",
+	},
+	{
+		question: "Je li ovo službeni izračun?",
+		answer:
+			"Ne. Ovo je procjena temeljena na javno dostupnim propisima (Uredbi o načinu izračuna PPMV-a, NN 156/22, i Pravilniku o posebnom porezu na motorna vozila) — nije službeno porezno mišljenje. Za konačan, obvezujući iznos obratite se Carinskoj upravi.",
+	},
+	{
+		question: "Koja je razlika između NEDC i WLTP mjerenja CO2?",
+		answer: (
+			<>
+				Riječ je o dva različita ciklusa mjerenja potrošnje i emisija — primjenjuju se
+				različite porezne tablice ovisno o tome je li vozilo prvi put registrirano prije
+				ili poslije 1.1.2021. Puno objašnjenje s primjerima pročitajte na stranici{" "}
+				<Link href="/nedc-vs-wltp" className="font-medium text-[var(--primary)] hover:underline">
+					NEDC vs. WLTP
+				</Link>
+				.
+			</>
+		),
+		answerText:
+			"Riječ je o dva različita ciklusa mjerenja potrošnje i emisija — primjenjuju se različite porezne tablice ovisno o tome je li vozilo prvi put registrirano prije ili poslije 1.1.2021.",
+	},
+	{
+		question: "S kojih stranica kalkulator može pročitati oglas?",
+		answer:
+			"Podržani su mobile.de, AutoScout24, njuškalo i autobid.de. Zalijepite link oglasa i kalkulator će pokušati pročitati marku, model, cijenu, CO2 i ostale podatke izravno s oglasa.",
+	},
+	{
+		question: "Što ako link oglasa ne radi ili nešto ne uspije pročitati?",
+		answer:
+			"Podatke uvijek možete unijeti ručno — ispod obrasca za link nalazi se i opcija pretrage naše baze vozila, a polja za cijenu, CO2, datum registracije i ostalo možete i sami popuniti ili ispraviti u bilo kojem trenutku.",
+	},
+	{
+		question: "Postoji li olakšica za električna, plug-in hibridna ili vozila s više sjedala?",
+		answer:
+			"Da. Električna vozila u potpunosti su oslobođena PPMV-a. Plug-in hibridi dobivaju umanjenje prema dometu vožnje na struju (EAER city), vozila s 8 sjedala plaćaju polovicu, a s 9 i više sjedala četvrtinu iznosa. Kamperi imaju zasebno umanjenje. Sve se primjenjuje automatski kad unesete relevantne podatke.",
+	},
+];
 
 export default function Home() {
 	const [mode, setMode] = useState<EntryMode>("link");
@@ -381,12 +437,72 @@ export default function Home() {
 						updating={ppmvLoading}
 						hint={ppmvHint ?? "Popunite podatke o vozilu za izračun PPMV-a."}
 					/>
+					<p className="text-xs text-[var(--text-soft)] px-1">
+						Ovo je procjena temeljena na javno dostupnim propisima, nije
+						službeno porezno mišljenje. Za konačan iznos obratite se
+						Carinskoj upravi.
+					</p>
 				</div>
 			</div>
 
 			<div className="mt-4">
 				<CarVerticalCard vin={urlResult?.parsed.vin} />
 			</div>
+
+			<section className="mt-12 max-w-3xl space-y-3">
+				<h2 className="text-lg font-semibold text-[var(--text)]">Kako radi</h2>
+				<div className="space-y-3 text-sm leading-relaxed text-[var(--text-soft)]">
+					<p>
+						PPMV (posebni porez na motorna vozila) plaća se pri prvoj registraciji
+						vozila u Hrvatskoj, a iznos ovisi o dvije stvari: vrijednosti vozila i
+						njegovim CO2 emisijama. Kalkulator te dvije komponente izračunava prema
+						službenim tablicama iz Uredbe (NN 156/22) i Pravilnika, uz umanjenje za
+						starost vozila prema propisanoj tablici amortizacije.
+					</p>
+					<p>
+						Zalijepite link oglasa i kalkulator sam pokuša pročitati cijenu, CO2,
+						datum prve registracije i ostale podatke potrebne za izračun. Kad nešto
+						nedostaje — najčešće CO2 — dopunjava ga iz interne baze službenih
+						cjenika Carinske uprave ili nudi orijentacijski raspon iz Wikipedije, a
+						sve što nije pouzdano pročitano uvijek možete ručno provjeriti i
+						ispraviti prije nego pogledate rezultat.
+					</p>
+					<p>
+						Rezultat je procjena, ne službeno porezno rješenje. Detaljno objašnjenje
+						cijele formule, s izvorima i primjerom pravog izračuna, pročitajte na{" "}
+						<Link
+							href="/kako-se-izracunava-ppmv"
+							className="font-medium text-[var(--primary)] hover:underline"
+						>
+							stranici Kako se izračunava PPMV
+						</Link>{" "}
+						ili na{" "}
+						<Link
+							href="/o-kalkulatoru"
+							className="font-medium text-[var(--primary)] hover:underline"
+						>
+							stranici O kalkulatoru
+						</Link>
+						.
+					</p>
+				</div>
+			</section>
+
+			<section className="mt-10 max-w-3xl space-y-3">
+				<h2 className="text-lg font-semibold text-[var(--text)]">Najčešća pitanja</h2>
+				<FaqList items={FAQ_ITEMS} />
+				<p className="text-sm text-[var(--text-soft)]">
+					Više pitanja i odgovora na{" "}
+					<Link
+						href="/cesta-pitanja"
+						className="font-medium text-[var(--primary)] hover:underline"
+					>
+						stranici Česta pitanja
+					</Link>
+					.
+				</p>
+			</section>
+			<FaqSchema items={FAQ_ITEMS} />
 
 			<MobilePriceBar
 				result={ppmvResult}
