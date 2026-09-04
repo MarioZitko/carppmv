@@ -646,3 +646,70 @@ def test_bmw_banner_variant_keeps_price_distinguishing_fullname():
 def test_ingest_cli_smoke():
     """Full round-trip: LLM → apply_mapping → DB insert. Requires real env."""
     pytest.skip("Integration: needs OPENROUTER_API_KEY + running DB")
+
+
+# ===========================================================================
+# Currency resolution: header -> euro-adoption date -> the LLM's guess
+# The real regression: Mazda's price header ("MPC (s trošarinom)") names no
+# currency, so the mapping fell through to a guessed "HRK" and divided already-
+# euro prices by the kuna rate — 7,354 rows, a 50,142 EUR CX-5 stored as 6,655.
+# ===========================================================================
+
+# Deliberately currency-silent, like the real Mazda header.
+SILENT_HEADER = [
+    "MARKA", "MODEL", "GORIVO", "MPC (s trošarinom)", "VRIJEDI OD", "CO2 (g/km)",
+]
+SILENT_MAPPING = _mapping(
+    model_name_column="MODEL",
+    price_column="MPC (s trošarinom)",
+    price_currency="HRK",   # the LLM's guess — wrong for post-euro sheets
+    co2_column="CO2 (g/km)",
+)
+
+
+def _silent(*args) -> tuple:
+    return args + (None,) * (len(SILENT_HEADER) - len(args))
+
+
+def test_post_euro_date_overrides_a_guessed_hrk_currency():
+    rows = [_silent("Mazda", "CX-5", "D", 50142.57, date(2025, 3, 1), 173.0)]
+    r = apply_mapping(rows, SILENT_HEADER, SILENT_MAPPING, "mazda.xlsx", "CX5")[0]
+    assert r.price_source_currency == "EUR"
+    assert r.price_eur == 50142.57  # NOT 6655.06
+
+
+def test_pre_euro_date_leaves_the_mapped_currency_alone():
+    # Before 2023-01-01 the guess is the only signal there is, so it stands and
+    # the conversion still happens.
+    rows = [_silent("Mazda", "CX-5", "D", 376725.0, date(2017, 2, 1), 139.0)]
+    r = apply_mapping(rows, SILENT_HEADER, SILENT_MAPPING, "mazda.xlsx", "CX5")[0]
+    assert r.price_source_currency == "HRK"
+    assert r.price_eur == pytest.approx(
+        round(376725.0 / get_settings().hrk_to_eur_rate, 2), abs=0.01
+    )
+
+
+def test_explicit_kuna_header_still_wins_over_a_post_euro_date():
+    """Dual price display was mandatory 2022-09-05 to 2023-12-31, so a 2023
+    sheet may genuinely carry a kuna column — and when it does, its header says
+    so. The date must only break a tie the header left open."""
+    header = ["MARKA", "MODEL", "GORIVO", "cijena_kn", "VRIJEDI OD", "CO2 (g/km)"]
+    mapping = _mapping(
+        model_name_column="MODEL",
+        price_column="cijena_kn",
+        price_currency="EUR",
+        co2_column="CO2 (g/km)",
+    )
+    rows = [("Mazda", "CX-5", "D", 376725.0, date(2023, 6, 1), 139.0)]
+    r = apply_mapping(rows, header, mapping, "mazda.xlsx", "CX5")[0]
+    assert r.price_source_currency == "HRK"
+
+
+def test_euro_adoption_boundary_is_the_first_of_january_2023():
+    rows = [
+        _silent("Mazda", "CX-5", "D", 50000.0, date(2022, 12, 31), 173.0),
+        _silent("Mazda", "CX-5", "D", 50000.0, date(2023, 1, 1), 173.0),
+    ]
+    result = apply_mapping(rows, SILENT_HEADER, SILENT_MAPPING, "mazda.xlsx", "CX5")
+    assert result[0].price_source_currency == "HRK"
+    assert result[1].price_source_currency == "EUR"

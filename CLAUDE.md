@@ -200,6 +200,22 @@ inline comments in this file before touching any tuning constant
 (`ACCEPT_SCORE`, `POWER_TOLERANCE_KW`, etc.) — most encode a specific
 real-world regression that was fixed by that exact value.
 
+Fuel derivation (`_derive_fuel_family`) is shared by ingestion and by
+`/calculate`'s query-side scoring, so it is the highest-blast-radius function
+in this file. It reads three badge shapes: the trailing letter (`320d`/`320i`,
+multi-brand), the decimal displacement (`2.0i`/`2.2d`, multi-brand, matched on
+RAW text because `normalize_text` splits the period), and the leading letter
+(`G120`/`CD175`/`Skyactiv-X186`), which is **gated on `brand == "Mazda"` via an
+explicit `brand=` argument that defaults to None** — so a caller that doesn't
+know the brand is safe by construction. That gate is measured, not cautious:
+ungated, the leading-letter rule mislabels BMW rows (`(G20)` normalizes to a
+bare `g20` token) and Opel rows (`0UC98CD61` fragments into `0 uc98 cd61`).
+Mazda needs it because its price lists carry no fuel column at all — before
+the gate existed the whole brand, 11k rows, was dropped at ingest for a NULL
+`fuel_type`. Any change here should be replayed over the full catalogue (every
+row has a known `fuel_type`) and show zero contradictions before it lands; see
+`docs/INGEST_REWORK_PLAN.md` §10.3 result.
+
 `app/catalogue/brands.py` is the single source of truth for canonical
 brand spelling, shared by ingestion (fixing source typos like
 "Marcedes-Benz"), the autobid.de URL-slug parser, and matching's brand
@@ -223,12 +239,27 @@ group — some groups bundle several marques, see `FOLDER_BRANDS` in
   into `CanonicalRow`s; this is what both ingestion paths (the main
   pipeline and the one-off `scripts/ingest_catalogue.py`) share, and
   what `tests/test_apply_mapping.py` exercises without any LLM calls.
+- **Currency is read from the document first, the date second, the LLM last**
+  (`canonical_schema._resolve_price_currency`): price-column header text, then
+  a sub-header cell in that same column, then `valid_from >=
+  EURO_ADOPTION_DATE` (2023-01-01, Croatia's euro adoption), then
+  `ColumnMapping.price_currency`. The order is load-bearing in both
+  directions. Without the date tier the LLM guesses on currency-silent headers
+  and guessed HRK on 7,354 post-euro rows, dividing euro prices by 7.5345 a
+  second time (a 50,142 EUR CX-5 stored as 6,655). With the date tier placed
+  *above* the document, Opel's post-euro file of legacy MY21/MY22 kuna sheets
+  gets multiplied by 7.5345 instead. A post-euro file can still hold a
+  pre-euro price list, so the date may only break a tie the sheet itself left
+  open. `valid_from` is therefore resolved before the price is normalized.
 - `ingest.py` runs concurrently (`--concurrency`, default 24), caches
   LLM mappings per header layout (success *and* failure, so a bad layout
   isn't retried every file), sorts batch upserts by the unique-constraint
   columns before insert (Postgres deadlock avoidance under concurrent
-  writes), and filters bad rows individually rather than failing an
-  entire file's batch on one row.
+  writes), refreshes every *derived* column on conflict (price, CO2, currency,
+  fuel, power, CO2 standard, source file — never the identifying key columns),
+  so a corrected mapping actually reaches rows that already exist instead of
+  leaving them stale and self-contradictory, and filters bad rows individually
+  rather than failing an entire file's batch on one row.
 - Run with `python -m app.data.catalogues.ingest --brand <slug>
   --concurrency 24` (omit `--brand` for everything). Ingestion status is
   a property of the database, not of a doc — query per-brand row counts

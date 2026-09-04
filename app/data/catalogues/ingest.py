@@ -83,7 +83,7 @@ def _override_fuel_from_variant(
     has NO fuel column at all (mapped_fuel is None). Reuses matching's
     _derive_fuel_family so ingest and lookup share one multi-brand vocabulary.
     When the text yields nothing, keep whatever the mapping produced."""
-    derived = _derive_fuel_family(brand, model, variant)
+    derived = _derive_fuel_family(brand, model, variant, brand=brand)
     if derived is not None:
         return _DERIVED_FUEL_TO_DB[derived]
     return mapped_fuel
@@ -308,11 +308,25 @@ async def _upsert_rows(rows: list[dict]) -> int:
     for i in range(0, len(deduped), batch_size):
         batch = deduped[i:i + batch_size]
         stmt = pg_insert(Catalogue).values(batch)
+        # Every column here is DERIVED from ingest logic, so each one goes stale
+        # the moment that logic is corrected and the file is re-ingested. The
+        # set_ originally listed only price and CO2, which left the audit trail
+        # actively lying: after the currency fix (canonical_schema.
+        # _resolve_price_currency) re-ingested a row's price as EUR, its
+        # source_currency still read "HRK", i.e. the column that exists to
+        # explain how price_eur was derived contradicted it. The unique-key
+        # columns (brand/model/variant/valid_from) are deliberately absent —
+        # those identify the row rather than describe it.
         stmt = stmt.on_conflict_do_update(
             constraint="uq_catalogue_lookup_key",
             set_={
                 "price_eur": stmt.excluded.price_eur,
                 "co2_g_km": stmt.excluded.co2_g_km,
+                "source_currency": stmt.excluded.source_currency,
+                "fuel_type": stmt.excluded.fuel_type,
+                "power_kw": stmt.excluded.power_kw,
+                "co2_standard": stmt.excluded.co2_standard,
+                "source_file": stmt.excluded.source_file,
             },
         )
         # Sorting makes deadlocks rare, not impossible, under high concurrency —

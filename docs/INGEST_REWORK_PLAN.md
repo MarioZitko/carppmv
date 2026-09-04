@@ -471,6 +471,112 @@ committing.
 **Effort**: small code change, but needs careful cross-brand regression
 testing since `matching.py` fuel derivation is shared, high-blast-radius code.
 
+### 10.3 result (DONE, 2026-09-04)
+Mazda is live: **0 → 11,212 rows**, 44 brands in the catalogue (was 43). Code
+change only, no LLM calls — all 59 files' header layouts were already cached,
+so the re-ingest was $0 (`--brand mazda`, 59 succeeded / 0 failed).
+
+**The original diagnosis above was right about the mechanism and wrong about
+the shape**, which matters because a fix built to the description alone would
+have recovered a minority of the rows and looked like it worked. `"1.3i"` /
+`"2.0d"` is a real Mazda naming style but a small one; the dominant shape is
+the family letter *leading* the power figure — `Skyactiv-G120`, `CD175`,
+`e-Skyactiv-X186`, `G100` — plus `e-SKYACTIV PHEV` on the CX-60/CX-80.
+
+Three rules added in `matching.py`, in tiers:
+- `_SKYACTIV_{DIESEL,PETROL}_RE` — the family letter anchored to a `skyactiv`
+  token, in the *engine-word* tier (it is definitional, like TDI/TSI).
+- `_BADGE_PREFIX_{DIESEL,PETROL}_RE` — the bare leading-letter badge, badge
+  tier, **gated on brand == Mazda**.
+- `_BADGE_DECIMAL_{DIESEL,PETROL}_RE` — `2.0i`/`2.2d`, matched on RAW text
+  (normalize_text splits the period into an unanchorable one-digit run) and
+  multi-brand, with a `(?!-)` guard.
+- `"phev"` added to `_PETROL_ENGINE_WORDS`, agreeing with canonical_schema's
+  existing `PETROL_PLUG_IN_HYBRID -> FuelType.PETROL`.
+
+**The brand gate is a measured result, not caution.** §10.3 flagged the
+false-positive risk and it was real: replayed unrestricted over the 159,443
+rows already in the catalogue, the leading-letter rule mislabelled 47 in two
+classes that no tightening removes — BMW's chassis code normalizes to a bare
+`g20` token (every G20/G21 diesel read as petrol), and `normalize_text`
+fragments Opel's `0UC98CD61` into `0 uc98 cd61`, whose `cd61` read as diesel
+on a petrol Adam. The `(?!-)` guard came from the same run: Kia's petrol
+`1.4 D-CVVT` read as diesel and Honda's diesel `1.6 i-DTEC` read as petrol.
+
+Final regression over all 159,443 pre-existing rows: **0 derivations
+contradicting the stored fuel**, 483 rows (Land Rover 273, Jaguar 175,
+Infiniti 21, Kia 14) newly deriving a value that agrees with it. Fuel now
+resolves for **98.7%** of the Mazda corpus; the ~223 that don't are MX-30 EVs
+(correctly excluded — EVs are PPMV-exempt) and ~30 "Mazda2 Hybrid" rows
+("hybrid" alone is deliberately not in the vocabulary — it sits on diesel
+hybrids too). Locked in by four tests in `tests/test_matching.py`.
+
+**Two things this did NOT fix, both pre-existing classes:**
+- **Mazda's `model` column is the descriptive blob, not a model family** —
+  3,070 distinct values for 11,212 rows, e.g. `CX-60 2022 5WGN 2.5L e-SKYACTIV
+  PHEV 327ps 8AT AWD EXCLUSIVE-LINE CON-P PAN-P`, plus 594 rows where it is a
+  bare type code (`KDRPEAWCS7`). This is the same class as 10.2
+  (Jaguar/Land Rover) and makes `GET /catalogue/models?brand=Mazda` a poor
+  suggestion list, though fuzzy matching on variant text still works.
+- **411 rows have a paint colour as the model** (`Mazda3 Soul crvena
+  Crystal`) — the per-colour-sheet banner issue §5 already describes.
+- Related cascade, fixed separately or not at all: because `PHASE_0_BRANDS`
+  was derived from brands *present in the DB*, Mazda was never in
+  `BRAND_ARTICLES` either, so `wikipedia_engine_data` holds 0 Mazda rows. The
+  catalogue now covers Mazda, but the Wikipedia fallback tier still does not.
+
+### Currency resolution fix (DONE, 2026-09-04)
+Found while verifying 10.3 in the UI: a Mazda CX-5 listed at 50,142 EUR was
+stored as **6,655 EUR**. The value is not in the source file — it is
+`50142.5712 / 7.5345`, i.e. an already-euro price divided by the kuna rate.
+
+**Root cause.** `apply_mapping` resolved currency as
+`_detect_currency_from_header(price_column) or mapping.price_currency`. When
+the header names no currency — Mazda's is `MPC (s trošarinom)` — that falls
+through to the LLM's *guess*, and the model has nothing to read, so it guesses.
+It guessed HRK on **7,354 post-euro rows** across Mazda (5,634), Hyundai (611),
+Opel (585), Renault (356) and Dacia (168). Price is the base of the whole PPMV
+formula, so this understates the tax ~7.5x, confidently and with no warning.
+
+**Fix** (`canonical_schema._resolve_price_currency`), four tiers:
+header text → **sub-header cell in the same column** → **validity date
+(`EURO_ADOPTION_DATE`, 2023-01-01)** → the LLM's guess. `valid_from` is now
+resolved *before* the price is normalized, since it feeds the decision.
+
+**The tier order is the whole design, and the date is deliberately third.**
+A date-first rule looked right and is wrong: Opel's `OPEL 11.09.2023..xlsx` is
+a post-euro *file* holding legacy MY21/MY22 sheets whose real prices are in
+kuna (median raw 283,100 — as euro that would be a 283k Opel; as kuna it is a
+correct 37,573). Date-first would have multiplied every Opel price by 7.53
+while fixing Mazda. What saves it is that the evidence is in the document:
+Opel's price column carries a *sub-header* row reading `Preporucena cijena sa
+ukljucenim PDV-om KN`, which `_pick_header_index` never selected. Reading that
+row is the second tier, and it beats the date. An absolute magnitude threshold
+was considered and rejected — Land Rover's legitimate post-euro EUR median is
+112,435, too close to Opel's kuna figures to separate them safely.
+
+**Corpus-wide replay before re-ingesting** (all 7,477 mapped sheets):
+815 sheets flip HRK→EUR, every one with a plausible euro median (17k-37k);
+exactly **1** flips EUR→HRK (Opel's, landing at 36,435). Three Land Rover
+"-options" sheets also flip, but they are accessory lists with no CO2 column
+and produce zero catalogue rows either way.
+
+**Second defect found while verifying the first.** The re-ingest corrected
+prices but left `source_currency` reading "HRK" — the upsert's
+`on_conflict_do_update` set only `price_eur` and `co2_g_km`, so every other
+derived column goes stale on re-ingest and the audit column ended up
+contradicting the price it exists to explain. `set_` now also refreshes
+`source_currency`, `fuel_type`, `power_kw`, `co2_standard` and `source_file`;
+the unique-key columns stay out, since they identify the row rather than
+describe it.
+
+**Result** after re-ingesting the 8 affected brand folders (all cached
+mappings, $0): post-euro rows still tagged HRK **7,354 → 570**, and those 570
+are Opel's genuinely-kuna sheets at a correct 34,165 EUR average. Mazda's
+average price 14,543 → 40,907. Verified in the browser: the CX-5 row now reads
+50.142,57 EUR. Four tests in `tests/test_apply_mapping.py` cover the tier
+order, including the dual-display carve-out and the 2023-01-01 boundary.
+
 ### 10.4 Suzuki: 1 DB row despite 38 source files
 **Not confirmed as a bug yet** — at least the pre-2014 files genuinely lack
 a CO2 column in the sheet. Before writing any code:

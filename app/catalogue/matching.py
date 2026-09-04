@@ -269,6 +269,14 @@ _DIESEL_ENGINE_WORDS = frozenset({
 _PETROL_ENGINE_WORDS = frozenset({
     "tfsi", "tsi", "fsi", "tce", "thp", "puretech", "vti", "ecoboost",
     "gdi", "tgdi", "mpi", "benzin", "benzina", "gasoline",
+    # A plug-in hybrid's combustion half is petrol in every catalogue row that
+    # states one, and canonical_schema already collapses
+    # PETROL_PLUG_IN_HYBRID -> FuelType.PETROL, so this agrees with how the
+    # rest of the pipeline files these. It is the only fuel signal Mazda's
+    # CX-60/CX-80 "e-SKYACTIV PHEV" rows carry — 1,345 of them. Deliberately
+    # NOT "hybrid": that word sits on diesel hybrids too, and _fuel_from_engine
+    # _words would then have to guess rather than read.
+    "phev",
 })
 # BMW/Mercedes/Audi numeric badge whose trailing letter is the fuel code:
 # 320d/420d/120d → diesel, 320i/120i → petrol. Anchored to a digit run so it
@@ -279,39 +287,121 @@ _PETROL_ENGINE_WORDS = frozenset({
 _BADGE_DIESEL_RE = re.compile(r"\b\d{2,3}d\b")
 _BADGE_PETROL_RE = re.compile(r"\b\d{2,3}i\b")
 
+# Mazda's badge is the mirror image of the BMW shape above: the family letter
+# LEADS the power figure ("G120", "CD175", "D150", "X186") instead of trailing
+# the displacement code. G and X are petrol (Skyactiv-G, Skyactiv-X), D and CD
+# are diesel. Mazda price lists carry no fuel column at all, so this is the
+# only fuel signal those 59 files have — without it every Mazda row is dropped
+# at ingest for a NULL fuel_type, which is exactly what happened (0 rows in the
+# catalogue from 17,673 otherwise-complete rows).
+#
+# These two are applied ONLY when the brand is Mazda, and that restriction is
+# load-bearing rather than cautious. Replaying them unrestricted over the 159k
+# rows already in the catalogue mislabelled 47 of them, in two collision
+# classes that no amount of tightening removes:
+#   - BMW writes its chassis code the same way. "serije 3 Limuzina (G20)"
+#     normalizes to a bare "g20" token, so every G20/G21 diesel read as petrol.
+#   - normalize_text fragments long type codes into badge-shaped pieces:
+#     Opel's "0UC98CD61" becomes "0 uc98 cd61", and that "cd61" read as diesel
+#     on a petrol Adam.
+# The shape simply isn't brand-neutral the way a trailing "320d" is, so it is
+# gated instead of guessed.
+_BADGE_PREFIX_DIESEL_RE = re.compile(r"\b(?:cd|d)\d{2,3}\b")
+_BADGE_PREFIX_PETROL_RE = re.compile(r"\b[gx]\d{2,3}\b")
+
+# Displacement + fuel letter ("2.0i", "2.2d") — Mazda's pre-Skyactiv naming,
+# and a common older-European-price-list style generally. Matched against RAW
+# text, before normalize_text: it splits on the period ("2.0i" -> "2 0i"),
+# leaving a one-digit run that none of the rules above can anchor to. That
+# fragmentation is why the plain badge regexes never fired on these rows.
+# The trailing (?!-) is not cosmetic: without it "1.4 D-CVVT" (Kia's petrol
+# Dual-CVVT) reads as diesel and "1.6 i-DTEC" (Honda's diesel) reads as petrol
+# — 28 such rows in the current catalogue. A hyphen after the letter means the
+# letter belongs to the NEXT word, not to the displacement.
+_BADGE_DECIMAL_DIESEL_RE = re.compile(r"\b\d\.\d\s*d\b(?!-)", re.IGNORECASE)
+_BADGE_DECIMAL_PETROL_RE = re.compile(r"\b\d\.\d\s*i\b(?!-)", re.IGNORECASE)
+
+# Skyactiv spelled out, with the family letter as its own token
+# ("SKYACTIV-D 150" -> "skyactiv d 150") or fused ("e-Skyactiv-X186" ->
+# "skyactiv x186"). Anchored to the "skyactiv" token so a bare "d"/"g"/"x"
+# elsewhere in a variant blob can never fire this.
+_SKYACTIV_DIESEL_RE = re.compile(r"\bskyactiv d\d{0,3}\b")
+_SKYACTIV_PETROL_RE = re.compile(r"\bskyactiv [gx]\d{0,3}\b")
+
 
 def _fuel_from_engine_words(text: str) -> str | None:
     """diesel / petrol from engine words (tdi/tfsi/...), or None when the text
-    carries neither or — self-contradictorily — both."""
-    tokens = set(normalize_text(text).split())
-    diesel = bool(tokens & _DIESEL_ENGINE_WORDS)
-    petrol = bool(tokens & _PETROL_ENGINE_WORDS)
+    carries neither or — self-contradictorily — both.
+
+    "Skyactiv-D" / "Skyactiv-G" / "Skyactiv-X" are checked here rather than in
+    the badge tier below because the family letter is definitional in exactly
+    the way TDI/TSI are — it names the engine family, not a power figure — so
+    it deserves to outrank a site's stated fuel just as the other engine words
+    do. It is a two-token phrase after normalize_text, hence a regex instead of
+    an entry in the token frozensets."""
+    blob = normalize_text(text)
+    tokens = set(blob.split())
+    diesel = bool(tokens & _DIESEL_ENGINE_WORDS) or bool(_SKYACTIV_DIESEL_RE.search(blob))
+    petrol = bool(tokens & _PETROL_ENGINE_WORDS) or bool(_SKYACTIV_PETROL_RE.search(blob))
     if diesel == petrol:  # neither, or contradictory → don't guess
         return None
     return "diesel" if diesel else "petrol"
 
 
-def _fuel_from_badge(text: str) -> str | None:
-    """diesel / petrol from a numeric badge suffix (320d/320i), or None."""
+def _is_mazda(brand: str | None) -> bool:
+    return (brand or "").strip().lower() == "mazda"
+
+
+def _fuel_from_badge(text: str, brand: str | None = None) -> str | None:
+    """diesel / petrol from a numeric badge: the trailing-letter shape
+    (320d/320i), the decimal displacement shape (2.0i/2.2d), or — for Mazda
+    only — the leading-letter shape (G120/CD175). None when the text carries
+    neither or, self-contradictorily, both.
+
+    The decimal rule reads the RAW text; the others read the normalized blob,
+    because normalize_text is what splits a fused badge into a matchable token
+    in the first place — and, for the decimal shape, what destroys it ("2.0i"
+    becomes "2 0i", a one-digit run nothing can anchor to).
+
+    `brand` defaults to None, i.e. no Mazda rules, so a caller that doesn't
+    know the brand is safe by construction rather than by luck."""
     blob = normalize_text(text)
-    diesel = bool(_BADGE_DIESEL_RE.search(blob))
-    petrol = bool(_BADGE_PETROL_RE.search(blob))
+    mazda = _is_mazda(brand)
+    diesel = bool(
+        _BADGE_DIESEL_RE.search(blob)
+        or _BADGE_DECIMAL_DIESEL_RE.search(text)
+        or (mazda and _BADGE_PREFIX_DIESEL_RE.search(blob))
+    )
+    petrol = bool(
+        _BADGE_PETROL_RE.search(blob)
+        or _BADGE_DECIMAL_PETROL_RE.search(text)
+        or (mazda and _BADGE_PREFIX_PETROL_RE.search(blob))
+    )
     if diesel == petrol:
         return None
     return "diesel" if diesel else "petrol"
 
 
-def _derive_fuel_family(*texts: str | None) -> str | None:
+def _derive_fuel_family(*texts: str | None, brand: str | None = None) -> str | None:
     """Best fuel guess from brand/model/variant free text: an engine word wins
     (definitional), else the numeric badge suffix. Used for candidate-side
     scoring; the query side goes through _resolve_query_fuel, which also folds in
-    the site's own fuel field."""
+    the site's own fuel field.
+
+    `brand` unlocks the brand-specific badge shapes in _fuel_from_badge. Pass it
+    even when the brand is also among `texts` — the badge rules need to know
+    which brand they are looking at, not merely to see the word somewhere in a
+    blob (Mazda's own price lists frequently never spell the marque out: a
+    variant reads "CX-60 2022 5WGN 2.5L e-SKYACTIV PHEV 327ps")."""
     joined = " ".join(t for t in texts if t)
-    return _fuel_from_engine_words(joined) or _fuel_from_badge(joined)
+    return _fuel_from_engine_words(joined) or _fuel_from_badge(joined, brand)
 
 
 def _resolve_query_fuel(
-    site_fuel: str | None, model: str | None, variant: str | None
+    site_fuel: str | None,
+    model: str | None,
+    variant: str | None,
+    brand: str | None = None,
 ) -> str | None:
     """The listing's fuel, most trustworthy source first:
 
@@ -327,7 +417,7 @@ def _resolve_query_fuel(
     return (
         _fuel_from_engine_words(text)
         or _map_listing_fuel(site_fuel)
-        or _fuel_from_badge(text)
+        or _fuel_from_badge(text, brand)
     )
 
 
@@ -779,7 +869,7 @@ async def find_match(
     # field second — so a diesel "A4 40 TDI" from autobid.de (which never exposes
     # a fuel field) still hard-filters out the petrol "A4 40 TFSI" rows it would
     # otherwise tie with at 100 (same tokens, same 150 kW). See _resolve_query_fuel.
-    query_fuel = _resolve_query_fuel(fuel_type, model, variant)
+    query_fuel = _resolve_query_fuel(fuel_type, model, variant, brand)
     if query_fuel is not None:
         narrowed = [c for c in candidates if c.fuel_type == query_fuel]
         if narrowed:  # don't let an over-strict fuel filter erase a real match

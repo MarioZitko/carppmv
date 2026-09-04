@@ -292,6 +292,52 @@ def test_derive_fuel_family_none_when_unknown_or_contradictory():
     assert _derive_fuel_family("BMW 420xd Gran Coupe") is None
 
 
+def test_derive_fuel_family_mazda_skyactiv_and_leading_letter_badge():
+    """Mazda price lists carry no fuel column, so the badge is the only signal.
+    Every shape the 59-file corpus actually uses, 2013 -> 2026."""
+    # Skyactiv family letter, spaced and fused.
+    assert _derive_fuel_family("Mazda CX-5 SKYACTIV-D 150", brand="Mazda") == "diesel"
+    assert _derive_fuel_family("Mazda3 Skyactiv-G120", brand="Mazda") == "petrol"
+    assert _derive_fuel_family("Mazda3 e-Skyactiv-X186 AWD", brand="Mazda") == "petrol"
+    # Leading-letter badge with no "Skyactiv" anywhere (the older lists).
+    assert _derive_fuel_family("Mazda6 Wagon CD175 AWD AT", brand="Mazda") == "diesel"
+    assert _derive_fuel_family("Mazda3 G100 CHALLENGE", brand="Mazda") == "petrol"
+    # Plug-in hybrid: petrol, matching how canonical_schema files PHEVs.
+    assert _derive_fuel_family(
+        "CX-60 2.5L e-SKYACTIV PHEV 327ps 8AT AWD", brand="Mazda"
+    ) == "petrol"
+
+
+def test_derive_fuel_family_decimal_displacement_badge():
+    # "2.0i"/"2.2d" — matched on raw text, because normalize_text splits the
+    # period and leaves a one-digit run ("2.0i" -> "2 0i").
+    assert _derive_fuel_family("Mazda6 2.0i EMOTION", brand="Mazda") == "petrol"
+    assert _derive_fuel_family("Mazda6 2.2d ATTRACTION", brand="Mazda") == "diesel"
+    # A hyphen means the letter belongs to the next word, not the displacement.
+    # Kia's D-CVVT is petrol and Honda's i-DTEC is diesel, so reading either off
+    # the digits inverts the answer. Both must stay unclaimed here and let the
+    # sheet's own fuel column decide — which is what those rows have.
+    assert _derive_fuel_family("Rio 5 vrata 1.4 D-CVVT EX Fun", brand="Kia") is None
+    assert _derive_fuel_family("CR-V 1.6 i-DTEC 4WD", brand="Honda") is None
+
+
+def test_leading_letter_badge_is_mazda_only():
+    """The G120/CD175 shape collides with other brands' codes, so it is gated
+    on the brand rather than tightened. Both of these are real catalogue rows
+    that the ungated rule mislabelled."""
+    # BMW's chassis code normalizes to a bare "g20" token — must NOT read as
+    # petrol on a diesel 320d.
+    assert _derive_fuel_family(
+        "BMW", "serije 3 Limuzina (G20) LCI", "BMW 320d_automatski", brand="BMW"
+    ) == "diesel"
+    # normalize_text fragments Opel's type code into "0 uc98 cd61"; that "cd61"
+    # must not make a petrol Adam diesel.
+    assert _derive_fuel_family("Opel", "Adam", "0UC98CD61", brand="Opel") is None
+    # Same strings under Mazda would resolve — the gate is the brand, not the text.
+    assert _derive_fuel_family("CD175", brand="Mazda") == "diesel"
+    assert _derive_fuel_family("CD175") is None
+
+
 def test_resolve_query_fuel_prefers_engine_word_over_site_field():
     # A "TDI" in the text is definitional and overrides a mislabelled site fuel.
     assert _resolve_query_fuel("petrol", "A4", "A4 40 TDI") == "diesel"

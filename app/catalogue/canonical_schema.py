@@ -231,6 +231,13 @@ _WORD_FUEL_MAP: dict[str, FuelCategory] = {
     "electric": FuelCategory.ELECTRIC,
 }
 
+# Croatia adopted the euro on 2023-01-01 (Council Decision (EU) 2022/1211).
+# From that date the euro is the only legal tender, so a price list *valid
+# from* it is denominated in euro as a matter of law, not of probability.
+# That makes the date a harder currency signal than a language model's guess
+# — see _resolve_price_currency.
+EURO_ADOPTION_DATE = date(2023, 1, 1)
+
 _EUR_HEADER_PATTERN = re.compile(r"eur|€", re.IGNORECASE)
 _HEADER_WORD_PATTERN = re.compile(r"[a-zčćžšđ]+", re.IGNORECASE)
 
@@ -505,6 +512,78 @@ def _detect_currency_from_header(header: str | None) -> str | None:
     return None
 
 
+def _detect_currency_from_subheader(
+    rows: list[tuple], price_col_idx: int | None, scan_rows: int = 5
+) -> str | None:
+    """Currency token from a *sub-header* cell sitting in the price column.
+
+    Some sheets split their column labels across two rows, and _pick_header_index
+    can only choose one of them — so the currency ends up in a cell the header
+    detector never sees. Opel's 2023 file is the standing case: the chosen
+    header reads "Recommended Retail price incl. VAT" (silent), while the row
+    directly beneath it reads "Preporucena cijena sa ukljucenim PDV-om KN".
+    That file really is in kuna, with a median raw price of 283,100 — reading
+    only the chosen header and then falling back to the date would multiply
+    every Opel price by 7.53.
+
+    Only non-numeric cells are considered, and only the first few rows: a label
+    is text and sits at the top, whereas a price is a number. That keeps this
+    from firing on some data row whose text happens to contain "kn"."""
+    if price_col_idx is None:
+        return None
+    for row in rows[:scan_rows]:
+        if price_col_idx >= len(row):
+            continue
+        cell = row[price_col_idx]
+        if cell is None or isinstance(cell, (int, float)):
+            continue
+        found = _detect_currency_from_header(str(cell))
+        if found is not None:
+            return found
+    return None
+
+
+def _resolve_price_currency(
+    header: str | None,
+    mapping_currency: str | None,
+    valid_from: date | None,
+    subheader_currency: str | None = None,
+) -> str | None:
+    """The price column's currency, most authoritative source first.
+
+    1. The header's own text ("(kn)", "(EUR)", "osnovica_kn"). Still first: a
+       2023 sheet may legitimately carry a kuna column, because dual price
+       display was mandatory in Croatia from 2022-09-05 through 2023-12-31, and
+       when it does, the header says so.
+    2. A sub-header cell in the same column (see above) — the same evidence,
+       just in a row the header picker didn't choose.
+    3. The file's validity date. A list valid on or after EURO_ADOPTION_DATE is
+       in euro as a matter of law.
+    4. Only then ColumnMapping.price_currency — the LLM's reading.
+
+    Steps 2 and 3 are what this function adds, and they exist because step 4 was
+    silently wrong at scale. Where nothing in the sheet names a currency (Mazda's
+    "MPC (s trošarinom)" is the biggest case) the model has nothing to read and
+    simply guesses; it guessed "HRK" on 7,354 post-euro rows, whose euro prices
+    were then divided by the kuna rate a second time. A CX-5 listed at 50,142
+    EUR was stored as 6,655 EUR. Price is the base of the whole PPMV
+    calculation, so that is not cosmetic — it understates the tax roughly
+    sevenfold, confidently, with no warning anywhere in the response.
+
+    Order matters more than it looks. The date is deliberately BELOW both
+    document signals rather than above them: a post-euro *file* can still carry
+    a legacy kuna price list (Opel's 2023 file holds MY21/MY22 sheets), so the
+    date may only break a tie that the document itself left open."""
+    from_header = _detect_currency_from_header(header)
+    if from_header is not None:
+        return from_header
+    if subheader_currency is not None:
+        return subheader_currency
+    if valid_from is not None and valid_from >= EURO_ADOPTION_DATE:
+        return "EUR"
+    return mapping_currency
+
+
 def _categorize_fuel(
     fuel_raw: object,
     power_boost_kw: float | None,
@@ -650,6 +729,12 @@ def apply_mapping(
     brand_col_idx = column_index.get(mapping.brand_column) if mapping.brand_column else None
     typical_brand_text = _typical_brand_cell_text(rows, brand_col_idx)
 
+    # Computed once per sheet, not per row: the currency is a property of the
+    # column, and the sub-header rows carrying it are the same for every row.
+    subheader_currency = _detect_currency_from_subheader(
+        rows, column_index.get(mapping.price_column)
+    )
+
     # Defined once rather than per row: a closure built inside the loop would
     # capture `source_row_index` by reference, so it only happened to log the
     # right row because every call fired in the same iteration (ruff B023).
@@ -697,15 +782,8 @@ def apply_mapping(
             log_skip(source_row_index, "nonpositive_price")
             continue
 
-        currency = _detect_currency_from_header(mapping.price_column) or mapping.price_currency
-        if currency == "HRK":
-            price_eur = round(price_value / settings.hrk_to_eur_rate, 2)
-        elif currency == "EUR":
-            price_eur = price_value
-        else:
-            log_skip(source_row_index, "unrecognized_currency")
-            continue
-
+        # Resolved before the price is normalized, because the date is one of
+        # the currency signals (see _resolve_price_currency).
         # Prefer the sheet's own date column; fall back to the filename date
         # (default_valid_from) when the sheet has no such column or the cell is
         # blank/unparseable — the file is named for its effective date.
@@ -716,6 +794,18 @@ def apply_mapping(
             valid_from = default_valid_from
         if valid_from is None:
             log_skip(source_row_index, "missing_or_unparseable_valid_from")
+            continue
+
+        currency = _resolve_price_currency(
+            mapping.price_column, mapping.price_currency, valid_from,
+            subheader_currency,
+        )
+        if currency == "HRK":
+            price_eur = round(price_value / settings.hrk_to_eur_rate, 2)
+        elif currency == "EUR":
+            price_eur = price_value
+        else:
+            log_skip(source_row_index, "unrecognized_currency")
             continue
 
         power_kw, power_boost_kw = _parse_power(_cell(row, column_index, mapping.power_kw_column))
