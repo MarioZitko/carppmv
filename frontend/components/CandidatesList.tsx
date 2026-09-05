@@ -34,7 +34,7 @@ export function CandidatesList({ candidates, selectedCatalogueId, onSelect, titl
           {title ?? "Pronađeni zapisi u bazi vozila"}
         </h3>
         <p className="text-xs text-[var(--text-soft)]">
-          Odaberite redak koji odgovara vašem vozilu ({candidates.length}) — preuzima njegovu cijenu i CO2.
+          Odaberite redak koji odgovara vašem vozilu ({candidates.length}). Preuzet će se njegova cijena i CO2.
         </p>
       </div>
       <ul className="divide-y divide-[var(--border)] max-h-80 overflow-y-auto">

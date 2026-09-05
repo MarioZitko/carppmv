@@ -11,12 +11,6 @@ export default function sitemap(): MetadataRoute.Sitemap {
 			priority: 1,
 		},
 		{
-			url: `${SITE_URL}/profitability`,
-			lastModified: new Date(),
-			changeFrequency: "weekly",
-			priority: 0.6,
-		},
-		{
 			url: `${SITE_URL}/o-kalkulatoru`,
 			lastModified: new Date(),
 			changeFrequency: "monthly",

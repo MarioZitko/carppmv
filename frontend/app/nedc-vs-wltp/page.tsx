@@ -4,27 +4,32 @@ import { CalculatorCta } from "@/components/CalculatorCta";
 import { FaqList, FaqSchema, type FaqItem } from "@/components/Faq";
 
 export const metadata: Metadata = {
-	title: "NEDC vs. WLTP — koji CO2 vrijedi za PPMV",
+	title: "NEDC ili WLTP: koji CO2 vrijedi za PPMV",
 	description:
-		"Razlika između NEDC i WLTP mjerenja CO2, zašto je datum 1.1.2021. presudan za izračun PPMV-a i gdje pronaći ispravnu vrijednost za svoje vozilo.",
+		"Razlika između NEDC i WLTP mjerenja CO2, zašto je 1.1.2021. presudan datum za PPMV i gdje u dokumentima vozila pronaći točnu vrijednost.",
 	alternates: { canonical: "/nedc-vs-wltp" },
 };
 
 const FAQ_ITEMS: FaqItem[] = [
 	{
-		question: "Koji datum je bitan — datum proizvodnje ili datum registracije?",
+		question: "Vrijedi li datum proizvodnje ili datum registracije?",
 		answer:
-			"Datum prve registracije vozila, ne datum proizvodnje. Vozilo proizvedeno krajem 2020. ali registrirano tek u 2021. već potpada pod WLTP tablice u ovom kalkulatoru.",
+			"Datum prve registracije. Vozilo proizvedeno krajem 2020., a prvi put registrirano u 2021., računa se po WLTP tablicama.",
 	},
 	{
-		question: "Što ako oglas navodi i NEDC i WLTP vrijednost CO2?",
+		question: "Oglas navodi dvije CO2 vrijednosti. Koju uzeti?",
 		answer:
-			"Koristite vrijednost koja odgovara ciklusu za datum prve registracije vozila — NEDC za registraciju prije 1.1.2021, WLTP za registraciju od tog datuma nadalje. To je vrijednost koja se stvarno nalazi u COC dokumentu vozila.",
+			"Onu koja odgovara ciklusu za datum prve registracije: NEDC za registraciju do 31.12.2020., WLTP za registraciju od 1.1.2021. Njemački oglasi za vozila iz 2018. do 2020. često navode obje, jer su se u tom razdoblju prijavljivale i WLTP i preračunata NEDC vrijednost.",
 	},
 	{
-		question: "Zašto se WLTP vrijednosti CO2 čine više od NEDC vrijednosti za isto vozilo?",
+		question: "Zašto je WLTP vrijednost viša od NEDC vrijednosti za isti auto?",
 		answer:
-			"WLTP ciklus mjeri u realističnijim uvjetima vožnje (veće brzine, dulje dionice, manje idealizirano ubrzanje) pa za isto vozilo obično daje veći broj g/km CO2 nego stariji NEDC ciklus. Zato tablice u Uredbi za WLTP-registrirana vozila imaju i drugačije (pomaknute) granice bodovnih razreda.",
+			"Zato što je test stroži, a ne zato što auto troši više. Istraživanja Zajedničkog istraživačkog centra Europske komisije i ICCT-a pokazuju omjer WLTP prema NEDC otprilike od 1,1 do 1,4, ovisno o vrsti pogona i o tome koliko je vozilo emisivno.",
+	},
+	{
+		question: "Što ako se vrijednost iz oglasa razlikuje od one u COC dokumentu?",
+		answer:
+			"Mjerodavan je COC dokument. Oglasi se pišu ručno i CO2 je jedno od polja koje prodavači najčešće upišu krivo ili prepišu s druge izvedbe istog modela.",
 	},
 ];
 
@@ -33,80 +38,89 @@ export default function NedcVsWltpPage() {
 		<div className="mx-auto max-w-3xl px-6 py-14 space-y-10">
 			<header className="space-y-2">
 				<h1 className="text-2xl font-bold text-[var(--text)]">
-					NEDC vs. WLTP — koji CO2 vrijedi za PPMV
+					NEDC ili WLTP: koji CO2 vrijedi za PPMV
 				</h1>
 				<p className="text-sm text-[var(--text-soft)]">
-					Dva ciklusa mjerenja, dvije različite porezne tablice — evo kako znati
-					koji se primjenjuje na vaše vozilo.
+					Dva ciklusa mjerenja i dvije porezne tablice. Datum prve registracije
+					određuje koja se primjenjuje.
 				</p>
 			</header>
 
 			<section className="space-y-3 text-sm leading-relaxed text-[var(--text-soft)]">
-				<h2 className="text-lg font-semibold text-[var(--text)]">Što je NEDC</h2>
-				<p>
-					NEDC (New European Driving Cycle) je stariji europski ciklus mjerenja
-					potrošnje goriva i emisija CO2, korišten za homologaciju vozila do kraja
-					2020. Mjerenja su se provodila u laboratorijskim uvjetima s relativno
-					blagim profilom ubrzanja i niskim brzinama, zbog čega su izmjerene
-					vrijednosti CO2 sustavno niže od stvarne potrošnje u svakodnevnoj vožnji.
-				</p>
-			</section>
-
-			<section className="space-y-3 text-sm leading-relaxed text-[var(--text-soft)]">
-				<h2 className="text-lg font-semibold text-[var(--text)]">Što je WLTP</h2>
-				<p>
-					WLTP (Worldwide Harmonised Light Vehicle Test Procedure) je noviji ciklus
-					koji je zamijenio NEDC — uključuje veće brzine, dulje testne dionice,
-					realističniji profil ubrzanja i uzima u obzir dodatnu opremu vozila. Zbog
-					toga WLTP vrijednosti CO2 za isto vozilo obično ispadaju više od starih
-					NEDC vrijednosti, iako je stvarna potrošnja vozila ostala ista — mijenja
-					se samo metoda mjerenja.
-				</p>
-			</section>
-
-			<section className="space-y-3 text-sm leading-relaxed text-[var(--text-soft)]">
 				<h2 className="text-lg font-semibold text-[var(--text)]">
-					Datum 1.1.2021. i zašto je presudan za PPMV
+					Kratko: što je koji ciklus
 				</h2>
 				<p>
-					Uredba o načinu izračuna PPMV-a (NN 156/22) propisuje dva odvojena
-					seta tablica ekološke komponente (ON/EN) i vrijednosne komponente
-					(VN/PC) — jedan za vozila prvi put registrirana do 31.12.2020., temeljen
-					na NEDC vrijednostima CO2, i drugi za vozila registrirana od 1.1.2021.
-					nadalje, temeljen na WLTP vrijednostima. Granice CO2 razreda i iznosi u
-					te dvije tablice nisu isti brojevi pomaknuti za razliku ciklusa — riječ
-					je o potpuno zasebnim tablicama, pa je bitno koristiti onu koja odgovara
-					datumu prve registracije vozila, ne datumu kupnje ili uvoza.
+					NEDC (New European Driving Cycle) je stariji laboratorijski ciklus za
+					mjerenje potrošnje i emisija. Vozio se blago, s niskim brzinama i
+					umjerenim ubrzanjima, pa su izmjerene vrijednosti bile osjetno niže od
+					stvarne potrošnje na cesti.
 				</p>
 				<p>
-					kalkulatoruvoza.com ovo automatski prepoznaje — čim unesete datum prve
-					registracije, sam odabere ispravan set tablica za izračun.
+					WLTP (Worldwide Harmonised Light Vehicle Test Procedure) ga je
+					zamijenio. Test traje dulje, uključuje veće brzine i oštrija ubrzanja i
+					uzima u obzir dodatnu opremu konkretnog primjerka. Za nove tipove
+					vozila obvezan je od rujna 2017., a za sva nova vozila od rujna 2018.
+					U prijelaznom razdoblju do kraja 2020. proizvođači su uz WLTP
+					prijavljivali i preračunatu NEDC vrijednost, zbog čega za vozila iz tog
+					razdoblja često postoje dva broja.
+				</p>
+				<p>
+					Isti auto po WLTP-u ispada emisivniji nego po NEDC-u, obično u omjeru
+					od otprilike 1,1 do 1,4. Auto nije počeo trošiti više, promijenio se
+					način mjerenja.
 				</p>
 			</section>
 
 			<section className="space-y-3 text-sm leading-relaxed text-[var(--text-soft)]">
 				<h2 className="text-lg font-semibold text-[var(--text)]">
-					Gdje pronaći CO2 vrijednost svog vozila
+					Zašto je 1.1.2021. presudan za PPMV
+				</h2>
+				<p>
+					Uredba NN 156/22 propisuje dva odvojena kompleta tablica. Vozila prvi
+					put registrirana do 31.12.2020. računaju se po NEDC tablicama, vozila
+					registrirana od 1.1.2021. po WLTP tablicama. To nisu iste tablice s
+					pomaknutim granicama, nego zasebne tablice s vlastitim razredima i
+					iznosima, i za vrijednosnu i za ekološku komponentu.
+				</p>
+				<p>
+					Praktična posljedica: unos WLTP vrijednosti za vozilo iz 2019. daje
+					previsok porez, jer se veći broj gura u NEDC tablicu koja je pisana za
+					manje brojeve. Obrnuto, NEDC vrijednost za vozilo iz 2022. daje
+					prenizak iznos. Kalkulator sam bira tablicu prema datumu prve
+					registracije koji unesete, ali CO2 morate unijeti iz ispravnog ciklusa.
+				</p>
+			</section>
+
+			<section className="space-y-3 text-sm leading-relaxed text-[var(--text-soft)]">
+				<h2 className="text-lg font-semibold text-[var(--text)]">
+					Gdje piše CO2 vrijednost vašeg vozila
 				</h2>
 				<ul className="list-disc pl-5 space-y-2">
 					<li>
 						<span className="font-medium text-[var(--text)]">COC dokument</span>{" "}
-						(Certificate of Conformity) — najpouzdaniji izvor, sadrži točnu CO2
-						vrijednost prema ciklusu koji vrijedi za taj model.
-					</li>
-					<li>
-						<span className="font-medium text-[var(--text)]">Sam oglas</span> —
-						većina oglasa na mobile.de, AutoScout24 i sličnim stranicama navodi
-						CO2 vrijednost u tehničkim podacima vozila.
+						(potvrda o sukladnosti) je najpouzdaniji izvor. CO2 se nalazi pod
+						točkom 49.
 					</li>
 					<li>
 						<span className="font-medium text-[var(--text)]">
-							kalkulatoruvoza.com
+							Prometna dozvola
 						</span>{" "}
-						— kad oglas ne navodi CO2, kalkulator ga pokuša pronaći u internoj
-						bazi službenih cjenika Carinske uprave, a kao zadnju opciju nudi
-						orijentacijski raspon s Wikipedije, koji ipak uvijek treba usporediti
-						sa stvarnim COC dokumentom.
+						vozila, hrvatska i njemačka, ima CO2 u polju V.7.
+					</li>
+					<li>
+						<span className="font-medium text-[var(--text)]">Sam oglas</span>{" "}
+						često navodi CO2 u tehničkim podacima, ali ga prodavači znaju
+						prepisati s druge izvedbe. Uzmite ga kao orijentaciju, a ne kao
+						dokaz.
+					</li>
+					<li>
+						<span className="font-medium text-[var(--text)]">
+							Ovaj kalkulator
+						</span>{" "}
+						pokušava CO2 pronaći u bazi službenih cjenika uvoznika kad ga oglas
+						ne navodi. Ako ni tamo nema pogotka, ponudi orijentacijski raspon s
+						Wikipedije, koji služi samo za grubu provjeru i ne ulazi u izračun.
 					</li>
 				</ul>
 			</section>
@@ -119,7 +133,8 @@ export default function NedcVsWltpPage() {
 
 			<section className="space-y-3 text-sm leading-relaxed text-[var(--text-soft)]">
 				<p>
-					Za puni prikaz formule i primjer stvarnog izračuna pogledajte{" "}
+					Kako te tablice ulaze u konačni iznos, s primjerom izračuna, piše na
+					stranici{" "}
 					<Link
 						href="/kako-se-izracunava-ppmv"
 						className="font-medium text-[var(--primary)] hover:underline"
@@ -131,7 +146,7 @@ export default function NedcVsWltpPage() {
 			</section>
 
 			<div className="pt-2">
-				<CalculatorCta>Unesite datum registracije i CO2 u kalkulator</CalculatorCta>
+				<CalculatorCta>Unesite CO2 i datum registracije</CalculatorCta>
 			</div>
 		</div>
 	);

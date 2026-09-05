@@ -11,7 +11,6 @@ import { MobilePriceBar } from "@/components/MobilePriceBar";
 import { PPMVBreakdownCard } from "@/components/PPMVBreakdownCard";
 import { CarVerticalCard } from "@/components/CarVerticalCard";
 import { ParsedFieldsCard } from "@/components/ParsedFieldsCard";
-import { FaqList, FaqSchema, type FaqItem } from "@/components/Faq";
 import { ApiTimeoutError, calculateFromUrl, calculateFromSpecs } from "@/lib/api";
 import { normalizeUrl } from "@/lib/format";
 import { guessFuelType, toIsoDate, todayIso } from "@/lib/fuel";
@@ -36,29 +35,29 @@ type EntryMode = "link" | "search";
 // for logs, not for this audience, so it's deliberately never shown as-is.
 function describeUrlError(err: unknown): string {
 	if (err instanceof ApiTimeoutError) {
-		return "Dohvat oglasa predugo traje — poslužitelj trenutno ne odgovara. Pokušajte ponovno za trenutak ili unesite podatke ručno u nastavku.";
+		return "Dohvat oglasa predugo traje i poslužitelj ne odgovara. Pokušajte ponovno za trenutak ili unesite podatke ručno u nastavku.";
 	}
 	if (!(err instanceof ApiError)) {
 		return "Nismo se uspjeli povezati s poslužiteljem. Provjerite internetsku vezu i pokušajte ponovno.";
 	}
 	switch (err.status) {
 		case 429:
-			return "Previše zahtjeva s ove adrese — pričekajte nekoliko minuta pa pokušajte ponovno.";
+			return "Previše zahtjeva s ove adrese. Pričekajte nekoliko minuta pa pokušajte ponovno.";
 		case 403:
-			return "Sigurnosna provjera nije uspjela — osvježite stranicu i pokušajte ponovno zalijepiti link.";
+			return "Sigurnosna provjera nije uspjela. Osvježite stranicu i zalijepite poveznicu ponovno.";
 		case 503:
-			return "Dnevni limit automatskog dohvata oglasa je dostignut — unesite podatke o vozilu ručno u nastavku.";
+			return "Dnevni limit automatskog dohvata oglasa je dostignut. Unesite podatke o vozilu ručno u nastavku.";
 		case 422:
-			return "Ne prepoznajemo ovaj link — provjerite je li to poveznica na oglas s podržane stranice (autoscout24, autobid.de, mobile.de), ili unesite podatke ručno u nastavku.";
+			return "Ne prepoznajemo ovu poveznicu. Provjerite vodi li na oglas s podržane stranice (mobile.de, AutoScout24, autobid.de, Njuškalo) ili unesite podatke ručno u nastavku.";
 		case 404:
-			return "Oglas nije pronađen — možda je uklonjen ili je poveznica netočna. Unesite podatke ručno u nastavku.";
+			return "Oglas nije pronađen. Možda je uklonjen ili je poveznica netočna. Unesite podatke ručno u nastavku.";
 		case 502:
 		case 504:
-			return "Stranica oglasa trenutno nije dostupna — oglas je možda uklonjen, istekao ili stranica privremeno ne odgovara. Unesite podatke ručno u nastavku.";
+			return "Stranica oglasa trenutno nije dostupna. Oglas je možda uklonjen ili istekao. Unesite podatke ručno u nastavku.";
 		case 400:
-			return "Podaci iz oglasa (npr. cijena ili CO2) izgledaju neispravni pa izračun nije moguć — provjerite oglas ili unesite podatke ručno u nastavku.";
+			return "Podaci iz oglasa (cijena ili CO2) izgledaju neispravni pa izračun nije moguć. Provjerite oglas ili unesite podatke ručno u nastavku.";
 		default:
-			return "Nešto je pošlo po zlu prilikom čitanja oglasa — pokušajte ponovno ili unesite podatke ručno u nastavku.";
+			return "Čitanje oglasa nije uspjelo. Pokušajte ponovno ili unesite podatke ručno u nastavku.";
 	}
 }
 
@@ -67,70 +66,16 @@ function describeUrlError(err: unknown): string {
 // logs, so translate them into something an average user can act on.
 function describePpmvError(err: unknown): string {
 	if (err instanceof ApiTimeoutError) {
-		return "Izračun predugo traje — poslužitelj trenutno ne odgovara. Pokušajte ponovno za trenutak.";
+		return "Izračun predugo traje i poslužitelj ne odgovara. Pokušajte ponovno za trenutak.";
 	}
 	if (!(err instanceof ApiError)) {
-		return "Izračun trenutno nije dostupan — pokušajte ponovno za trenutak.";
+		return "Izračun trenutno nije dostupan. Pokušajte ponovno za trenutak.";
 	}
 	if (err.status === 400) {
-		return "Unesena cijena ili CO2 vrijednost je izvan očekivanog raspona — provjerite jesu li podaci točni.";
+		return "Unesena cijena ili CO2 vrijednost je izvan očekivanog raspona. Provjerite jesu li podaci točni.";
 	}
-	return "Izračun trenutno nije dostupan — pokušajte ponovno za trenutak.";
+	return "Izračun trenutno nije dostupan. Pokušajte ponovno za trenutak.";
 }
-
-const FAQ_ITEMS: FaqItem[] = [
-	{
-		question: "Što je PPMV?",
-		answer:
-			"Posebni porez na motorna vozila (PPMV) plaća se pri prvoj registraciji vozila u Hrvatskoj. Iznos ovisi o vrijednosti vozila (VN/PC komponenta) i njegovim CO2 emisijama (ON/EN komponenta), uz umanjenje za starost vozila prema propisanoj tablici amortizacije.",
-	},
-	{
-		question: "Trebam li platiti PPMV ako uvozim vozilo iz EU?",
-		answer:
-			"Da. PPMV je nacionalni porez na registraciju vozila i plaća se bez obzira odakle vozilo dolazi — iz EU ili izvan nje. Carinska pristojba i PDV su druga priča: te se stavke naplaćuju samo pri uvozu iz zemalja izvan EU, budući da unutar jedinstvenog tržišta EU nema carine.",
-	},
-	{
-		question: "Odakle da znam CO2 vrijednost svog vozila?",
-		answer:
-			"Najpouzdaniji izvor je COC dokument (Certificate of Conformity) vozila. Kad zalijepite link oglasa, kalkulator prvo pokuša pročitati CO2 izravno s oglasa; ako ga nema, pretražuje internu bazu službenih cjenika Carinske uprave po marki, modelu i izvedbi. Kad ni to ne uspije, nudi orijentacijski raspon prikupljen s Wikipedije — to je samo smjernica za usporedbu s COC dokumentom, nikad se automatski ne koristi u samom izračunu.",
-	},
-	{
-		question: "Je li ovo službeni izračun?",
-		answer:
-			"Ne. Ovo je procjena temeljena na javno dostupnim propisima (Uredbi o načinu izračuna PPMV-a, NN 156/22, i Pravilniku o posebnom porezu na motorna vozila) — nije službeno porezno mišljenje. Za konačan, obvezujući iznos obratite se Carinskoj upravi.",
-	},
-	{
-		question: "Koja je razlika između NEDC i WLTP mjerenja CO2?",
-		answer: (
-			<>
-				Riječ je o dva različita ciklusa mjerenja potrošnje i emisija — primjenjuju se
-				različite porezne tablice ovisno o tome je li vozilo prvi put registrirano prije
-				ili poslije 1.1.2021. Puno objašnjenje s primjerima pročitajte na stranici{" "}
-				<Link href="/nedc-vs-wltp" className="font-medium text-[var(--primary)] hover:underline">
-					NEDC vs. WLTP
-				</Link>
-				.
-			</>
-		),
-		answerText:
-			"Riječ je o dva različita ciklusa mjerenja potrošnje i emisija — primjenjuju se različite porezne tablice ovisno o tome je li vozilo prvi put registrirano prije ili poslije 1.1.2021.",
-	},
-	{
-		question: "S kojih stranica kalkulator može pročitati oglas?",
-		answer:
-			"Podržani su mobile.de, AutoScout24, njuškalo i autobid.de. Zalijepite link oglasa i kalkulator će pokušati pročitati marku, model, cijenu, CO2 i ostale podatke izravno s oglasa.",
-	},
-	{
-		question: "Što ako link oglasa ne radi ili nešto ne uspije pročitati?",
-		answer:
-			"Podatke uvijek možete unijeti ručno — ispod obrasca za link nalazi se i opcija pretrage naše baze vozila, a polja za cijenu, CO2, datum registracije i ostalo možete i sami popuniti ili ispraviti u bilo kojem trenutku.",
-	},
-	{
-		question: "Postoji li olakšica za električna, plug-in hibridna ili vozila s više sjedala?",
-		answer:
-			"Da. Električna vozila u potpunosti su oslobođena PPMV-a. Plug-in hibridi dobivaju umanjenje prema dometu vožnje na struju (EAER city), vozila s 8 sjedala plaćaju polovicu, a s 9 i više sjedala četvrtinu iznosa. Kamperi imaju zasebno umanjenje. Sve se primjenjuje automatski kad unesete relevantne podatke.",
-	},
-];
 
 export default function Home() {
 	const [mode, setMode] = useState<EntryMode>("link");
@@ -249,7 +194,7 @@ export default function Home() {
 				parsed.co2_g_km === null;
 			if (nothingParsed) {
 				setUrlError(
-					"Nismo uspjeli pročitati podatke iz ovog oglasa — provjerite je li poveznica ispravna ili unesite podatke ručno u nastavku.",
+					"Nismo uspjeli pročitati podatke iz ovog oglasa. Provjerite je li poveznica ispravna ili unesite podatke ručno u nastavku.",
 				);
 			}
 
@@ -341,9 +286,9 @@ export default function Home() {
 				Izračun PPMV-a
 			</h1>
 			<p className="text-sm text-[var(--text-soft)] mb-5 max-w-2xl">
-				Procijenite hrvatski posebni porez na motorna vozila (PPMV) — zalijepite
-				link oglasa ili odaberite vozilo izravno iz baze podataka, a cijenu i
-				CO2 uvijek možete naknadno fino podesiti.
+				Procijenite posebni porez na motorna vozila. Zalijepite poveznicu
+				oglasa ili odaberite vozilo iz baze, a cijenu i CO2 možete naknadno
+				podesiti.
 			</p>
 
 			<div className="grid grid-cols-1 lg:grid-cols-3 gap-4 items-start">
@@ -438,9 +383,8 @@ export default function Home() {
 						hint={ppmvHint ?? "Popunite podatke o vozilu za izračun PPMV-a."}
 					/>
 					<p className="text-xs text-[var(--text-soft)] px-1">
-						Ovo je procjena temeljena na javno dostupnim propisima, nije
-						službeno porezno mišljenje. Za konačan iznos obratite se
-						Carinskoj upravi.
+						Procjena po važećim propisima, nije službeno porezno mišljenje.
+						Obvezujući iznos utvrđuje Carinska uprava u poreznom rješenju.
 					</p>
 				</div>
 			</div>
@@ -449,60 +393,50 @@ export default function Home() {
 				<CarVerticalCard vin={urlResult?.parsed.vin} />
 			</div>
 
+			{/* Deliberately short: the long "how it works" and FAQ copy lives on
+			    /o-kalkulatoru and /cesta-pitanja, so it isn't duplicated across two
+			    URLs. What stays here is unique to this page and keeps the landing
+			    page from being a bare form with no context. */}
 			<section className="mt-12 max-w-3xl space-y-3">
-				<h2 className="text-lg font-semibold text-[var(--text)]">Kako radi</h2>
+				<h2 className="text-lg font-semibold text-[var(--text)]">
+					Što ovaj kalkulator računa
+				</h2>
 				<div className="space-y-3 text-sm leading-relaxed text-[var(--text-soft)]">
 					<p>
-						PPMV (posebni porez na motorna vozila) plaća se pri prvoj registraciji
-						vozila u Hrvatskoj, a iznos ovisi o dvije stvari: vrijednosti vozila i
-						njegovim CO2 emisijama. Kalkulator te dvije komponente izračunava prema
-						službenim tablicama iz Uredbe (NN 156/22) i Pravilnika, uz umanjenje za
-						starost vozila prema propisanoj tablici amortizacije.
+						Posebni porez na motorna vozila (PPMV) plaća se prije prve
+						registracije vozila u Hrvatskoj. Iznos ovisi o cijeni vozila, emisiji
+						CO2 i starosti vozila, a računa se po tablicama iz Uredbe NN 156/22 i
+						Pravilnika o posebnom porezu na motorna vozila. Iste tablice koristi i
+						ovaj kalkulator.
 					</p>
 					<p>
-						Zalijepite link oglasa i kalkulator sam pokuša pročitati cijenu, CO2,
-						datum prve registracije i ostale podatke potrebne za izračun. Kad nešto
-						nedostaje — najčešće CO2 — dopunjava ga iz interne baze službenih
-						cjenika Carinske uprave ili nudi orijentacijski raspon iz Wikipedije, a
-						sve što nije pouzdano pročitano uvijek možete ručno provjeriti i
-						ispraviti prije nego pogledate rezultat.
+						Zalijepite poveznicu oglasa i kalkulator pokušava sam pročitati
+						cijenu, CO2 i datum prve registracije. Podatak koji nedostaje, najčešće
+						je to CO2, traži u bazi službenih cjenika uvoznika. Sve možete i ručno
+						ispraviti prije izračuna.
 					</p>
-					<p>
-						Rezultat je procjena, ne službeno porezno rješenje. Detaljno objašnjenje
-						cijele formule, s izvorima i primjerom pravog izračuna, pročitajte na{" "}
+					<p className="flex flex-wrap gap-x-4 gap-y-1">
 						<Link
 							href="/kako-se-izracunava-ppmv"
 							className="font-medium text-[var(--primary)] hover:underline"
 						>
-							stranici Kako se izračunava PPMV
-						</Link>{" "}
-						ili na{" "}
+							Cijela formula s primjerom izračuna
+						</Link>
 						<Link
-							href="/o-kalkulatoru"
+							href="/vodic-uvoz-njemacka"
 							className="font-medium text-[var(--primary)] hover:underline"
 						>
-							stranici O kalkulatoru
+							Svi koraci uvoza iz Njemačke
 						</Link>
-						.
+						<Link
+							href="/cesta-pitanja"
+							className="font-medium text-[var(--primary)] hover:underline"
+						>
+							Česta pitanja
+						</Link>
 					</p>
 				</div>
 			</section>
-
-			<section className="mt-10 max-w-3xl space-y-3">
-				<h2 className="text-lg font-semibold text-[var(--text)]">Najčešća pitanja</h2>
-				<FaqList items={FAQ_ITEMS} />
-				<p className="text-sm text-[var(--text-soft)]">
-					Više pitanja i odgovora na{" "}
-					<Link
-						href="/cesta-pitanja"
-						className="font-medium text-[var(--primary)] hover:underline"
-					>
-						stranici Česta pitanja
-					</Link>
-					.
-				</p>
-			</section>
-			<FaqSchema items={FAQ_ITEMS} />
 
 			<MobilePriceBar
 				result={ppmvResult}

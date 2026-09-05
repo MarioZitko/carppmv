@@ -120,9 +120,8 @@ export function PriceFineTune({ priceEur, onChange, anchorToken }: Props) {
 				</div>
 				<p className="text-xs text-[var(--text-soft)] mt-0.5">
 					Ovo je cijena vozila{" "}
-					<strong className="text-[var(--text)]">kao novog</strong> (s dodatnom
-					opremom) — amortizacija se zatim primjenjuje na ovaj iznos da bi se
-					dobila trenutna porezna osnovica, ne obrnuto.
+					<strong className="text-[var(--text)]">kao novog</strong>, s dodatnom
+					opremom. Amortizacija se primjenjuje na taj iznos, a ne obrnuto.
 				</p>
 			</div>
 

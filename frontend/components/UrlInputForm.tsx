@@ -85,7 +85,7 @@ export function UrlInputForm({ onSubmit, loading }: Props) {
 					<input
 						type="text"
 						inputMode="url"
-						placeholder="Zalijepite link oglasa (autoscout24, autobid.de, mobile.de)"
+						placeholder="Zalijepite poveznicu oglasa (mobile.de, AutoScout24, autobid.de, Njuškalo)"
 						value={value}
 						onChange={(e) => setValue(e.target.value)}
 						className={`w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] pl-4 py-3 text-sm text-[var(--text)] placeholder:text-[var(--text-soft)] focus:border-[var(--primary)] transition-colors ${

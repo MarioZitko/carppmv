@@ -41,17 +41,16 @@ export default function CookiePolicyPage() {
 
 			<div className="space-y-3 text-sm leading-relaxed text-[var(--text-soft)]">
 				<p>
-					Kalkulator radi bez korisničkog računa i bez vlastite analitike —
-					trenutno ne postavljamo nijedan kolačić izravno mi sami. Jedini
-					kolačić koji se može pojaviti dolazi od Cloudflare Turnstile,
-					vanjske usluge koja provjerava da zahtjev nije automatiziran, i
-					aktivan je samo na produkcijskoj verziji stranice.
+					Kalkulator radi bez korisničkog računa i bez vlastite analitike, pa
+					sami ne postavljamo nijedan kolačić. Jedini koji se može pojaviti
+					dolazi od Cloudflare Turnstilea, vanjske usluge koja provjerava da
+					zahtjev nije automatiziran, i aktivan je samo na produkcijskoj
+					verziji stranice.
 				</p>
 				<p>
-					Ako u budućnosti uvedemo Google AdSense ili alat za analitiku
-					posjeta, ova tablica i stranica bit će ažurirane prije nego ti
-					kolačići počnu raditi, zajedno s odgovarajućim obavijestima o
-					privoli gdje je to zakonski potrebno.
+					Ako uvedemo Google AdSense ili alat za analitiku posjeta, ova tablica
+					bit će ažurirana prije nego ti kolačići počnu raditi, zajedno s
+					obavijesti o privoli ondje gdje je zakonski potrebna.
 				</p>
 			</div>
 
@@ -67,13 +66,13 @@ export default function CookiePolicyPage() {
 						<Row
 							name="cf_clearance / __cf_bm"
 							who="Cloudflare (Turnstile)"
-							purpose="Nužan kolačić — potvrđuje da zahtjev za dohvat mobile.de oglasa nije poslao automatizirani program (bot)."
+							purpose="Nužan kolačić. Potvrđuje da zahtjev za dohvat mobile.de oglasa nije poslao automatizirani program."
 							duration="Do 30 min / do 1 dan"
 						/>
 						<Row
 							name="Affiliate praćenje (carVertical)"
 							who="carVertical / Everflow"
-							purpose="Postavlja se tek nakon što kliknete na partnerski link prema carvertical.deal i napustite ovu stranicu — služi da carVertical zna da je posjet došao od nas."
+							purpose="Postavlja se tek kad otvorite partnersku poveznicu prema carVerticalu i napustite ovu stranicu. Služi da carVertical zna da je posjet došao od nas."
 							duration="Ovisi o carVertical politici"
 						/>
 						<Row
@@ -85,7 +84,7 @@ export default function CookiePolicyPage() {
 						<Row
 							name="Google AdSense"
 							who="—"
-							purpose="Trenutno nije aktivan na stranici. Kad postane aktivan, ovdje će biti popisani kolačići koje AdSense postavlja i zatražena privola prije prikaza oglasa."
+							purpose="Trenutno nije aktivan. Kad postane, ovdje će biti popisani kolačići koje postavlja, a privola zatražena prije prikaza oglasa."
 							duration="—"
 						/>
 					</div>
@@ -97,18 +96,17 @@ export default function CookiePolicyPage() {
 					Kako upravljati kolačićima
 				</h2>
 				<p>
-					Kolačiće možete u svakom trenutku obrisati ili blokirati kroz
-					postavke svog preglednika. Imajte na umu da blokiranje Cloudflare
-					Turnstile kolačića može onemogućiti dohvat mobile.de oglasa, jer
-					provjera bota tada ne može proći.
+					Kolačiće možete obrisati ili blokirati u postavkama preglednika.
+					Blokiranje Turnstile kolačića onemogućuje dohvat mobile.de oglasa,
+					jer provjera tada ne može proći.
 				</p>
 				<p>
-					Više o tome koje se druge podatke obrađuje i zašto pročitajte na{" "}
+					Koji se drugi podaci obrađuju i zašto piše u{" "}
 					<Link
 						href="/privatnost"
 						className="font-medium text-[var(--primary)] hover:underline"
 					>
-						stranici Politika privatnosti
+						politici privatnosti
 					</Link>
 					.
 				</p>

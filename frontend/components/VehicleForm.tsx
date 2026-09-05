@@ -188,7 +188,7 @@ export function VehicleForm({ values, onChange, co2Hint, co2Lookup }: Props) {
 					checked={values.isNew}
 					onChange={(v) => onChange({ isNew: v })}
 					label="Novo vozilo"
-					hint="Uključite ako vozilo nije prethodno registrirano — amortizacija se tada ne primjenjuje."
+					hint="Uključite ako vozilo nije prethodno registrirano. Amortizacija se tada ne primjenjuje."
 				/>
 
 				<div>
@@ -209,7 +209,7 @@ export function VehicleForm({ values, onChange, co2Hint, co2Lookup }: Props) {
 										: "text-[var(--text-soft)]"
 								}`}
 							>
-								8 sjedala (7+1) — 50%
+								8 sjedala (7+1), umanjenje 50%
 							</button>
 							<button
 								type="button"
@@ -220,7 +220,7 @@ export function VehicleForm({ values, onChange, co2Hint, co2Lookup }: Props) {
 										: "text-[var(--text-soft)]"
 								}`}
 							>
-								9+ sjedala (8+1) — 75%
+								9+ sjedala (8+1), umanjenje 75%
 							</button>
 						</div>
 					)}

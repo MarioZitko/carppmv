@@ -76,7 +76,7 @@ export function CarVerticalCard({ vin }: { vin?: string | null }) {
 			</div>
 			<p className="text-sm text-[var(--text-soft)]">
 				{vin
-					? "Imamo VIN ovog vozila — provjerite kilometražu, štete i vlasništvo odmah."
+					? "Imamo VIN ovog vozila. Provjerite kilometražu, štete i vlasništvo odmah."
 					: "Unesite broj šasije ili registraciju i provjerite kilometražu, vlasništvo i je li vozilo bilo u nesreći prije kupnje."}
 			</p>
 			<p className="mt-2 text-sm text-[var(--text)]">
@@ -112,9 +112,9 @@ export function CarVerticalCard({ vin }: { vin?: string | null }) {
 				</a>
 			</div>
 			<p className="mt-3 text-xs text-[var(--text-soft)]">
-				Kalkulator uvoza koristi partnerski (affiliate) link prema
-				carVertical — ako kliknete i kupite provjeru, možemo dobiti
-				proviziju.
+				Poveznica prema carVerticalu je partnerska (affiliate). Ako kupite
+				provjeru preko nje, kalkulator može dobiti proviziju, a cijena za vas
+				ostaje ista.
 			</p>
 		</div>
 	);

@@ -109,7 +109,7 @@ export function Co2HintNote({ hint, engineCode, onBrowse, midpointApplied }: Pro
         onClick={toggle}
         aria-expanded={open}
         aria-controls="co2-hint-detail"
-        title="Procjena s Wikipedije — kliknite za detalje"
+        title="Procjena s Wikipedije, kliknite za detalje"
         className={`absolute right-1.5 top-1/2 -translate-y-1/2 flex items-center gap-1 rounded-lg border px-2 py-1 text-[11px] font-medium transition-colors ${
           open
             ? "border-[var(--primary)] bg-[var(--primary-soft)] text-[var(--primary)]"
@@ -142,7 +142,7 @@ export function Co2HintNote({ hint, engineCode, onBrowse, midpointApplied }: Pro
             </div>
             <p className="mt-1.5 text-xs leading-snug text-[var(--text-soft)]">
               {midpointApplied
-                ? "Upisana je sredina raspona — prilagodite ako znate točnu vrijednost."
+                ? "Upisana je sredina raspona. Prilagodite ako znate točnu vrijednost."
                 : "Nije službeni podatak. Provjerite COC dokument vozila i upišite točnu vrijednost."}
             </p>
           </div>

@@ -3,9 +3,9 @@ import Link from "next/link";
 import { CalculatorCta } from "@/components/CalculatorCta";
 
 export const metadata: Metadata = {
-	title: "Vodič za uvoz automobila iz Njemačke",
+	title: "Vodič za uvoz auta iz Njemačke",
 	description:
-		"Koraci uvoza auta iz Njemačke u Hrvatsku: pronalazak oglasa, provjera specifikacija i CO2, izračun PPMV-a, prijevoz, homologacija i registracija.",
+		"Koraci uvoza auta iz Njemačke u Hrvatsku: papiri kod prodavača, PDV i PPMV, prijava na obrascu PP-MV u roku od 15 dana, homologacija, tehnički pregled i registracija.",
 	alternates: { canonical: "/vodic-uvoz-njemacka" },
 };
 
@@ -38,126 +38,192 @@ export default function GuideImportGermanyPage() {
 		<div className="mx-auto max-w-3xl px-6 py-14 space-y-10">
 			<header className="space-y-2">
 				<h1 className="text-2xl font-bold text-[var(--text)]">
-					Vodič za uvoz automobila iz Njemačke
+					Vodič za uvoz auta iz Njemačke
 				</h1>
 				<p className="text-sm text-[var(--text-soft)]">
-					Njemačko tržište rabljenih vozila (mobile.de, AutoScout24, autobid.de) je
-					najveće u Europi — evo koraka od odabira oglasa do registracije u
-					Hrvatskoj.
+					Od oglasa do hrvatskih tablica: koji papiri trebaju, što se od poreza
+					stvarno plaća i kojim redoslijedom ide postupak.
 				</p>
 			</header>
 
 			<section className="space-y-6">
 				<Step n={1} title="Pronađite oglas">
 					<p>
-						mobile.de, AutoScout24 i autobid.de su najveće njemačke platforme za
-						rabljena vozila. autobid.de je aukcijska platforma (uglavnom za
-						registrirane trgovce) i CO2 vrijednost se prije prijave rijetko
-						prikazuje u samom oglasu, dok mobile.de i AutoScout24 obično imaju
-						potpunije tehničke podatke.
+						Najveći njemački oglasnici su mobile.de i AutoScout24. autobid.de je
+						aukcijska platforma na kojoj uglavnom licitiraju registrirani trgovci
+						i tehnički podaci, uključujući CO2, često nisu vidljivi bez prijave.
+						Za procjenu poreza trebaju vam četiri podatka iz oglasa: cijena,
+						emisija CO2, datum prve registracije i broj sjedala.
 					</p>
 				</Step>
 
-				<Step n={2} title="Provjerite specifikacije i CO2 vrijednost">
+				<Step n={2} title="Provjerite papire prije nego pošaljete kaparu">
 					<p>
-						Prije nego ozbiljno razmatrate oglas, provjerite cijenu, CO2 emisije,
-						datum prve registracije i broj sjedala — to su podaci koji izravno
-						ulaze u izračun PPMV-a. Ako oglas ne navodi CO2, potražite podatak u
-						COC dokumentu vozila ili ga provjerite kod prodavača prije kupnje —
-						pogrešna pretpostavka o CO2 vrijednosti je jedna od najčešćih grešaka
-						kod procjene troška uvoza (vidi{" "}
+						Kod prodavača tražite dva dokumenta. Prvi je{" "}
+						<span className="font-medium text-[var(--text)]">
+							Zulassungsbescheinigung Teil II
+						</span>{" "}
+						(nekad Fahrzeugbrief), koji dokazuje vlasništvo i bez kojeg vozilo ne
+						možete prevesti na sebe. Drugi je{" "}
+						<span className="font-medium text-[var(--text)]">COC dokument</span>{" "}
+						(potvrda o sukladnosti), koji nosi službenu CO2 vrijednost pod točkom
+						49 i tehničke podatke potrebne za homologaciju.
+					</p>
+					<p>
+						Ako COC-a nema, alternativa je potvrda proizvođača koju izdaje
+						ovlašteni zastupnik marke u Hrvatskoj. Naplaćuje se i zna potrajati,
+						pa je bolje to riješiti prije kupnje nego nakon nje. Kako pročitati
+						CO2 vrijednost i koja se od dvije navedene odnosi na vaš auto, piše
+						na stranici{" "}
 						<Link
 							href="/nedc-vs-wltp"
 							className="font-medium text-[var(--primary)] hover:underline"
 						>
-							NEDC vs. WLTP
-						</Link>{" "}
-						za to koja vrijednost vrijedi za koji datum registracije).
+							NEDC ili WLTP
+						</Link>
+						.
 					</p>
 				</Step>
 
-				<Step n={3} title="Izračunajte PPMV">
+				<Step n={3} title="Izračunajte PPMV prije dogovora">
 					<p>
-						Zalijepite link oglasa u{" "}
-						<Link href="/" className="font-medium text-[var(--primary)] hover:underline">
+						Posebni porez na motorna vozila zna biti najveća pojedinačna stavka
+						nakon same cijene auta, osobito kod dizelaša s višim emisijama.
+						Zalijepite poveznicu oglasa u{" "}
+						<Link
+							href="/"
+							className="font-medium text-[var(--primary)] hover:underline"
+						>
 							kalkulator
 						</Link>{" "}
-						— pokušat će pročitati potrebne podatke izravno s oglasa i dopuniti
-						ono što nedostaje. Dobivena procjena vam govori koliko će vas uvoz
-						koštati prije nego uopće krenete s dogovorom oko kupnje i prijevoza.
+						i dobit ćete procjenu prije nego se obvežete na kupnju. Iznos ovisi o
+						cijeni, CO2 emisiji i starosti vozila.
 					</p>
 				</Step>
 
-				<Step n={4} title="Dogovorite prijevoz">
+				<Step n={4} title="Provjerite plaćate li PDV">
 					<p>
-						Vozilo do Hrvatske možete dovesti sami (uz privremene pločice/Zollkennzeichen
-						ili već postojeću njemačku registraciju) ili unajmiti transportnu
-						tvrtku koja prevozi vozila iz Njemačke prema Hrvatskoj. Trošak
-						prijevoza nije uključen u PPMV izračun — dodajte ga zasebno u ukupni
-						budžet uvoza.
+						Unutar EU nema carine. PDV se za rabljeno vozilo iz druge članice u
+						pravilu ne plaća u Hrvatskoj jer je već plaćen u državi kupnje. Iznimka
+						je takozvano novo prijevozno sredstvo: vozilo isporučeno unutar šest
+						mjeseci od prve uporabe ili s manje od 6.000 prijeđenih kilometara. Za
+						njega se plaća hrvatski PDV od 25%, bez obzira na to što je plaćeno u
+						Njemačkoj.
+					</p>
+					<p>
+						Za auto od godinu ili dvije s malom kilometražom taj prag je stvarno
+						blizu, pa prije kupnje usporedite datum prve uporabe i stanje brojila s
+						oba kriterija.
 					</p>
 				</Step>
 
-				<Step n={5} title="Provjerite homologaciju">
+				<Step n={5} title="Dovezite ili prevezite vozilo">
 					<p>
-						Da bi se vozilo moglo registrirati u Hrvatskoj, mora zadovoljavati
-						homologacijske uvjete — za većinu vozila proizvedenih za EU tržište to
-						nije prepreka, ali provjerite ima li vozilo sve što hrvatska
-						registracija zahtijeva (npr. ispravan COC dokument, sukladnost s EU
-						normama).
+						Za vožnju iz Njemačke prodavač odjavljuje vozilo, a vi vadite izvozne
+						tablice (Ausfuhrkennzeichen) s pripadajućim osiguranjem, koje vrijede
+						od nekoliko tjedana do nekoliko mjeseci. Kratkotrajne tablice
+						(Kurzzeitkennzeichen) vrijede pet dana i namijenjene su probnim
+						vožnjama unutar Njemačke, pa nisu zamjena za izvozne. Druga opcija je
+						transportna tvrtka, što košta više, ali otpadaju tablice, osiguranje i
+						put.
+					</p>
+					<p>
+						Prijevoz, gorivo i cestarine nisu dio PPMV izračuna. Držite ih kao
+						zasebnu stavku u budžetu.
 					</p>
 				</Step>
 
-				<Step n={6} title="Registrirajte vozilo">
+				<Step n={6} title="Prijavite PPMV u roku od 15 dana">
 					<p>
-						Zadnji korak je prijava vozila Carinskoj upravi radi obračuna i plaćanja
-						PPMV-a, nakon čega slijedi tehnički pregled i registracija kod ovlaštenog
-						stanica za tehnički pregled. Iznos koji vam kalkulator prikaže je
-						procjena — službeni iznos određuje Carinska uprava na temelju stvarno
-						predane dokumentacije.
+						Poreznu prijavu na obrascu PP-MV podnosite carinskom uredu nadležnom
+						prema svom prebivalištu, u roku od 15 dana od dana unosa vozila u
+						Hrvatsku. Prijavu možete predati i elektronički kroz sustav e-Građani,
+						uz vjerodajnicu značajne razine sigurnosti, pa rješenje i obavijesti
+						stižu u korisnički pretinac bez odlaska u carinski ured.
+					</p>
+					<p>
+						Carinska uprava donosi rješenje s konačnim iznosom. Dok PPMV nije
+						plaćen i evidentiran, vozilo se ne može registrirati.
+					</p>
+				</Step>
+
+				<Step n={7} title="Homologirajte vozilo">
+					<p>
+						Uvezeno vozilo prolazi utvrđivanje sukladnosti pojedinačnog vozila,
+						postupak kojim se provjerava odgovara li propisima za svoju kategoriju.
+						Provode ga Centar za vozila Hrvatske i Hrvatski autoklub na ispitnim
+						mjestima u stanicama za tehnički pregled. Uz vozilo se predaje COC
+						dokument ili potvrda proizvođača s tehničkom specifikacijom. Vozila
+						kupljena na njemačkom tržištu u pravilu prolaze bez prepravki, jer su
+						homologirana za EU.
+					</p>
+				</Step>
+
+				<Step n={8} title="Tehnički pregled i registracija">
+					<p>
+						Nakon homologacije slijede tehnički pregled i registracija. Na
+						registraciju nosite račun ili kupoprodajni ugovor, njemačku prometnu
+						dozvolu i Teil II, potvrdu o sukladnosti, dokaz o plaćenom PPMV-u i
+						policu obveznog osiguranja. Tek tada dobivate hrvatsku prometnu
+						dozvolu i tablice.
 					</p>
 				</Step>
 			</section>
 
 			<section className="space-y-3">
-				<h2 className="text-lg font-semibold text-[var(--text)]">Česte greške</h2>
+				<h2 className="text-lg font-semibold text-[var(--text)]">
+					Greške koje se najčešće ponavljaju
+				</h2>
 				<ul className="list-disc pl-5 space-y-2 text-sm leading-relaxed text-[var(--text-soft)]">
 					<li>
 						<span className="font-medium text-[var(--text)]">
-							Pogrešna pretpostavka o CO2 vrijednosti.
+							CO2 vrijednost uzeta odoka ili sa sličnog modela.
 						</span>{" "}
-						Procjena &bdquo;na oko&rdquo; ili preuzimanje CO2 vrijednosti sličnog, ali ne
-						identičnog modela može značajno promijeniti iznos PPMV-a — ekološka
-						komponenta raste po razredima CO2, ne linearno cijelim rasponom.
+						Ekološka komponenta ide po razredima, pa nekoliko grama razlike može
+						vozilo prebaciti u viši razred i podignuti porez za nekoliko stotina
+						eura.
 					</li>
 					<li>
 						<span className="font-medium text-[var(--text)]">
-							Nedostajući ili neispravan COC dokument.
+							Kupnja bez COC dokumenta.
 						</span>{" "}
-						Bez COC dokumenta teško je potvrditi CO2 vrijednost i ostale
-						tehničke podatke potrebne za registraciju — provjerite prije kupnje da
-						ga prodavač uopće ima ili da ga može ishoditi.
+						Naknadno pribavljanje potvrde proizvođača košta i traje, a bez jednog
+						od ta dva dokumenta homologacija stoji.
 					</li>
 					<li>
 						<span className="font-medium text-[var(--text)]">
-							Zaboravljen trošak prijevoza i tehničkog pregleda.
+							Propušten rok od 15 dana.
 						</span>{" "}
-						PPMV je samo jedna stavka ukupnog troška uvoza — prijevoz, tehnički
-						pregled i registracijske pristojbe dolaze zasebno.
+						Rok teče od unosa vozila u Hrvatsku, ne od dana kad ste odlučili
+						registrirati auto.
+					</li>
+					<li>
+						<span className="font-medium text-[var(--text)]">
+							Zaboravljen PDV na gotovo novo vozilo.
+						</span>{" "}
+						Auto mlađi od šest mjeseci ili s manje od 6.000 km povlači hrvatski
+						PDV od 25%, što lako pojede cijelu uštedu na cijeni.
+					</li>
+					<li>
+						<span className="font-medium text-[var(--text)]">
+							Računanje samo s PPMV-om.
+						</span>{" "}
+						Uz porez idu prijevoz, izvozne tablice i osiguranje, homologacija,
+						tehnički pregled i registracijske pristojbe.
 					</li>
 				</ul>
 			</section>
 
 			<section className="space-y-3 text-sm leading-relaxed text-[var(--text-soft)]">
 				<p>
-					Za detaljno objašnjenje same formule pogledajte{" "}
+					Detaljan prikaz formule je na stranici{" "}
 					<Link
 						href="/kako-se-izracunava-ppmv"
 						className="font-medium text-[var(--primary)] hover:underline"
 					>
 						Kako se izračunava PPMV
 					</Link>
-					, a za odgovore na dodatna pitanja{" "}
+					, a odgovori na pojedinačna pitanja na stranici{" "}
 					<Link
 						href="/cesta-pitanja"
 						className="font-medium text-[var(--primary)] hover:underline"
@@ -169,7 +235,7 @@ export default function GuideImportGermanyPage() {
 			</section>
 
 			<div className="pt-2">
-				<CalculatorCta>Izračunajte PPMV za oglas koji ste pronašli</CalculatorCta>
+				<CalculatorCta>Izračunajte PPMV za oglas koji ste našli</CalculatorCta>
 			</div>
 		</div>
 	);

@@ -39,8 +39,8 @@ export default function PrivacyPolicyPage() {
 
 			<Section title="Tko je voditelj obrade">
 				<p>
-					Ovu stranicu vodi Mario Žitković, kao samostalni projekt. Za sva
-					pitanja o privatnosti ili zahtjeve vezane uz vaše podatke, pišite na{" "}
+					Stranicu vodi Mario Žitković kao samostalni projekt. Za pitanja o
+					privatnosti i zahtjeve vezane uz vaše podatke pišite na{" "}
 					<a
 						href="mailto:mariozitkovic@gmail.com"
 						className="font-medium text-[var(--primary)] hover:underline"
@@ -53,21 +53,20 @@ export default function PrivacyPolicyPage() {
 
 			<Section title="Koje podatke prikupljamo i zašto">
 				<p>
-					Kalkulator ne traži registraciju niti prijavu — možete ga koristiti
-					potpuno anonimno. Ono što se ipak obrađuje u pozadini, ograničeno je
-					na ono što je potrebno da servis radi i da se spriječi zlouporaba:
+					Kalkulator ne traži registraciju ni prijavu i možete ga koristiti
+					anonimno. U pozadini se obrađuje samo ono što je potrebno da servis
+					radi i da se spriječi zlouporaba:
 				</p>
 				<ul className="list-disc pl-5 space-y-2">
 					<li>
 						<span className="font-medium text-[var(--text)]">
-							IP adresa — nikad se ne pohranjuje u izvornom obliku.
+							IP adresa se nikad ne pohranjuje u izvornom obliku.
 						</span>{" "}
-						Kad zalijepite link s mobile.de, vaša IP adresa se prije spremanja
+						Kad zalijepite poveznicu s mobile.de, IP adresa se prije spremanja
 						pretvori u jednosmjerni kriptografski otisak (SHA-256 s tajnom
-						soli) — iz otiska se izvorna adresa ne može rekonstruirati. Otisak
-						koristimo isključivo da ograničimo koliko puta dnevno jedan
-						posjetitelj može pokrenuti dohvat oglasa preko plaćenog vanjskog
-						servisa (Apify), čime štitimo servis od automatiziranog
+						soli), iz kojeg se izvorna adresa ne može rekonstruirati. Otisak
+						služi samo za ograničavanje broja dohvata oglasa preko plaćenog
+						vanjskog servisa (Apify), radi zaštite od automatiziranog
 						izvlačenja podataka i prekomjernog troška.
 					</li>
 					<li>
@@ -77,21 +76,20 @@ export default function PrivacyPolicyPage() {
 						Za svaki pokušaj dohvata mobile.de oglasa bilježimo: stranicu s
 						koje je oglas, ID oglasa, je li rezultat došao iz predmemorije ili
 						iz plaćenog poziva, ishod (uspjeh, neuspjeh, blokiran kao bot,
-						dosegnut dnevni limit) i procijenjeni trošak poziva. Ovo je
-						isključivo tehnička/računovodstvena evidencija — ne sadrži vaše
-						ime, e-mail ni bilo koji drugi osobni identifikator, samo gore
-						opisani IP otisak.
+						dosegnut dnevni limit) i procijenjeni trošak poziva. Riječ je o
+						tehničkoj evidenciji troška. Ne sadrži ime, e-mail ni drugi osobni
+						identifikator, nego samo gore opisani otisak IP adrese.
 					</li>
 					<li>
 						<span className="font-medium text-[var(--text)]">
 							Podaci o oglasu vozila koji unesete.
 						</span>{" "}
-						Kad zalijepite link oglasa, s njega se očitaju javno dostupni
-						podaci o vozilu (marka, model, godina, CO2, cijena i slično) da bi
-						se izračunala procjena PPMV-a. Rezultat dohvaćanja mobile.de
-						oglasa privremeno se sprema (do 24 sata) kako se isti oglas ne bi
-						ponovno plaćeno dohvaćao ako ga u tom roku provjeri netko drugi —
-						ovo su podaci o vozilu s javnog oglasa, ne o vama osobno.
+						Kad zalijepite poveznicu oglasa, s njega se očitaju javno dostupni
+						podaci o vozilu (marka, model, godina, CO2, cijena i slično) radi
+						izračuna. Rezultat dohvata mobile.de oglasa sprema se do 24 sata,
+						kako se isti oglas ne bi ponovno plaćeno dohvaćao ako ga u tom roku
+						provjeri netko drugi. To su podaci o vozilu s javnog oglasa, ne o
+						vama.
 					</li>
 					<li>
 						<span className="font-medium text-[var(--text)]">
@@ -100,7 +98,7 @@ export default function PrivacyPolicyPage() {
 						Na produkcijskoj verziji stranice dio zahtjeva za mobile.de oglase
 						prolazi kroz Cloudflare Turnstile, servis koji provjerava je li
 						zahtjev poslao stvaran posjetitelj. Turnstile pritom može
-						postaviti vlastiti kolačić — detalji su na{" "}
+						postaviti vlastiti kolačić, o čemu piše na{" "}
 						<Link
 							href="/kolacici"
 							className="font-medium text-[var(--primary)] hover:underline"
@@ -112,9 +110,8 @@ export default function PrivacyPolicyPage() {
 				</ul>
 				<p>
 					Podaci koje ručno upišete u obrazac (cijena, datum prve
-					registracije, broj sjedala i slično) obrađuju se samo u vašem
-					pregledniku i na poslužitelju radi izračuna — ne spremaju se trajno
-					vezano uz vas.
+					registracije, broj sjedala i slično) obrađuju se u pregledniku i na
+					poslužitelju radi izračuna i ne spremaju se trajno uz vas.
 				</p>
 			</Section>
 
@@ -131,11 +128,11 @@ export default function PrivacyPolicyPage() {
 
 			<Section title="Koliko dugo čuvamo podatke">
 				<p>
-					Predmemorija dohvaćenih mobile.de oglasa briše se automatski nakon
-					24 sata. Evidencija dohvata (uz hashiranu IP adresu) čuva se onoliko
-					dugo koliko je razumno potrebno za praćenje troškova i sprječavanje
-					zlouporabe. Budući da je IP adresa nepovratno hashirana, ti se zapisi
-					ne mogu natrag povezati s vama kao pojedincem.
+					Predmemorija dohvaćenih mobile.de oglasa briše se nakon 24 sata.
+					Evidencija dohvata s hashiranom IP adresom čuva se onoliko dugo koliko
+					je potrebno za praćenje troškova i sprječavanje zlouporabe. Kako je IP
+					adresa nepovratno hashirana, ti se zapisi ne mogu povezati s vama kao
+					pojedincem.
 				</p>
 			</Section>
 
@@ -156,18 +153,17 @@ export default function PrivacyPolicyPage() {
 					</li>
 					<li>
 						<span className="font-medium text-[var(--text)]">carVertical</span>{" "}
-						— ako kliknete na njihov partnerski (affiliate) link na ovoj
-						stranici, dalje ste na njihovoj stranici i podliježete njihovoj
-						politici privatnosti; mi tim klikom ne dobivamo nikakve vaše
-						osobne podatke, samo saznajemo da je do klika došlo.
+						vodi partnerska (affiliate) poveznica na ovoj stranici. Kad je
+						otvorite, nalazite se na njihovoj stranici i podliježete njihovoj
+						politici privatnosti. Mi tim klikom ne dobivamo vaše osobne
+						podatke, nego samo podatak da je do klika došlo.
 					</li>
 					<li>
 						<span className="font-medium text-[var(--text)]">
 							Google AdSense
 						</span>{" "}
-						— trenutno nije aktivan na stranici. Ako i kad ga uključimo, ova
-						politika i stranica o kolačićima bit će ažurirane prije nego
-						oglasi krenu prikazivati se.
+						trenutno nije aktivan. Ako ga uključimo, ova politika i stranica o
+						kolačićima bit će ažurirane prije prvog prikazanog oglasa.
 					</li>
 				</ul>
 			</Section>
@@ -176,11 +172,9 @@ export default function PrivacyPolicyPage() {
 				<p>
 					Prema GDPR-u imate pravo zatražiti uvid u podatke koje o vama
 					obrađujemo, njihov ispravak ili brisanje, kao i uložiti prigovor na
-					obradu temeljenu na legitimnom interesu. Budući da najveći dio
-					podataka koje bilježimo (hashirana IP adresa) ne omogućuje
-					identifikaciju konkretne osobe, mogućnost povezivanja zahtjeva s
-					određenim zapisima je u praksi ograničena — ali svaki zahtjev
-					poslan na{" "}
+					obradu temeljenu na legitimnom interesu. Kako hashirana IP adresa ne
+					omogućuje identifikaciju konkretne osobe, povezivanje zahtjeva s
+					određenim zapisima često nije izvedivo, ali svaki zahtjev poslan na{" "}
 					<a
 						href="mailto:mariozitkovic@gmail.com"
 						className="font-medium text-[var(--primary)] hover:underline"
@@ -208,10 +202,9 @@ export default function PrivacyPolicyPage() {
 
 			<Section title="Izmjene ove politike">
 				<p>
-					Ako promijenimo što i kako prikupljamo — primjerice uvođenjem
-					AdSense oglasa ili analitike — ova stranica će biti ažurirana prije
-					uvođenja te promjene, s naznakom datuma zadnje izmjene na vrhu
-					stranice.
+					Ako se promijeni što prikupljamo i kako, primjerice uvođenjem AdSense
+					oglasa ili analitike, ova stranica bit će ažurirana prije te promjene,
+					s novim datumom izmjene na vrhu.
 				</p>
 			</Section>
 		</div>

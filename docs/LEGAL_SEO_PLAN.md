@@ -6,6 +6,24 @@
 
 ---
 
+## Status note (2026-09-05)
+
+Phases 0-2 are built. Two things diverge from the plan below and the plan is the
+stale one:
+
+- **Phase 1's "Kako radi" + FAQ block on the calculator page is gone.** The FAQ
+  items were a verbatim subset of `/cesta-pitanja`, so the same Q&As lived on two
+  URLs with two `FAQPage` schema blocks. Google removed FAQ rich results for
+  non-government/health sites in Aug 2023 and switched them off entirely on
+  2026-05-07, so the markup no longer buys a SERP feature and there was nothing
+  to weigh against the duplication. What stays on `/` is a short block of copy
+  unique to that page, so the landing page still isn't a bare form for AdSense
+  review, plus links out to the deep pages.
+- **`/profitability` is deleted**, not deferred: page, nav entry and sitemap
+  entry. The backend `app/profitability/` stub is untouched.
+
+---
+
 ## Phase 0 — Legal pages (before any public traffic, ~1 day)
 
 Not SEO, but blocking: GDPR applies the moment you set a cookie or hash an IP, which the

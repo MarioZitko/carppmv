@@ -6,156 +6,174 @@ import { FaqList, FaqSchema, type FaqItem } from "@/components/Faq";
 export const metadata: Metadata = {
 	title: "Česta pitanja o PPMV-u i uvozu vozila",
 	description:
-		"Odgovori na najčešća pitanja o PPMV-u, CO2 vrijednostima, NEDC/WLTP tablicama, umanjenjima i tome kako kalkulatoruvoza.com radi.",
+		"Odgovori na pitanja o PPMV-u: tko ga plaća, u kojem roku se prijavljuje, kad se plaća PDV, gdje piše CO2 vrijednost i kako radi ovaj kalkulator.",
 	alternates: { canonical: "/cesta-pitanja" },
 };
 
+const link = "font-medium text-[var(--primary)] hover:underline";
+
 const FAQ_ITEMS: FaqItem[] = [
 	{
-		question: "Što je PPMV?",
+		question: "Što je PPMV i kada se plaća?",
 		answer:
-			"Posebni porez na motorna vozila (PPMV) plaća se pri prvoj registraciji vozila u Hrvatskoj. Iznos ovisi o vrijednosti vozila (VN/PC komponenta) i njegovim CO2 emisijama (ON/EN komponenta), uz umanjenje za starost vozila prema propisanoj tablici amortizacije.",
+			"Posebni porez na motorna vozila plaća se prije prve registracije vozila u Hrvatskoj. Iznos se dobiva zbrajanjem vrijednosne komponente, koja ovisi o cijeni vozila, i ekološke komponente, koja ovisi o emisiji CO2. Za rabljena vozila taj se zbroj umanjuje prema tablici amortizacije po starosti.",
 	},
 	{
-		question: "Trebam li platiti PPMV ako uvozim vozilo iz EU?",
+		question: "Plaća li se PPMV i za vozilo kupljeno u EU?",
 		answer:
-			"Da. PPMV je nacionalni porez na registraciju vozila i plaća se bez obzira odakle vozilo dolazi — iz EU ili izvan nje. Carinska pristojba i PDV su druga priča: te se stavke naplaćuju samo pri uvozu iz zemalja izvan EU, budući da unutar jedinstvenog tržišta EU nema carine.",
+			"Da. PPMV je nacionalni porez vezan uz prvu registraciju u Hrvatskoj i ne ovisi o tome odakle vozilo dolazi.",
 	},
 	{
-		question: "Plaćam li PPMV i za novo i za rabljeno vozilo?",
+		question: "Plaća li se carina i PDV pri uvozu iz EU?",
 		answer:
-			"Da, oboje podliježe PPMV-u. Razlika je u amortizaciji: novo vozilo plaća pun iznos (faktor 1,0), dok se rabljenom vozilu iznos umanjuje prema propisanoj tablici koja ovisi o starosti u mjesecima od prve registracije.",
+			"Carine unutar EU nema. PDV se za rabljeno vozilo u pravilu ne plaća jer je već plaćen u državi kupnje. Iznimka je novo prijevozno sredstvo, dakle vozilo isporučeno unutar šest mjeseci od prve uporabe ili s manje od 6.000 prijeđenih kilometara. Za njega se plaća hrvatski PDV od 25%.",
+	},
+	{
+		question: "Plaća li se PPMV i za novo i za rabljeno vozilo?",
+		answer:
+			"Oboje podliježe porezu. Novo vozilo plaća puni iznos, a rabljenom se iznos množi postotkom iz tablice amortizacije, koji ovisi o broju punih mjeseci od prve registracije.",
+	},
+	{
+		question: "U kojem roku moram prijaviti PPMV?",
+		answer:
+			"U roku od 15 dana od dana unosa vozila u Hrvatsku, na obrascu PP-MV, carinskom uredu nadležnom prema vašem prebivalištu ili sjedištu. Prijava se može predati i elektronički kroz sustav e-Građani.",
+	},
+	{
+		question: "Mogu li registrirati vozilo prije nego platim PPMV?",
+		answer:
+			"Ne. Registracija je moguća tek kad je porez plaćen i kad Carinska uprava to evidentira, pa prijava PPMV-a dolazi prije tehničkog pregleda i registracije.",
 	},
 	{
 		question: "Je li ovo službeni izračun?",
 		answer:
-			"Ne. Ovo je procjena temeljena na javno dostupnim propisima (Uredbi o načinu izračuna PPMV-a, NN 156/22, i Pravilniku o posebnom porezu na motorna vozila) — nije službeno porezno mišljenje. Za konačan, obvezujući iznos obratite se Carinskoj upravi.",
+			"Nije. Ovo je procjena po javno dostupnim propisima, Uredbi NN 156/22 i Pravilniku o posebnom porezu na motorna vozila. Obvezujući iznos utvrđuje Carinska uprava u poreznom rješenju.",
 	},
 	{
-		question: "Kako kalkulator izračunava iznos?",
+		question: "Kako kalkulator dolazi do iznosa?",
 		answer: (
 			<>
-				Prema formuli propisanoj Uredbom — zbroj vrijednosne i ekološke komponente,
-				umanjen za amortizaciju po starosti vozila. Puni prikaz svakog koraka, s
-				pravim primjerom izračuna, nalazi se na stranici{" "}
-				<Link
-					href="/kako-se-izracunava-ppmv"
-					className="font-medium text-[var(--primary)] hover:underline"
-				>
+				Zbraja vrijednosnu i ekološku komponentu iz tablica Uredbe, primjenjuje
+				umanjenja za vrstu vozila i na kraju množi postotkom amortizacije. Svaki
+				korak, s primjerom u brojevima, opisan je na stranici{" "}
+				<Link href="/kako-se-izracunava-ppmv" className={link}>
 					Kako se izračunava PPMV
 				</Link>
 				.
 			</>
 		),
 		answerText:
-			"Prema formuli propisanoj Uredbom — zbroj vrijednosne i ekološke komponente, umanjen za amortizaciju po starosti vozila.",
+			"Zbraja vrijednosnu i ekološku komponentu iz tablica Uredbe, primjenjuje umanjenja za vrstu vozila i na kraju množi postotkom amortizacije. Svaki korak je opisan na stranici Kako se izračunava PPMV.",
 	},
 	{
-		question: "Koja je razlika između NEDC i WLTP mjerenja CO2?",
+		question: "Koja je razlika između NEDC i WLTP vrijednosti CO2?",
 		answer: (
 			<>
-				Riječ je o dva različita ciklusa mjerenja potrošnje i emisija — primjenjuju se
-				različite porezne tablice ovisno o tome je li vozilo prvi put registrirano
-				prije ili poslije 1.1.2021. Puno objašnjenje s primjerima pročitajte na
+				To su dva ciklusa mjerenja. Vozila prvi put registrirana do 31.12.2020.
+				računaju se po NEDC tablicama, a ona registrirana od 1.1.2021. po WLTP
+				tablicama, koje su zasebne i imaju druge granice razreda. Detaljnije na
 				stranici{" "}
-				<Link href="/nedc-vs-wltp" className="font-medium text-[var(--primary)] hover:underline">
-					NEDC vs. WLTP
+				<Link href="/nedc-vs-wltp" className={link}>
+					NEDC ili WLTP
 				</Link>
 				.
 			</>
 		),
 		answerText:
-			"Riječ je o dva različita ciklusa mjerenja potrošnje i emisija — primjenjuju se različite porezne tablice ovisno o tome je li vozilo prvi put registrirano prije ili poslije 1.1.2021.",
+			"To su dva ciklusa mjerenja. Vozila prvi put registrirana do 31.12.2020. računaju se po NEDC tablicama, a ona registrirana od 1.1.2021. po WLTP tablicama, koje su zasebne i imaju druge granice razreda.",
 	},
 	{
-		question: "Odakle da znam CO2 vrijednost svog vozila?",
+		question: "Gdje piše CO2 vrijednost mog vozila?",
 		answer:
-			"Najpouzdaniji izvor je COC dokument (Certificate of Conformity) vozila. Kad zalijepite link oglasa, kalkulator prvo pokuša pročitati CO2 izravno s oglasa; ako ga nema, pretražuje internu bazu službenih cjenika Carinske uprave po marki, modelu i izvedbi. Kad ni to ne uspije, nudi orijentacijski raspon prikupljen s Wikipedije — to je samo smjernica za usporedbu s COC dokumentom, nikad se automatski ne koristi u samom izračunu.",
+			"U COC dokumentu pod točkom 49 i u prometnoj dozvoli u polju V.7. Oglasi tu vrijednost često navode, ali je znaju prepisati s druge izvedbe istog modela, pa je prije prijave usporedite s dokumentom.",
 	},
 	{
-		question: "Koliko je pouzdana Wikipedia procjena CO2?",
+		question: "Koliko je pouzdana procjena CO2 s Wikipedije?",
 		answer:
-			"Namjerno je označena kao orijentacijska, ne kao ulazni podatak za izračun — CO2 polje u obrascu se njome nikad ne popunjava automatski. Uvijek je usporedite sa stvarnim COC dokumentom prije nego što se na nju oslonite.",
+			"Dovoljno da vidite jeste li u pravom redu veličine, ali ne dovoljno da se na nju osloni porezni izračun. Zato se njome CO2 polje nikad ne popunjava automatski, nego stoji kao raspon za usporedbu s COC dokumentom.",
 	},
 	{
 		question: "S kojih stranica kalkulator može pročitati oglas?",
 		answer:
-			"Podržani su mobile.de, AutoScout24, njuškalo i autobid.de. Zalijepite link oglasa i kalkulator će pokušati pročitati marku, model, cijenu, CO2 i ostale podatke izravno s oglasa.",
+			"S mobile.de, AutoScout24, Njuškala i autobid.de. Zalijepite poveznicu i kalkulator pokušava pročitati marku, model, cijenu, CO2 i datum prve registracije.",
 	},
 	{
-		question: "Što ako link oglasa ne radi ili nešto ne uspije pročitati?",
+		question: "Što ako poveznica ne radi ili se podaci ne pročitaju?",
 		answer:
-			"Podatke uvijek možete unijeti ručno — ispod obrasca za link nalazi se i opcija pretrage naše baze vozila, a polja za cijenu, CO2, datum registracije i ostalo možete i sami popuniti ili ispraviti u bilo kojem trenutku.",
+			"Sve možete unijeti ručno. Ispod polja za poveznicu nalazi se i pretraga baze vozila, a svako pojedino polje možete popuniti ili ispraviti sami.",
 	},
 	{
-		question: "Kalkulator mi je ponudio nekoliko mogućih vozila iz baze — koje odabrati?",
+		question: "Kalkulator nudi nekoliko vozila iz baze. Koje odabrati?",
 		answer:
-			"Kad kalkulator nije dovoljno siguran koji red iz baze cjenika odgovara oglasu, prikazuje rangiranu listu kandidata umjesto da nagađa — to je namjerno, jer bi pogrešno automatski odabrana cijena ili CO2 vrijednost pokvarila cijeli izračun. Odaberite red koji najbolje odgovara izvedbi vozila iz oglasa (motor, snaga, godina).",
+			"Kad podudaranje nije sigurno, prikazuje se rangirana lista umjesto automatskog odabira, jer bi kriva cijena ili CO2 pokvarili cijeli izračun. Odaberite red koji odgovara motoru, snazi i godini iz oglasa.",
 	},
 	{
-		question: "Postoji li olakšica za električna vozila?",
-		answer:
-			"Da, električna vozila su u potpunosti oslobođena PPMV-a (iznos je 0 EUR).",
+		question: "Plaćaju li električna vozila PPMV?",
+		answer: "Ne. Vozila s emisijom 0 g/km oslobođena su poreza u cijelosti.",
 	},
 	{
-		question: "Postoji li olakšica za plug-in hibride?",
+		question: "Kakvo umanjenje imaju plug-in hibridi?",
 		answer:
-			"Da, umanjenje se računa prema dometu vožnje isključivo na struju (EAER city domet u kilometrima) — što je taj domet veći, umanjenje je veće, do najviše 100%.",
+			"Umanjenje je brojčano jednako dometu vožnje na struju u gradskoj vožnji (EAER city, u kilometrima), najviše 100%. Domet od 59 km znači umanjenje od 59%.",
 	},
 	{
-		question: "Postoji li olakšica za vozila s više sjedala ili kampere?",
+		question: "Postoji li umanjenje za vozila s više sjedala i za kampere?",
 		answer:
-			"Da. Vozila s ukupno 8 sjedala plaćaju polovicu iznosa, s 9 i više sjedala četvrtinu. Kamperi plaćaju 15% iznosa. Sva umanjenja se primjenjuju automatski kad u obrascu označite relevantno polje.",
+			"Vozilo s 8 sjedala plaća polovicu iznosa, s 9 i više sjedala četvrtinu, a kamperi 15%. Umanjenja se primjenjuju automatski kad u obrascu unesete te podatke.",
 	},
 	{
 		question: "Je li trošak prijevoza uključen u izračun?",
 		answer: (
 			<>
-				Ne. Kalkulator izračunava isključivo PPMV. Trošak prijevoza, tehničkog
-				pregleda i registracijskih pristojbi dolazi zasebno — pogledajte{" "}
-				<Link
-					href="/vodic-uvoz-njemacka"
-					className="font-medium text-[var(--primary)] hover:underline"
-				>
-					Vodič za uvoz automobila iz Njemačke
-				</Link>{" "}
-				za pregled svih koraka i troškova uvoza.
+				Nije. Kalkulator računa samo PPMV. Prijevoz, izvozne tablice,
+				homologacija, tehnički pregled i registracijske pristojbe dolaze zasebno.
+				Pregled svih koraka i troškova je u{" "}
+				<Link href="/vodic-uvoz-njemacka" className={link}>
+					vodiču za uvoz auta iz Njemačke
+				</Link>
+				.
 			</>
 		),
 		answerText:
-			"Ne. Kalkulator izračunava isključivo PPMV. Trošak prijevoza, tehničkog pregleda i registracijskih pristojbi dolazi zasebno.",
+			"Nije. Kalkulator računa samo PPMV. Prijevoz, izvozne tablice, homologacija, tehnički pregled i registracijske pristojbe dolaze zasebno.",
+	},
+	{
+		question: "Trebam li COC dokument i što ako ga vozilo nema?",
+		answer:
+			"COC dokument nosi službenu CO2 vrijednost i tehničke podatke potrebne za homologaciju, pa ga tražite od prodavača prije kupnje. Ako ga nema, zamjena je potvrda proizvođača koju izdaje ovlašteni zastupnik marke u Hrvatskoj, uz naknadu.",
+	},
+	{
+		question: "Što je homologacija i tko je provodi?",
+		answer:
+			"To je utvrđivanje sukladnosti pojedinačnog vozila, provjera odgovara li vozilo propisima za svoju kategoriju. Provode je Centar za vozila Hrvatske i Hrvatski autoklub na ispitnim mjestima u stanicama za tehnički pregled.",
 	},
 	{
 		question: "Je li korištenje kalkulatora besplatno?",
-		answer: "Da, kalkulator je u potpunosti besplatan i ne zahtijeva registraciju.",
+		answer: "Jest, i ne traži registraciju.",
 	},
 	{
-		question: "Što je carVertical link koji vidim na stranici?",
+		question: "Što je carVertical poveznica na stranici?",
 		answer:
-			"To je partnerski (affiliate) link prema carVertical, servisu za provjeru povijesti vozila po VIN broju ili registarskoj oznaci. Ako kliknete na njega i kupite provjeru, kalkulatoruvoza.com može dobiti proviziju — vas to ništa dodatno ne košta.",
+			"Partnerska (affiliate) poveznica prema carVerticalu, servisu za provjeru povijesti vozila po VIN broju. Ako kliknete i kupite provjeru, kalkulator može dobiti proviziju. Vama cijena ostaje ista.",
 	},
 	{
 		question: "Koje podatke kalkulator prikuplja o meni?",
 		answer: (
 			<>
-				Kalkulator ne zahtijeva registraciju i može se koristiti anonimno. Detalje
-				o tome koji se podaci u pozadini ipak obrađuju (npr. hashirana IP adresa
-				radi sprječavanja zlouporabe) pogledajte na stranici{" "}
-				<Link
-					href="/privatnost"
-					className="font-medium text-[var(--primary)] hover:underline"
-				>
-					Politika privatnosti
+				Račun nije potreban i kalkulator se koristi anonimno. Što se ipak
+				obrađuje u pozadini, primjerice hashirana IP adresa radi sprječavanja
+				zlouporabe, piše u{" "}
+				<Link href="/privatnost" className={link}>
+					politici privatnosti
 				</Link>
 				, a o kolačićima na stranici{" "}
-				<Link href="/kolacici" className="font-medium text-[var(--primary)] hover:underline">
+				<Link href="/kolacici" className={link}>
 					Kolačići
 				</Link>
 				.
 			</>
 		),
 		answerText:
-			"Kalkulator ne zahtijeva registraciju i može se koristiti anonimno. Detalje o podacima koji se u pozadini obrađuju pogledajte na stranici Politika privatnosti, a o kolačićima na stranici Kolačići.",
+			"Račun nije potreban i kalkulator se koristi anonimno. Što se ipak obrađuje u pozadini, primjerice hashirana IP adresa radi sprječavanja zlouporabe, piše u politici privatnosti, a o kolačićima na stranici Kolačići.",
 	},
 ];
 
@@ -167,8 +185,7 @@ export default function FaqPage() {
 					Česta pitanja o PPMV-u i uvozu vozila
 				</h1>
 				<p className="text-sm text-[var(--text-soft)]">
-					Sva pitanja koja korisnici najčešće postavljaju o izračunu PPMV-a i
-					korištenju kalkulatora, na jednom mjestu.
+					Porez, rokovi, papiri i rad samog kalkulatora, na jednom mjestu.
 				</p>
 			</header>
 
@@ -181,34 +198,28 @@ export default function FaqPage() {
 				</h2>
 				<ul className="list-disc pl-5 space-y-2">
 					<li>
-						<Link
-							href="/kako-se-izracunava-ppmv"
-							className="font-medium text-[var(--primary)] hover:underline"
-						>
+						<Link href="/kako-se-izracunava-ppmv" className={link}>
 							Kako se izračunava PPMV
-						</Link>{" "}
-						— puna formula i primjer izračuna.
+						</Link>
+						: formula i primjer izračuna.
 					</li>
 					<li>
-						<Link href="/nedc-vs-wltp" className="font-medium text-[var(--primary)] hover:underline">
-							NEDC vs. WLTP
-						</Link>{" "}
-						— koji CO2 podatak vrijedi za vaše vozilo.
+						<Link href="/nedc-vs-wltp" className={link}>
+							NEDC ili WLTP
+						</Link>
+						: koja CO2 vrijednost vrijedi za vaše vozilo.
 					</li>
 					<li>
-						<Link
-							href="/vodic-uvoz-njemacka"
-							className="font-medium text-[var(--primary)] hover:underline"
-						>
-							Vodič za uvoz automobila iz Njemačke
-						</Link>{" "}
-						— svi koraci uvoza, ne samo porez.
+						<Link href="/vodic-uvoz-njemacka" className={link}>
+							Vodič za uvoz auta iz Njemačke
+						</Link>
+						: svi koraci postupka, ne samo porez.
 					</li>
 					<li>
-						<Link href="/o-kalkulatoru" className="font-medium text-[var(--primary)] hover:underline">
+						<Link href="/o-kalkulatoru" className={link}>
 							O kalkulatoru
-						</Link>{" "}
-						— metodologija i izvori.
+						</Link>
+						: izvori i granice alata.
 					</li>
 				</ul>
 			</section>

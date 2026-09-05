@@ -399,7 +399,7 @@ function Breadcrumbs({
   if (!article) {
     return (
       <h3 className="text-sm font-semibold text-[var(--text)] truncate">
-        Odaberite model — {brand}
+        Odaberite model za {brand}
       </h3>
     );
   }

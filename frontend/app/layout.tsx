@@ -5,14 +5,33 @@ import "./globals.css";
 import { SupportSection } from "@/components/SupportSection";
 
 const SITE_URL = "https://kalkulatoruvoza.com";
-const SITE_NAME = "carPPMV — Kalkulator uvoza";
+const SITE_NAME = "carPPMV";
+const SITE_TITLE = "carPPMV: kalkulator PPMV-a za uvoz auta";
 const DESCRIPTION =
-	"Besplatan kalkulator PPMV-a (posebni porez na motorna vozila) za uvoz automobila u Hrvatsku. Zalijepite link oglasa (mobile.de, autoscout24, autobid.de) ili pretražite bazu vozila i odmah dobijte procjenu carine i poreza.";
+	"Besplatan izračun posebnog poreza na motorna vozila (PPMV) pri uvozu auta u Hrvatsku. Zalijepite poveznicu oglasa s mobile.de, AutoScout24, autobid.de ili Njuškala, ili pretražite bazu vozila, i odmah vidite procjenu poreza.";
+
+const NAV_LINKS = [
+	{ href: "/", label: "Kalkulator" },
+	{ href: "/kako-se-izracunava-ppmv", label: "Kako se računa" },
+	{ href: "/nedc-vs-wltp", label: "NEDC ili WLTP" },
+	{ href: "/vodic-uvoz-njemacka", label: "Uvoz iz Njemačke" },
+	{ href: "/cesta-pitanja", label: "Pitanja" },
+] as const;
+
+const FOOTER_LINKS = [
+	{ href: "/kako-se-izracunava-ppmv", label: "Kako se izračunava PPMV" },
+	{ href: "/nedc-vs-wltp", label: "NEDC ili WLTP" },
+	{ href: "/vodic-uvoz-njemacka", label: "Uvoz auta iz Njemačke" },
+	{ href: "/cesta-pitanja", label: "Česta pitanja" },
+	{ href: "/o-kalkulatoru", label: "O kalkulatoru" },
+	{ href: "/privatnost", label: "Privatnost" },
+	{ href: "/kolacici", label: "Kolačići" },
+] as const;
 
 export const metadata: Metadata = {
 	metadataBase: new URL(SITE_URL),
 	title: {
-		default: `${SITE_NAME} — izračun PPMV-a za uvoz auta`,
+		default: SITE_TITLE,
 		template: `%s | ${SITE_NAME}`,
 	},
 	description: DESCRIPTION,
@@ -35,12 +54,12 @@ export const metadata: Metadata = {
 		locale: "hr_HR",
 		url: SITE_URL,
 		siteName: SITE_NAME,
-		title: `${SITE_NAME} — izračun PPMV-a za uvoz auta`,
+		title: SITE_TITLE,
 		description: DESCRIPTION,
 	},
 	twitter: {
 		card: "summary_large_image",
-		title: `${SITE_NAME} — izračun PPMV-a za uvoz auta`,
+		title: SITE_TITLE,
 		description: DESCRIPTION,
 	},
 };
@@ -88,48 +107,59 @@ export default function RootLayout({
 								</span>
 								<span className="hidden sm:inline text-[var(--text-soft)]">
 									{" "}
-									— izračun uvozne pristojbe
+									· izračun PPMV-a
 								</span>
 							</span>
 						</Link>
-						<nav className="flex gap-1 text-sm font-medium">
-							<Link
-								href="/"
-								className="rounded-lg px-3 py-2 text-[var(--text)] hover:bg-[var(--primary-soft)] hover:text-[var(--primary)] transition-colors"
-							>
-								Izračun PPMV-a
-							</Link>
-							<Link
-								href="/profitability"
-								className="rounded-lg px-3 py-2 text-[var(--text)] hover:bg-[var(--primary-soft)] hover:text-[var(--primary)] transition-colors"
-							>
-								Isplativost
-							</Link>
+						<nav className="hidden md:flex gap-1 text-sm font-medium">
+							{NAV_LINKS.map((link) => (
+								<Link
+									key={link.href}
+									href={link.href}
+									className="rounded-lg px-3 py-2 text-[var(--text)] hover:bg-[var(--primary-soft)] hover:text-[var(--primary)] transition-colors"
+								>
+									{link.label}
+								</Link>
+							))}
 						</nav>
+						{/* Below md the same links live in a native <details> dropdown, so the
+						    header stays a server component and the menu works without JS. */}
+						<details className="md:hidden relative group">
+							<summary className="cursor-pointer list-none rounded-lg px-3 py-2 text-sm font-medium text-[var(--text)] hover:bg-[var(--primary-soft)] hover:text-[var(--primary)] transition-colors">
+								Izbornik
+							</summary>
+							<div className="absolute right-0 mt-2 w-56 rounded-xl border border-[var(--border)] bg-white shadow-lg p-1.5 flex flex-col">
+								{NAV_LINKS.map((link) => (
+									<Link
+										key={link.href}
+										href={link.href}
+										className="rounded-lg px-3 py-2 text-sm font-medium text-[var(--text)] hover:bg-[var(--primary-soft)] hover:text-[var(--primary)] transition-colors"
+									>
+										{link.label}
+									</Link>
+								))}
+							</div>
+						</details>
 					</div>
 				</header>
 				<main className="flex-1">{children}</main>
 				<footer className="border-t border-[var(--border)] mt-16">
 					<div className="mx-auto max-w-6xl px-4 sm:px-6 py-6 space-y-4">
-						<div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 text-xs text-[var(--text-soft)]">
-							<p className="flex flex-wrap items-center gap-x-1">
-								<span>
-									Ovo je procjena — uvijek provjerite konačan iznos u
-									službenom carinskom rješenju.
-								</span>
+						<nav className="flex flex-wrap gap-x-4 gap-y-1.5 text-xs text-[var(--text-soft)]">
+							{FOOTER_LINKS.map((link) => (
 								<Link
-									href="/privatnost"
-									className="underline hover:text-[var(--text)] transition-colors"
+									key={link.href}
+									href={link.href}
+									className="hover:text-[var(--text)] transition-colors"
 								>
-									Privatnost
+									{link.label}
 								</Link>
-								<span aria-hidden="true">·</span>
-								<Link
-									href="/kolacici"
-									className="underline hover:text-[var(--text)] transition-colors"
-								>
-									Kolačići
-								</Link>
+							))}
+						</nav>
+						<div className="flex flex-col sm:flex-row sm:items-baseline sm:justify-between gap-2 text-xs text-[var(--text-soft)]">
+							<p>
+								Iznos koji ovdje vidite je procjena. Obvezujući iznos utvrđuje
+								Carinska uprava u poreznom rješenju.
 							</p>
 							<p>
 								Izradio{" "}
