@@ -98,7 +98,7 @@ export function CarVerticalCard({ vin }: { vin?: string | null }) {
 					value={manualId}
 					onChange={(e) => setManualId(e.target.value)}
 					placeholder="Broj šasije ili registracija (npr. ZG1234AB)"
-					className="flex-1 rounded-xl border bg-white px-4 py-3 text-sm text-[var(--text)] placeholder:text-[var(--text-soft)] focus:outline-none"
+					className="flex-1 rounded-xl border bg-white px-4 py-3 text-sm text-[var(--text)] placeholder:text-[var(--text-soft)]"
 					style={{ borderColor: `${CV_BLUE}4d` }}
 				/>
 				<a

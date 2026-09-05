@@ -19,7 +19,7 @@ export function ToggleSwitch({ checked, onChange, label, hint }: Props) {
         role="switch"
         aria-checked={checked}
         onClick={() => onChange(!checked)}
-        className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${
+        className={`relative h-6 w-11 shrink-0 rounded-full transition-colors after:absolute after:-inset-y-2.5 after:inset-x-0 after:content-[''] ${
           checked ? "bg-[var(--primary)]" : "bg-[var(--border)]"
         }`}
       >

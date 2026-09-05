@@ -203,7 +203,7 @@ export function VehicleForm({ values, onChange, co2Hint, co2Lookup }: Props) {
 							<button
 								type="button"
 								onClick={() => onChange({ seatCount: "8" })}
-								className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
+								className={`rounded-lg px-3 py-1.5 min-h-11 text-xs font-medium transition-colors ${
 									!is9Plus
 										? "bg-[var(--surface)] text-[var(--primary)] shadow-sm"
 										: "text-[var(--text-soft)]"
@@ -214,7 +214,7 @@ export function VehicleForm({ values, onChange, co2Hint, co2Lookup }: Props) {
 							<button
 								type="button"
 								onClick={() => onChange({ seatCount: "9" })}
-								className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
+								className={`rounded-lg px-3 py-1.5 min-h-11 text-xs font-medium transition-colors ${
 									is9Plus
 										? "bg-[var(--surface)] text-[var(--primary)] shadow-sm"
 										: "text-[var(--text-soft)]"

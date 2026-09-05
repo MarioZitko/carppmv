@@ -35,8 +35,8 @@
   --color-primary-dark: var(--primary-dark);
   --color-primary-soft: var(--primary-soft);
   --color-accent: var(--accent);
-  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
-  --font-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: var(--font-ibm-plex-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 
 html {
@@ -101,4 +101,40 @@ input[type="range"]::-moz-range-thumb {
   border: 3px solid white;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
   cursor: pointer;
+}
+
+/* Touch pointers get a real 44px hit area for the extras slider: it is the
+   primary price-tuning control on a phone, and the element's own box — not the
+   painted thumb — is what receives the touch. So the input grows to 44px and
+   the visible track moves onto ::-webkit-slider-runnable-track / ::-moz-range-track,
+   which keeps the track thin while the touch target is full height. Desktop
+   keeps the finer 6px track and 18px thumb defined above. */
+@media (pointer: coarse) {
+  input[type="range"] {
+    height: 44px;
+    background: transparent;
+  }
+
+  input[type="range"]::-webkit-slider-runnable-track {
+    height: 10px;
+    border-radius: 999px;
+    background: var(--border);
+  }
+
+  input[type="range"]::-webkit-slider-thumb {
+    height: 28px;
+    width: 28px;
+    margin-top: -9px; /* centre the 28px thumb on the 10px track */
+  }
+
+  input[type="range"]::-moz-range-track {
+    height: 10px;
+    border-radius: 999px;
+    background: var(--border);
+  }
+
+  input[type="range"]::-moz-range-thumb {
+    height: 28px;
+    width: 28px;
+  }
 }

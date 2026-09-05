@@ -78,13 +78,18 @@ export function CatalogueSearchForm({ onResult }: Props) {
 
   const inputCls =
     "w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3.5 py-2 text-sm text-[var(--text)] placeholder:text-[var(--text-soft)] focus:border-[var(--primary)] transition-colors";
-  const srOnly = "sr-only";
+  // Visible, not sr-only: this grid is 5 controls whose placeholders were the
+  // only label, and at 375px two of them ("Model (npr. 320d, A4…)", "Varijanta
+  // / oprema (opc.)") overflowed their box — leaving the field unidentifiable.
+  // Same class string as VehicleForm's labels so the two forms read alike.
+  const labelCls =
+    "block text-xs font-medium uppercase tracking-wide text-[var(--text-soft)] mb-1";
 
   return (
     <form onSubmit={handleSubmit} className="space-y-3">
-      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3">
         <div>
-          <label className={srOnly} htmlFor="cs-brand">Marka</label>
+          <label className={labelCls} htmlFor="cs-brand">Marka</label>
           <select
             id="cs-brand"
             className={inputCls}
@@ -94,7 +99,7 @@ export function CatalogueSearchForm({ onResult }: Props) {
               setModels([]);
             }}
           >
-            <option value="">Marka…</option>
+            <option value="">Odaberite…</option>
             {brands.map((b) => (
               <option key={b} value={b}>
                 {b}
@@ -104,11 +109,11 @@ export function CatalogueSearchForm({ onResult }: Props) {
         </div>
 
         <div>
-          <label className={srOnly} htmlFor="cs-model">Model</label>
+          <label className={labelCls} htmlFor="cs-model">Model</label>
           <input
             id="cs-model"
             className={inputCls}
-            placeholder="Model (npr. 320d, A4…)"
+            placeholder="npr. 320d"
             list="catalogue-model-suggestions"
             value={model}
             onChange={(e) => setModel(e.target.value)}
@@ -121,20 +126,20 @@ export function CatalogueSearchForm({ onResult }: Props) {
         </div>
 
         <div>
-          <label className={srOnly} htmlFor="cs-variant">Varijanta / oprema</label>
+          <label className={labelCls} htmlFor="cs-variant">Varijanta (opc.)</label>
           <input
             id="cs-variant"
             className={inputCls}
-            placeholder="Varijanta / oprema (opc.)"
+            placeholder="npr. M Sport"
             value={variant}
             onChange={(e) => setVariant(e.target.value)}
           />
         </div>
 
         <div>
-          <label className={srOnly} htmlFor="cs-year">Godina</label>
+          <label className={labelCls} htmlFor="cs-year">Godina (opc.)</label>
           <select id="cs-year" className={inputCls} value={year} onChange={(e) => setYear(e.target.value)}>
-            <option value="">Godina (opc.)</option>
+            <option value="">Sve godine</option>
             {YEARS.map((y) => (
               <option key={y} value={y}>
                 {y}
@@ -144,14 +149,14 @@ export function CatalogueSearchForm({ onResult }: Props) {
         </div>
 
         <div>
-          <label className={srOnly} htmlFor="cs-power">Snaga u kW</label>
+          <label className={labelCls} htmlFor="cs-power">Snaga u kW (opc.)</label>
           <input
             id="cs-power"
             className={inputCls}
             type="number"
             min="0"
             step="1"
-            placeholder="Snaga u kW (opc.)"
+            placeholder="npr. 140"
             value={powerKw}
             onChange={(e) => setPowerKw(e.target.value)}
           />

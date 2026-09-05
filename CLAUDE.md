@@ -551,6 +551,26 @@ on a phone it is the only way back to step one, and leaving that to the
 browser's back gesture (which closes the page, not the step) turns a two-step
 modal into a trap.
 
+`CandidatesList` is laid out around **what differs between rows, not what each
+row is.** A real query ("BMW" + "320d") returns a dozen rows that are the *same
+car* in successive official price lists: identical brand, model, variant, fuel
+and kW, all scoring 100, separated only by `valid_from` — across €10k of price
+and 12 g/km of CO2, both of which feed the tax directly. Three consequences,
+each of which looks like cosmetic detail and isn't:
+
+- **`valid_from` is labelled ("cjenik od …") and sits with the price it
+  qualifies.** It used to render bare and unlabelled at the tail of a `·`-joined
+  spec line, which made the list undecidable: nothing on screen said the date was
+  why the prices differed.
+- **The score badge is suppressed when every candidate scores the same.** Twelve
+  identical "podudarnost 100%" pills carry no information while reading as a
+  confidence signal. `scoreTierClassName` still tiers the mixed case, where the
+  score does discriminate. The wording is "podudarnost teksta" because that is
+  what the backend score measures — text similarity, not "this is your car".
+- **Row text wraps rather than truncating, and the row stacks below `sm`.** At
+  375px the heading and variant were the two lines that overflowed — i.e. exactly
+  the lines that tell rows apart.
+
 `Co2HintNote` renders **inside** the CO2 field: a muted chip in the input's
 trailing edge, and an absolutely-positioned popover for the detail. Both are
 outside the layout flow on purpose. An earlier version was a block below the
@@ -560,10 +580,11 @@ added here has to stay out of flow or the grid rhythm breaks again. The two
 actions inside it are deliberately unalike — "Promijeni motor" is a filled
 in-app control, the source link is muted with an external-link glyph — because
 as two identical lines of blue text they were indistinguishable.
-`app/page.tsx` is the PPMV calculator (the live product);
-`app/profitability/page.tsx` is a shell with no backend yet
-(`app/profitability/` on the backend is an empty stub — deferred, not
-broken). `lib/api.ts` is the only place that calls the backend — thin
+`app/page.tsx` is the PPMV calculator (the live product); the rest of
+`app/` is static content/SEO routes. There is no profitability page on
+the frontend — it was removed in `0718599`, and only the backend's empty
+`app/profitability/` package remains (deferred, not broken).
+`lib/api.ts` is the only place that calls the backend — thin
 fetch wrappers per endpoint, typed via `lib/types.ts` (hand-kept mirrors
 of the Pydantic schemas, not generated).
 

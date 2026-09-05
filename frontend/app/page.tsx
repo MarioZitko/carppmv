@@ -11,7 +11,11 @@ import { MobilePriceBar } from "@/components/MobilePriceBar";
 import { PPMVBreakdownCard } from "@/components/PPMVBreakdownCard";
 import { CarVerticalCard } from "@/components/CarVerticalCard";
 import { ParsedFieldsCard } from "@/components/ParsedFieldsCard";
-import { ApiTimeoutError, calculateFromUrl, calculateFromSpecs } from "@/lib/api";
+import {
+	ApiTimeoutError,
+	calculateFromUrl,
+	calculateFromSpecs,
+} from "@/lib/api";
 import { normalizeUrl } from "@/lib/format";
 import { guessFuelType, toIsoDate, todayIso } from "@/lib/fuel";
 import {
@@ -286,9 +290,8 @@ export default function Home() {
 				Izračun PPMV-a
 			</h1>
 			<p className="text-sm text-[var(--text-soft)] mb-5 max-w-2xl">
-				Procijenite posebni porez na motorna vozila. Zalijepite poveznicu
-				oglasa ili odaberite vozilo iz baze, a cijenu i CO2 možete naknadno
-				podesiti.
+				Procijenite posebni porez na motorna vozila. Zalijepite poveznicu oglasa
+				ili odaberite vozilo iz baze, a cijenu i CO2 možete naknadno podesiti.
 			</p>
 
 			<div className="grid grid-cols-1 lg:grid-cols-3 gap-4 items-start">
@@ -298,7 +301,7 @@ export default function Home() {
 							<button
 								type="button"
 								onClick={() => setMode("link")}
-								className={`rounded-lg px-4 py-1.5 text-sm font-medium transition-colors ${
+								className={`rounded-lg px-4 py-1.5 min-h-11 text-sm font-medium transition-colors ${
 									mode === "link"
 										? "bg-[var(--surface)] text-[var(--primary)] shadow-sm"
 										: "text-[var(--text-soft)]"
@@ -309,7 +312,7 @@ export default function Home() {
 							<button
 								type="button"
 								onClick={() => setMode("search")}
-								className={`rounded-lg px-4 py-1.5 text-sm font-medium transition-colors ${
+								className={`rounded-lg px-4 py-1.5 min-h-11 text-sm font-medium transition-colors ${
 									mode === "search"
 										? "bg-[var(--surface)] text-[var(--primary)] shadow-sm"
 										: "text-[var(--text-soft)]"
@@ -382,10 +385,6 @@ export default function Home() {
 						updating={ppmvLoading}
 						hint={ppmvHint ?? "Popunite podatke o vozilu za izračun PPMV-a."}
 					/>
-					<p className="text-xs text-[var(--text-soft)] px-1">
-						Procjena po važećim propisima, nije službeno porezno mišljenje.
-						Obvezujući iznos utvrđuje Carinska uprava u poreznom rješenju.
-					</p>
 				</div>
 			</div>
 
@@ -404,16 +403,16 @@ export default function Home() {
 				<div className="space-y-3 text-sm leading-relaxed text-[var(--text-soft)]">
 					<p>
 						Posebni porez na motorna vozila (PPMV) plaća se prije prve
-						registracije vozila u Hrvatskoj. Iznos ovisi o cijeni vozila, emisiji
-						CO2 i starosti vozila, a računa se po tablicama iz Uredbe NN 156/22 i
-						Pravilnika o posebnom porezu na motorna vozila. Iste tablice koristi i
-						ovaj kalkulator.
+						registracije vozila u Hrvatskoj. Iznos ovisi o cijeni vozila,
+						emisiji CO2 i starosti vozila, a računa se po tablicama iz Uredbe NN
+						156/22 i Pravilnika o posebnom porezu na motorna vozila. Iste
+						tablice koristi i ovaj kalkulator.
 					</p>
 					<p>
 						Zalijepite poveznicu oglasa i kalkulator pokušava sam pročitati
-						cijenu, CO2 i datum prve registracije. Podatak koji nedostaje, najčešće
-						je to CO2, traži u bazi službenih cjenika uvoznika. Sve možete i ručno
-						ispraviti prije izračuna.
+						cijenu, CO2 i datum prve registracije. Podatak koji nedostaje,
+						najčešće je to CO2, traži u bazi službenih cjenika uvoznika. Sve
+						možete i ručno ispraviti prije izračuna.
 					</p>
 					<p className="flex flex-wrap gap-x-4 gap-y-1">
 						<Link

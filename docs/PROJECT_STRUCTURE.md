@@ -71,9 +71,9 @@ app/
   profitability/         # DEFERRED — empty package (__init__.py only)
   main.py                # app factory, router registration, create_all on startup
 
-frontend/                # Next.js — PPMV calculator live, Profitability is a shell
-  app/                     # page.tsx (calculator), profitability/, layout, seo routes
-  components/              # 13 components (UrlInputForm, VehicleForm,
+frontend/                # Next.js — PPMV calculator live
+  app/                     # page.tsx (calculator), content pages, layout, seo routes
+  components/              # 18 components (UrlInputForm, VehicleForm,
                            #  PPMVBreakdownCard, CandidatesList, CarVerticalCard, ...)
   lib/                     # api.ts (the only backend caller), types.ts, format.ts,
                            #  fuel.ts, vehicleForm.ts
@@ -148,9 +148,10 @@ paid rebuild (`--fresh`) plus its validation steps.
 
 ## Deferred
 
-- **Profitability calculator** — `app/profitability/` is an empty package and
-  `frontend/app/profitability/` is a shell. Will consume `catalogue/matching.py`
-  the same way `/calculate` does.
+- **Profitability calculator** — `app/profitability/` is an empty backend
+  package; there is no frontend page (the earlier shell was removed in
+  `0718599`). Will consume `catalogue/matching.py` the same way `/calculate`
+  does.
 - **Sweep scraping** (nightly/weekly bulk) — njuškalo and mobile.de hard-block
   sweep patterns; needs an Apify cost decision that hasn't been made.
 - **AdSense** — gated on content pages and traffic, see `MONETIZATION_SPEC.md`.

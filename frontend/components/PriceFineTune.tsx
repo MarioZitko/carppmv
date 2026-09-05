@@ -110,13 +110,9 @@ export function PriceFineTune({ priceEur, onChange, anchorToken }: Props) {
 
 	return (
 		<div className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] shadow-sm p-5 space-y-4">
-			<h3 className="text-sm font-semibold text-[var(--text)]">
-				Fino podešavanje cijene
-			</h3>
-
 			<div>
 				<div className="flex items-center justify-between font-mono-tab text-xl font-semibold text-[var(--text)]">
-					{formatEur(priceEur)}
+					Cijena novog vozila: {formatEur(priceEur)}
 				</div>
 				<p className="text-xs text-[var(--text-soft)] mt-0.5">
 					Ovo je cijena vozila{" "}
@@ -125,7 +121,10 @@ export function PriceFineTune({ priceEur, onChange, anchorToken }: Props) {
 				</p>
 			</div>
 
-			<label id="pft-extras-label" className="block text-xs font-medium uppercase tracking-wide text-[var(--text-soft)]">
+			<label
+				id="pft-extras-label"
+				className="block text-xs font-medium uppercase tracking-wide text-[var(--text-soft)]"
+			>
 				Dodatna oprema iznad osnovne izvedbe
 			</label>
 			<div className="flex flex-wrap gap-1.5">
@@ -136,7 +135,7 @@ export function PriceFineTune({ priceEur, onChange, anchorToken }: Props) {
 							key={pct}
 							type="button"
 							onClick={() => applyPercent(pct)}
-							className={`rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors border ${
+							className={`rounded-lg px-2.5 py-1.5 min-h-11 text-xs font-medium transition-colors border ${
 								isActive
 									? "bg-[var(--primary-soft)] text-[var(--primary)] border-[var(--primary)]"
 									: "bg-[var(--surface-alt)] text-[var(--text-soft)] border-[var(--border)] hover:border-[var(--primary)] hover:text-[var(--primary)]"
@@ -167,7 +166,9 @@ export function PriceFineTune({ priceEur, onChange, anchorToken }: Props) {
 				))}
 			</datalist>
 
-			<label className="sr-only" htmlFor="pft-number">Cijena vozila (EUR)</label>
+			<label className="sr-only" htmlFor="pft-number">
+				Cijena vozila (EUR)
+			</label>
 			<input
 				id="pft-number"
 				type="number"

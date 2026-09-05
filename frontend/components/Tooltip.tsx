@@ -23,13 +23,17 @@ export function Tooltip({ text }: Props) {
   }, [open]);
 
   return (
-    <span className="relative inline-flex" ref={ref}>
+    <span
+      className="relative inline-flex"
+      ref={ref}
+      onMouseEnter={() => setOpen(true)}
+      onMouseLeave={() => setOpen(false)}
+    >
       <button
         type="button"
         aria-label="Objašnjenje"
         onClick={() => setOpen((v) => !v)}
-        onMouseEnter={() => setOpen(true)}
-        className="ml-1 inline-flex h-4 w-4 items-center justify-center rounded-full bg-[var(--border)] text-[10px] font-semibold text-[var(--text-soft)] hover:bg-[var(--primary)] hover:text-white transition-colors"
+        className="relative ml-1 inline-flex h-4 w-4 items-center justify-center rounded-full after:absolute after:-inset-3.5 after:content-[''] bg-[var(--border)] text-[10px] font-semibold text-[var(--text-soft)] hover:bg-[var(--primary)] hover:text-white transition-colors"
       >
         ?
       </button>

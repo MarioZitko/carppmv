@@ -119,7 +119,8 @@ app/
   scraping/      # per-site extractors, Apify fetcher, guard stack, persistence
   catalogue/     # fuzzy listing→catalogue matching + Excel ingestion pipeline
   data/          # offline catalogue ingestion CLI + source files
-  profitability/ # import profitability calculator (deferred, empty package)
+  profitability/ # import profitability calculator (deferred, empty package;
+                 #  no frontend page — removed in 0718599)
   db/            # SQLAlchemy models + session
   main.py        # FastAPI app factory
 frontend/        # Next.js — PPMV calculator page (live), Profitability (shell)

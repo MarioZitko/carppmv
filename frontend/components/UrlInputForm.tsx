@@ -121,7 +121,7 @@ export function UrlInputForm({ onSubmit, loading }: Props) {
 									>
 										<polyline points="20 6 9 17 4 12" />
 									</svg>
-									<span className="hidden xs:inline">Zalijepljeno</span>
+									<span>Zalijepljeno</span>
 								</>
 							) : pasteState === "failed" ? (
 								<span>Pokušaj opet</span>

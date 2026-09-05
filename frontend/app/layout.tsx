@@ -1,8 +1,26 @@
 import type { Metadata } from "next";
+import { Inter, IBM_Plex_Mono } from "next/font/google";
 import Image from "next/image";
 import Link from "next/link";
 import "./globals.css";
+import { MobileNav } from "@/components/MobileNav";
 import { SupportSection } from "@/components/SupportSection";
+
+// globals.css named both faces but nothing ever loaded them, so the whole UI
+// silently fell back to the system stack. latin-ext is required, not optional:
+// the entire interface is Croatian (č, ć, ž, š, đ).
+const inter = Inter({
+	subsets: ["latin", "latin-ext"],
+	variable: "--font-inter",
+	display: "swap",
+});
+
+const ibmPlexMono = IBM_Plex_Mono({
+	subsets: ["latin", "latin-ext"],
+	weight: ["400", "600"],
+	variable: "--font-ibm-plex-mono",
+	display: "swap",
+});
 
 const SITE_URL = "https://kalkulatoruvoza.com";
 const SITE_NAME = "carPPMV";
@@ -70,7 +88,7 @@ export default function RootLayout({
 	children: React.ReactNode;
 }>) {
 	return (
-		<html lang="hr" className="h-full">
+		<html lang="hr" className={`h-full ${inter.variable} ${ibmPlexMono.variable}`}>
 			<body className="min-h-full flex flex-col">
 				<script
 					type="application/ld+json"
@@ -91,7 +109,7 @@ export default function RootLayout({
 					}}
 				/>
 				<header className="sticky top-0 z-10 border-b border-[var(--border)] bg-white/80 backdrop-blur-sm">
-					<div className="mx-auto max-w-6xl px-6 py-4 flex items-center justify-between">
+					<div className="mx-auto max-w-6xl px-4 sm:px-6 py-4 flex items-center justify-between">
 						<Link href="/" className="flex items-center gap-2.5 text-lg">
 							<Image
 								src="/logo.svg"
@@ -122,29 +140,12 @@ export default function RootLayout({
 								</Link>
 							))}
 						</nav>
-						{/* Below md the same links live in a native <details> dropdown, so the
-						    header stays a server component and the menu works without JS. */}
-						<details className="md:hidden relative group">
-							<summary className="cursor-pointer list-none rounded-lg px-3 py-2 text-sm font-medium text-[var(--text)] hover:bg-[var(--primary-soft)] hover:text-[var(--primary)] transition-colors">
-								Izbornik
-							</summary>
-							<div className="absolute right-0 mt-2 w-56 rounded-xl border border-[var(--border)] bg-white shadow-lg p-1.5 flex flex-col">
-								{NAV_LINKS.map((link) => (
-									<Link
-										key={link.href}
-										href={link.href}
-										className="rounded-lg px-3 py-2 text-sm font-medium text-[var(--text)] hover:bg-[var(--primary-soft)] hover:text-[var(--primary)] transition-colors"
-									>
-										{link.label}
-									</Link>
-								))}
-							</div>
-						</details>
+						<MobileNav links={NAV_LINKS} />
 					</div>
 				</header>
 				<main className="flex-1">{children}</main>
 				<footer className="border-t border-[var(--border)] mt-16">
-					<div className="mx-auto max-w-6xl px-4 sm:px-6 py-6 space-y-4">
+					<div className="mx-auto max-w-6xl px-4 sm:px-6 py-6 pb-24 lg:pb-6 space-y-4">
 						<nav className="flex flex-wrap gap-x-4 gap-y-1.5 text-xs text-[var(--text-soft)]">
 							{FOOTER_LINKS.map((link) => (
 								<Link
