@@ -96,11 +96,17 @@ export function searchCatalogue(params: {
   return request<CatalogueSearchResponse>(`/catalogue/search?${qs.toString()}`, { method: "GET" });
 }
 
-/** GET /wikipedia/engines — every Wikipedia engine row for a brand, optionally
- * narrowed by free-text model/engine designation. Backs the engine picker,
- * which is how a user resolves ties the matcher can't (an Audi A2 "1.4" at
- * 55 kW is both a 142 g/km petrol and a 116 g/km diesel). */
-/** GET /wikipedia/models — the picker's first step: which generation is it? */
+/** GET /wikipedia/brands — the marques the Wikipedia corpus actually holds
+ * (37, against the catalogue's 43). It is the picker's zeroth step, reached
+ * whenever no listing has told us the brand — which is the whole point of the
+ * picker being openable on an empty form. Deliberately the corpus's own list
+ * and not `getCatalogueBrands()`: offering a marque the corpus has nothing for
+ * only leads to an empty model list that looks broken. */
+export function getWikipediaBrands(): Promise<string[]> {
+  return request<string[]>("/wikipedia/brands", { method: "GET" });
+}
+
+/** GET /wikipedia/models — the picker's model step: which generation is it? */
 export function searchWikipediaModels(params: {
   brand: string;
   q?: string;
@@ -115,6 +121,10 @@ export function searchWikipediaModels(params: {
   });
 }
 
+/** GET /wikipedia/engines — every Wikipedia engine row for a brand, optionally
+ * narrowed by free-text model/engine designation. Backs the engine picker,
+ * which is how a user resolves ties the matcher can't (an Audi A2 "1.4" at
+ * 55 kW is both a 142 g/km petrol and a 116 g/km diesel). */
 export function searchWikipediaEngines(params: {
   brand: string;
   q?: string;

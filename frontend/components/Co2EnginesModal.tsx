@@ -1,17 +1,31 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { searchWikipediaEngines, searchWikipediaModels } from "@/lib/api";
+import {
+  getWikipediaBrands,
+  searchWikipediaEngines,
+  searchWikipediaModels,
+} from "@/lib/api";
 import { WikipediaEngineRow, WikipediaModelRow } from "@/lib/types";
 
 interface Props {
   onClose: () => void;
-  /** Called with the row the user picked. The caller applies its CO2. */
-  onSelect: (row: WikipediaEngineRow) => void;
-  brand: string;
+  /** Called with the row the user picked, and the marque it was browsed under
+   * — the row itself carries no brand, and after the brand step that marque is
+   * no longer something the caller can assume it knows. */
+  onSelect: (row: WikipediaEngineRow, brand: string) => void;
+  /** Marque from the listing or the picked catalogue row, when there is one.
+   * Null opens the picker at the brand list instead — the case that makes this
+   * usable on an untouched form, with no URL pasted and nothing parsed. */
+  brand?: string | null;
   /** Initial search text — model + engine designation from the listing. Used to
-   * *rank* the model list, never to skip past it. */
-  initialQuery: string;
+   * *rank* the model list, never to skip past it. Only ever seeds the brand it
+   * came with; it is meaningless under any other marque. */
+  initialQuery?: string;
+  /** Model article the user already drilled into, so reopening the picker
+   * resumes there instead of dropping back to the brand list. Requires
+   * `brand`; ignored without one. */
+  initialArticle?: string | null;
   /** ISO first-registration date, when the form has one. Scopes both steps to
    * generations that could plausibly have been registered then. */
   registered?: string | null;
@@ -43,11 +57,11 @@ function formatPeriod(row: { production_start: string | null; production_end: st
   return row.production_end ? `${from}–${row.production_end}` : `${from}–danas`;
 }
 
-/** Pick the engine variant, and take its CO2 — in two steps: which model, then
- * which engine.
+/** Pick the engine variant, and take its CO2 — in three steps: which marque,
+ * which model, then which engine.
  *
- * **Why two steps and not one search box.** Free-text matching over a listing
- * blob cannot always be trusted to have found the right car, and nothing in its
+ * **Why steps and not one search box.** Free-text matching over a listing blob
+ * cannot always be trusted to have found the right car, and nothing in its
  * result says when it hasn't. A 3-series Gran Turismo has no de.wikipedia
  * article at all, so the closest honest answer is a different body of the same
  * era — offered with no visible difference from a correct one. Only the person
@@ -60,25 +74,44 @@ function formatPeriod(row: { production_start: string | null; production_end: st
  * indistinguishable to the matcher because autobid.de publishes no fuel type,
  * so it can only report their union, 116–142. The owner knows which they bought.
  *
+ * **The brand step is what makes this a browser rather than a follow-up to a
+ * scrape.** It is the entry point whenever no listing supplied a marque, so a
+ * user who never pastes a URL — typing their car's figures in by hand, which is
+ * a first-class path through this form — can still reach the corpus. When a
+ * marque *was* supplied the picker opens past it, but the crumb back to the
+ * full list stays live: a scrape that read the wrong brand, or a user checking
+ * a different car, must not be a dead end.
+ *
  * Selecting is a deliberate act, which is what makes filling the CO2 field here
  * compatible with the plan's rule against *auto*-filling. */
 export function Co2EnginesModal({
   onClose,
   onSelect,
-  brand,
-  initialQuery,
+  brand: initialBrand,
+  initialQuery = "",
+  initialArticle,
   registered,
 }: Props) {
-  // The chosen article is the whole navigation state: null is step one.
-  const [article, setArticle] = useState<WikipediaModelRow | null>(null);
-  const [query, setQuery] = useState(initialQuery);
+  // Brand and article together are the whole navigation state: no brand is step
+  // zero, brand without article is step one.
+  const [brand, setBrand] = useState<string | null>(initialBrand ?? null);
+  // Only the article *title* — that is all the fetches and the breadcrumb need,
+  // and keeping it a string is what lets a caller restore this step from the
+  // engine row it holds, which carries a title and not a model row.
+  const [article, setArticle] = useState<string | null>(
+    initialBrand ? (initialArticle ?? null) : null,
+  );
+  const [query, setQuery] = useState(
+    initialBrand && !initialArticle ? initialQuery : "",
+  );
 
+  const [brands, setBrands] = useState<string[] | null>(null);
   const [models, setModels] = useState<WikipediaModelRow[] | null>(null);
   const [rows, setRows] = useState<WikipediaEngineRow[] | null>(null);
   const [brandKnown, setBrandKnown] = useState(true);
   const [ignored, setIgnored] = useState<string[]>([]);
-  // The registration date narrows both steps, and a listing's parsed date is
-  // not always right. Scoping silently would rebuild the trap this whole
+  // The registration date narrows both list steps, and a listing's parsed date
+  // is not always right. Scoping silently would rebuild the trap this whole
   // rework is meant to remove — a user whose date is wrong by a year would see
   // a list with their car missing and no way to tell why. So it is visible and
   // switchable, and the user's own choice wins over the parse.
@@ -88,11 +121,35 @@ export function Co2EnginesModal({
   const [error, setError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
+  /** The listing text ranks the marque it was read from and nothing else — as a
+   * query under another brand it is pure noise, and worse than noise on the
+   * model step, where every word it drops is reported to the user. */
+  const seedQuery = useCallback(
+    (target: string) => (initialBrand && target === initialBrand ? initialQuery : ""),
+    [initialBrand, initialQuery],
+  );
+
+  const loadBrands = useCallback(async () => {
+    try {
+      const list = await getWikipediaBrands();
+      setBrands(list);
+      setError(null);
+    } catch {
+      setError("Dohvat popisa marki nije uspio. Pokušajte ponovno.");
+      setBrands([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  // Brand is passed in rather than closed over, so these callbacks depend only
+  // on `scope`. Closing over the brand state would make every navigation
+  // rebuild them, and the mount effect below would fire again on each one.
   const fetchModels = useCallback(
-    async (q: string) => {
+    async (target: string, q: string) => {
       try {
         const data = await searchWikipediaModels({
-          brand,
+          brand: target,
           q: q.trim() || undefined,
           registered: scope,
         });
@@ -108,14 +165,14 @@ export function Co2EnginesModal({
         setLoading(false);
       }
     },
-    [brand, scope],
+    [scope],
   );
 
   const fetchEngines = useCallback(
-    async (q: string, title: string) => {
+    async (target: string, q: string, title: string) => {
       try {
         const data = await searchWikipediaEngines({
-          brand,
+          brand: target,
           q: q.trim() || undefined,
           article: title,
           registered: scope,
@@ -131,25 +188,41 @@ export function Co2EnginesModal({
         setLoading(false);
       }
     },
-    [brand, scope],
+    [scope],
   );
 
-  // Search once on mount, so opening shows models rather than an empty box.
+  // Load the step we open on, so opening shows a list rather than an empty box.
   //
-  // set-state-in-effect fires here because it traces into fetchModels and finds
-  // the setState calls that store the response. Fetching on mount is the
-  // legitimate case the rule can't distinguish: the state isn't derivable
+  // Mount-only on purpose, and the deps array says so: `fetchModels` and
+  // `loadBrands` are listed by the exhaustive-deps rule, but `fetchModels`
+  // changes identity whenever the date scope is toggled, and re-running this
+  // effect then would refetch the *opening* step's list — models, with the
+  // listing query — on top of whatever step the user has since navigated to.
+  // The scope effect below is what handles that change, for the current step.
+  //
+  // set-state-in-effect fires here because it traces into the fetchers and
+  // finds the setState calls that store the response. Fetching on mount is the
+  // legitimate case that rule can't distinguish: the state isn't derivable
   // during render, and the mount *is* the trigger.
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    void fetchModels(initialQuery);
+    /* eslint-disable react-hooks/set-state-in-effect -- see above: the opening
+       list has to be fetched, and its arrival is state. */
+    if (initialBrand && initialArticle) {
+      void fetchEngines(initialBrand, "", initialArticle);
+    } else if (initialBrand) {
+      void fetchModels(initialBrand, initialQuery);
+    } else {
+      void loadBrands();
+    }
+    /* eslint-enable react-hooks/set-state-in-effect */
     // Autofocus only where focusing does not raise a keyboard. The signal is
     // the pointer, not the viewport width: a tablet is wide *and* touch, so a
     // width check would still pop the keyboard and shove a centred dialog
     // behind it. On touch the user taps the field when they want it.
     const coarse = window.matchMedia?.("(pointer: coarse)").matches ?? false;
     if (!coarse) inputRef.current?.focus();
-  }, [initialQuery, fetchModels]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -159,29 +232,61 @@ export function Co2EnginesModal({
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
 
+  function chooseBrand(target: string) {
+    const seed = seedQuery(target);
+    setBrand(target);
+    setArticle(null);
+    setModels(null);
+    setQuery(seed);
+    setLoading(true);
+    void fetchModels(target, seed);
+  }
+
   function chooseModel(model: WikipediaModelRow) {
-    setArticle(model);
+    setArticle(model.model_article_title);
     setRows(null);
     // The listing text got us to the right generation; inside it, it is mostly
     // noise. Starting the engine step blank shows every variant, which is the
     // shorter and more reliable list to scan.
     setQuery("");
     setLoading(true);
-    void fetchEngines("", model.model_article_title);
+    void fetchEngines(brand!, "", model.model_article_title);
   }
 
   function backToModels() {
+    if (!brand) return;
+    const seed = seedQuery(brand);
     setArticle(null);
     setRows(null);
-    setQuery(initialQuery);
+    setQuery(seed);
     setLoading(true);
-    void fetchModels(initialQuery);
+    void fetchModels(brand, seed);
+  }
+
+  function backToBrands() {
+    setBrand(null);
+    setArticle(null);
+    setModels(null);
+    setRows(null);
+    setQuery("");
+    setIgnored([]);
+    setError(null);
+    // The list is short and never changes mid-session, so a second visit is
+    // instant rather than another round trip.
+    if (brands === null) {
+      setLoading(true);
+      void loadBrands();
+    } else {
+      setLoading(false);
+    }
   }
 
   function runSearch(q: string) {
+    // The brand list filters as you type — there is nothing to submit.
+    if (!brand) return;
     setLoading(true);
-    if (article) void fetchEngines(q, article.model_article_title);
-    else void fetchModels(q);
+    if (article) void fetchEngines(brand, q, article);
+    else void fetchModels(brand, q);
   }
 
   // fetchModels/fetchEngines close over `scope`, so the refetch has to wait for
@@ -192,16 +297,28 @@ export function Co2EnginesModal({
       first.current = false;
       return;
     }
+    if (!brand) return;
+    /* eslint-disable react-hooks/set-state-in-effect -- refetching the current
+       step is exactly what this effect is for; the spinner and the response
+       both have to land as state. */
     setLoading(true);
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    if (article) void fetchEngines(query, article.model_article_title);
-    else void fetchModels(query);
-    // Only the scope change should retrigger this; query and article changes
-    // already refetch through their own handlers.
+    if (article) void fetchEngines(brand, query, article);
+    else void fetchModels(brand, query);
+    /* eslint-enable react-hooks/set-state-in-effect */
+    // Only the scope change should retrigger this; query, brand and article
+    // changes already refetch through their own handlers.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dateScoped]);
 
-  const step = article ? "engine" : "model";
+  const step = !brand ? "brand" : article ? "engine" : "model";
+
+  // Filtered in the browser rather than on the server: it is one short list
+  // (37 marques) that never changes, so a round trip per keystroke would buy
+  // nothing but latency.
+  const brandFilter = query.trim().toLowerCase();
+  const shownBrands = (brands ?? []).filter(
+    (b) => !brandFilter || b.toLowerCase().includes(brandFilter),
+  );
 
   return (
     <div
@@ -220,13 +337,16 @@ export function Co2EnginesModal({
           <div className="min-w-0">
             <Breadcrumbs
               brand={brand}
-              article={article?.model_article_title ?? null}
+              article={article}
+              onBrands={backToBrands}
               onBrand={backToModels}
             />
             <p className="mt-0.5 text-xs text-[var(--text-soft)]">
-              {step === "model"
-                ? "Odaberite model vozila. Podaci s Wikipedije, nisu službeni."
-                : "Odaberite motor. Odabir upisuje CO2 u obrazac."}
+              {step === "brand"
+                ? "Odaberite marku vozila. Podaci s Wikipedije, nisu službeni."
+                : step === "model"
+                  ? "Odaberite model vozila. Podaci s Wikipedije, nisu službeni."
+                  : "Odaberite motor. Odabir upisuje CO2 u obrazac."}
             </p>
           </div>
           <button
@@ -252,7 +372,11 @@ export function Co2EnginesModal({
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder={
-                step === "model" ? "npr. Golf ili 320d" : "npr. 1.4 TDI ili 320d"
+                step === "brand"
+                  ? "npr. BMW ili Volkswagen"
+                  : step === "model"
+                    ? "npr. Golf ili 320d"
+                    : "npr. 1.4 TDI ili 320d"
               }
               className="w-full min-w-0 rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3.5 py-1.5 text-sm text-[var(--text)] focus:border-[var(--primary)] transition-colors"
             />
@@ -268,15 +392,19 @@ export function Co2EnginesModal({
                 Sve
               </button>
             )}
-            <button
-              type="submit"
-              className="shrink-0 rounded-xl bg-[var(--primary)] px-4 py-1.5 text-sm font-medium text-white"
-            >
-              Traži
-            </button>
+            {/* No submit on the brand step: that list filters as you type, and
+                a button that visibly does nothing reads as a broken one. */}
+            {step !== "brand" && (
+              <button
+                type="submit"
+                className="shrink-0 rounded-xl bg-[var(--primary)] px-4 py-1.5 text-sm font-medium text-white"
+              >
+                Traži
+              </button>
+            )}
           </form>
           <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-            {registered && (
+            {registered && step !== "brand" && (
               <button
                 type="button"
                 onClick={() => setDateScoped((v) => !v)}
@@ -291,7 +419,7 @@ export function Co2EnginesModal({
                   : "sva godišta"}
               </button>
             )}
-            <IgnoredTerms terms={ignored} step={step} />
+            {step !== "brand" && <IgnoredTerms terms={ignored} step={step} />}
           </div>
         </div>
 
@@ -299,6 +427,31 @@ export function Co2EnginesModal({
           {loading && <p className="px-4 py-6 text-sm text-[var(--text-soft)]">Učitavanje…</p>}
 
           {!loading && error && <p className="px-4 py-6 text-sm text-[var(--err)]">{error}</p>}
+
+          {!loading && !error && step === "brand" && brands !== null && (
+            shownBrands.length === 0 ? (
+              <p className="px-4 py-6 text-sm text-[var(--text-soft)]">
+                Nema marke koja odgovara pojmu „{query.trim()}”.
+              </p>
+            ) : (
+              /* A grid, not the rows the other two steps use: these are 37
+                 short labels with nothing to say about themselves, so a
+                 one-per-row list would be three screens of mostly whitespace. */
+              <ul className="grid grid-cols-2 sm:grid-cols-3 gap-2 p-4">
+                {shownBrands.map((b) => (
+                  <li key={b}>
+                    <button
+                      type="button"
+                      onClick={() => chooseBrand(b)}
+                      className="w-full min-h-[44px] rounded-xl border border-[var(--border)] px-3 py-2 text-sm font-medium text-[var(--text)] text-left hover:border-[var(--primary)] hover:bg-[var(--surface-alt)] hover:text-[var(--primary)] transition-colors"
+                    >
+                      {b}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )
+          )}
 
           {!loading && !error && step === "model" && models !== null && (
             models.length === 0 ? (
@@ -350,7 +503,7 @@ export function Co2EnginesModal({
                   <li key={`${row.source_url}-${row.engine_code ?? "x"}-${row.power_kw ?? "x"}-${i}`}>
                     <button
                       type="button"
-                      onClick={() => onSelect(row)}
+                      onClick={() => onSelect(row, brand!)}
                       className="w-full text-left px-4 py-2 min-h-[44px] flex items-center justify-between gap-3 hover:bg-[var(--surface-alt)] transition-colors"
                     >
                       <span className="min-w-0 text-xs text-[var(--text-soft)] truncate">
@@ -380,44 +533,54 @@ export function Co2EnginesModal({
 
 /** Where you are, and the way back.
  *
- * The brand crumb is a real button rather than a decorative label: on a phone
- * it is the only way back to the model list, and burying that behind the
- * browser's back gesture (which would close the page, not the step) is how a
- * two-step modal becomes a trap. It stays on one line at every width — the
- * article title truncates rather than wrapping the crumb trail onto a second
- * row, because the header is a fixed block above a scrolling list and a second
- * row there eats list space on the smallest screens. */
+ * Each ancestor crumb is a real button rather than a decorative label: on a
+ * phone it is the only way back a step, and burying that behind the browser's
+ * back gesture (which would close the page, not the step) is how a multi-step
+ * modal becomes a trap. That includes the brand crumb on the model step even
+ * when the caller supplied the brand — a scrape that read the wrong marque
+ * would otherwise strand the user on the wrong list.
+ *
+ * It stays on one line at every width — the article title truncates rather than
+ * wrapping the crumb trail onto a second row, because the header is a fixed
+ * block above a scrolling list and a second row there eats list space on the
+ * smallest screens. For the same reason the engine step shows only its parent
+ * model, not the full marque/model/engine trail. */
 function Breadcrumbs({
   brand,
   article,
+  onBrands,
   onBrand,
 }: {
-  brand: string;
+  brand: string | null;
   article: string | null;
+  onBrands: () => void;
   onBrand: () => void;
 }) {
-  if (!article) {
+  if (!brand) {
     return (
       <h3 className="text-sm font-semibold text-[var(--text)] truncate">
-        Odaberite model za {brand}
+        Odaberite marku vozila
       </h3>
     );
   }
+  const [parentLabel, onParent, current] = article
+    ? ([brand, onBrand, article] as const)
+    : (["Sve marke", onBrands, brand] as const);
   return (
     <h3 className="flex items-center gap-1 text-sm min-w-0">
       <button
         type="button"
-        onClick={onBrand}
+        onClick={onParent}
         className="shrink-0 flex items-center gap-1 -ml-1 px-1 py-0.5 rounded font-medium text-[var(--primary)] hover:bg-[var(--primary-soft)] transition-colors"
       >
         <ChevronLeft />
-        {brand}
+        {parentLabel}
       </button>
       <span aria-hidden className="shrink-0 text-[var(--text-soft)]">
         /
       </span>
       <span className="min-w-0 truncate font-semibold text-[var(--text)]">
-        {article}
+        {current}
       </span>
     </h3>
   );

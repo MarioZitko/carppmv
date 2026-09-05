@@ -394,14 +394,15 @@ introduced to stop. Two are easy to break by "simplifying":
   designators the candidate pool actually uses, because BMW's X-range articles
   are titled by chassis code and "X3" appears nowhere in them.
 
-**The picker (`app/wikipedia/browse.py`, `GET /wikipedia/models` +
-`GET /wikipedia/engines`) is a different job from Phase 5 and shares only
+**The picker (`app/wikipedia/browse.py`, `GET /wikipedia/brands` +
+`GET /wikipedia/models` + `GET /wikipedia/engines`) is a different job from
+Phase 5 and shares only
 `normalize_text` with it.** Phase 5 asks "which engine is this vehicle?" and
 declines when unsure; this asks "what does Wikipedia have for this car at all?"
 and is deliberately permissive — the person reading the list decides, so there
 is no accept threshold, no auto-pick and no score in the response.
 
-**It is a two-step drill-down — model, then engine — and that shape is the
+**It is a drill-down — brand, then model, then engine — and that shape is the
 point.** Free-text matching over a listing blob cannot always be trusted to
 have found the right car, and *nothing in its result says when it hasn't*: a
 3-series Gran Turismo has no article in the corpus, so the closest honest answer
@@ -410,7 +411,14 @@ correct one. Ranking harder cannot fix that; only the person holding the logbook
 can. So `GET /models` groups the brand's rows by article and lets them choose,
 and `GET /engines?article=...` then filters *exactly* to that choice. What is
 left for free text — telling engines apart inside one generation — is the job
-the corpus does reliably. Three properties are load-bearing:
+the corpus does reliably.
+
+`GET /brands` is the entry point when nothing upstream supplied a marque, which
+is the ordinary case for someone filling the form in by hand rather than pasting
+a listing — precisely the person with no CO2 figure to hand. It returns the
+corpus's own 37 marques rather than the catalogue's 43, so a marque that would
+only ever yield an empty model list is never offered. Three properties are
+load-bearing:
 
 - **The model list ranks but never filters** (`group_models` appends the
   unmatched remainder). The engine list may filter, because by then the user has
@@ -545,11 +553,22 @@ picker, and the only modal in the app — its overlay/Escape/positioning are
 bespoke and inlined, there is no shared `Modal` to reuse) and
 `ParsedFieldsCard`.
 
-`Co2EnginesModal` is a two-step drill-down with a breadcrumb header — model
-list, then that model's engines. The brand crumb is a real button, not a label:
-on a phone it is the only way back to step one, and leaving that to the
-browser's back gesture (which closes the page, not the step) turns a two-step
-modal into a trap.
+`Co2EnginesModal` is a drill-down with a breadcrumb header — brand grid, then
+that brand's models, then that model's engines. Every ancestor crumb is a real
+button, not a label: on a phone it is the only way back a step, and leaving that
+to the browser's back gesture (which closes the page, not the step) turns a
+multi-step modal into a trap.
+
+**It opens at whichever step is already answered, and it is always openable.**
+The `co2Lookup` prop only *skips* steps — a parsed listing or a picked catalogue
+row supplies the brand, and an engine the user already picked supplies the model
+too, so "Promijeni motor" resumes on that model's engine list instead of
+charging them the whole drill-down again to change their mind. With none of that
+known it opens on the brand grid. Gating the entry point on a known brand (which
+it used to be) hid the corpus from exactly the user who most needed it: no URL
+pasted means no scraped CO2 and no catalogue match either. The brand crumb stays
+live even when a listing named the brand, because a scrape that read the wrong
+marque would otherwise be a dead end.
 
 `CandidatesList` is laid out around **what differs between rows, not what each
 row is.** A real query ("BMW" + "320d") returns a dozen rows that are the *same

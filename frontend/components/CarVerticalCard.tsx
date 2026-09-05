@@ -18,8 +18,14 @@ const CV_BLUE_SOFT = "#EAF0FE";
  * (VIN/plate) is attached. Previously duplicated between CV_CODE_LINK and
  * the inline `href` template, which could drift if the tracking params ever
  * changed in one place and not the other. */
-function buildCarVerticalUrl(opts?: { uid?: number; effectiveId?: string }): string {
-	const params = new URLSearchParams({ source_id: "AFF", sub1: "kalkulatoruvoza" });
+function buildCarVerticalUrl(opts?: {
+	uid?: number;
+	effectiveId?: string;
+}): string {
+	const params = new URLSearchParams({
+		source_id: "AFF",
+		sub1: "kalkulatoruvoza",
+	});
 	if (opts?.uid !== undefined) params.set("uid", String(opts.uid));
 	if (opts?.effectiveId) params.set("sub3", opts.effectiveId);
 	return `https://www.carvertical.deal/2CRT9JN/964QF6/?${params.toString()}`;
@@ -46,7 +52,10 @@ export function CarVerticalCard({ vin }: { vin?: string | null }) {
 	}
 	const effectiveId = (manualId || vin || "").trim();
 
-	const href = buildCarVerticalUrl({ uid: 167, effectiveId: effectiveId || undefined });
+	const href = buildCarVerticalUrl({
+		uid: 167,
+		effectiveId: effectiveId || undefined,
+	});
 
 	return (
 		<div
@@ -111,11 +120,6 @@ export function CarVerticalCard({ vin }: { vin?: string | null }) {
 					Provjeri povijest vozila →
 				</a>
 			</div>
-			<p className="mt-3 text-xs text-[var(--text-soft)]">
-				Poveznica prema carVerticalu je partnerska (affiliate). Ako kupite
-				provjeru preko nje, kalkulator može dobiti proviziju, a cijena za vas
-				ostaje ista.
-			</p>
 		</div>
 	);
 }

@@ -284,6 +284,35 @@ export default function Home() {
 	const candidates = urlResult?.candidates ?? searchResult?.candidates ?? [];
 	const showCandidates = candidates.length > 0;
 
+	// Which brand (and text) the Wikipedia engine picker should open on. Not a
+	// precondition for opening it — with nothing known it starts at its own
+	// brand list — only a way to skip the steps we can already answer.
+	//
+	// A parsed listing is the better seed when there is one: it is the actual
+	// car, whereas a catalogue row is at best a confirmed match to it and at
+	// worst an unconfirmed top-ranked guess. But the catalogue path is worth
+	// seeding from too — in "Pretraži bazu vozila" mode there is no listing at
+	// all, and the row the user selected is then the only statement of what the
+	// car is that we have.
+	const selectedCandidate =
+		candidates.find((c) => c.catalogue_id === selectedCatalogueId) ??
+		candidates[0];
+	const co2Lookup = urlResult?.parsed.brand
+		? {
+				brand: urlResult.parsed.brand,
+				query: [urlResult.parsed.model, urlResult.parsed.variant]
+					.filter(Boolean)
+					.join(" "),
+			}
+		: selectedCandidate
+			? {
+					brand: selectedCandidate.brand,
+					query: [selectedCandidate.model, selectedCandidate.variant]
+						.filter(Boolean)
+						.join(" "),
+				}
+			: null;
+
 	return (
 		<div className="mx-auto max-w-6xl px-4 sm:px-6 py-6 sm:py-8 pb-20 lg:pb-8">
 			<h1 className="text-xl sm:text-2xl font-bold tracking-tight text-[var(--text)] mb-1">
@@ -356,16 +385,7 @@ export default function Home() {
 						values={form}
 						onChange={patchForm}
 						co2Hint={urlResult?.wikipedia_hint}
-						co2Lookup={
-							urlResult?.parsed.brand
-								? {
-										brand: urlResult.parsed.brand,
-										query: [urlResult.parsed.model, urlResult.parsed.variant]
-											.filter(Boolean)
-											.join(" "),
-									}
-								: null
-						}
+						co2Lookup={co2Lookup}
 					/>
 				</div>
 

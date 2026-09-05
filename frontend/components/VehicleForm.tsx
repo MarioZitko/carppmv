@@ -16,10 +16,13 @@ interface Props {
 	 * unconfirmed hint. Never written into `values.co2` — the field stays the
 	 * user's to fill. */
 	co2Hint?: WikipediaCo2Hint | null;
-	/** Brand + seed text for the engine picker. Present whenever the listing
-	 * gave us a brand — including when `co2Hint` is null, which is the majority
-	 * case and precisely when picking is most useful: the automatic lookup
-	 * declined, but the corpus may still hold the right engine. */
+	/** Brand + seed text for the engine picker, when something upstream (a
+	 * parsed listing, a picked catalogue row) knows them. It only decides which
+	 * step the picker *opens* on — the picker itself is always reachable, and
+	 * starts at its own brand list when this is null. Present whenever a brand
+	 * is known, including when `co2Hint` is null, which is the majority case and
+	 * precisely when picking is most useful: the automatic lookup declined, but
+	 * the corpus may still hold the right engine. */
 	co2Lookup?: { brand: string; query: string } | null;
 }
 
@@ -37,9 +40,14 @@ export function VehicleForm({ values, onChange, co2Hint, co2Lookup }: Props) {
 	// type); once they've told us which engine it is, showing the union again
 	// would be actively misleading.
 	const [picked, setPicked] = useState<WikipediaEngineRow | null>(null);
+	// The marque comes back from the picker rather than from `co2Lookup`: once
+	// the brand step exists, the row the user picked need not be under the brand
+	// the listing named — or there may have been no listing at all.
+	const [pickedBrand, setPickedBrand] = useState("");
 
-	function selectEngine(row: WikipediaEngineRow) {
+	function selectEngine(row: WikipediaEngineRow, brand: string) {
 		setPicked(row);
+		setPickedBrand(brand);
 		setPickerOpen(false);
 		const value = co2Of(row);
 		if (value !== null) onChange({ co2: String(value) });
@@ -50,7 +58,7 @@ export function VehicleForm({ values, onChange, co2Hint, co2Lookup }: Props) {
 				co2_min_g_km: picked.co2_min ?? picked.co2_max ?? 0,
 				co2_max_g_km: picked.co2_max ?? picked.co2_min ?? 0,
 				source_url: picked.source_url,
-				brand: co2Lookup?.brand ?? "",
+				brand: pickedBrand,
 				model_article_title: picked.model_article_title,
 			}
 		: co2Hint;
@@ -134,9 +142,7 @@ export function VehicleForm({ values, onChange, co2Hint, co2Lookup }: Props) {
 						<input
 							id="vf-co2"
 							className={`${co2Missing && touched.co2 ? errInput : input} ${
-								values.fuelType !== "electric" && (shownHint || co2Lookup)
-									? "pr-28"
-									: ""
+								values.fuelType !== "electric" ? "pr-28" : ""
 							}`}
 							type="number"
 							min="0"
@@ -150,7 +156,7 @@ export function VehicleForm({ values, onChange, co2Hint, co2Lookup }: Props) {
 							<Co2HintNote
 								hint={shownHint}
 								engineCode={picked?.engine_code}
-								onBrowse={co2Lookup ? () => setPickerOpen(true) : undefined}
+								onBrowse={() => setPickerOpen(true)}
 								midpointApplied={!!picked && formatCo2(picked).includes("–")}
 							/>
 						)}
@@ -227,12 +233,26 @@ export function VehicleForm({ values, onChange, co2Hint, co2Lookup }: Props) {
 				</div>
 			</div>
 
-			{co2Lookup && pickerOpen && (
+			{/* No `co2Lookup` guard: the picker is a browser over the whole
+			    Wikipedia corpus, not a follow-up to a scrape. Someone filling
+			    this form by hand — no URL, no parsed brand — is exactly the
+			    person with no CO2 figure to hand, so gating their way into the
+			    data on a listing they never pasted had it hidden precisely when
+			    it was most useful. Without a brand it opens on its own brand
+			    list instead. */}
+			{pickerOpen && (
 				<Co2EnginesModal
 					onClose={() => setPickerOpen(false)}
 					onSelect={selectEngine}
-					brand={co2Lookup.brand}
-					initialQuery={co2Lookup.query}
+					/* An earlier pick outranks the listing: it is the more recent
+					   and more deliberate statement of what the car is, and it is
+					   what "Promijeni motor" means — reopening on the brand list
+					   would make changing your mind cost the whole drill-down
+					   again. Falls back to the listing's brand, then to nothing,
+					   which opens the picker's own brand list. */
+					brand={pickedBrand || co2Lookup?.brand || null}
+					initialArticle={picked?.model_article_title ?? null}
+					initialQuery={co2Lookup?.query ?? ""}
 					registered={values.regDate || null}
 				/>
 			)}
