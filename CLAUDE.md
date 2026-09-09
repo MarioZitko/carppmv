@@ -216,6 +216,15 @@ the gate existed the whole brand, 11k rows, was dropped at ingest for a NULL
 row has a known `fuel_type`) and show zero contradictions before it lands; see
 `docs/INGEST_REWORK_PLAN.md` §10.3 result.
 
+Because the gate reads the `brand=` argument and not the blob,
+`ingest.py::_to_catalogue_dict` **must resolve the brand (`snap_brand`) before
+it derives fuel**, and pass the resolved value. It used to pass `row.brand` —
+the raw source cell, empty on every sheet with no brand column, i.e. all of
+Mazda's — which left the gate shut at ingest for exactly the brand it exists
+for: only sheets whose model text happens to carry a brand-agnostic
+`Skyactiv-G/D` word (CX-30, Mazda3) survived, and CX-3/CX-5/MX-5/Mazda2/Mazda6
+were dropped whole for a NULL `fuel_type` (6,575 rows, 11,212 → 17,787).
+
 `app/catalogue/brands.py` is the single source of truth for canonical
 brand spelling, shared by ingestion (fixing source typos like
 "Marcedes-Benz"), the autobid.de URL-slug parser, and matching's brand

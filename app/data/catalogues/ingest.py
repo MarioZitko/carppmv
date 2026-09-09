@@ -96,20 +96,6 @@ def _to_catalogue_dict(
     co2_standard: CO2Standard,
     allowed_brands: tuple[str, ...] | None = None,
 ) -> dict | None:
-    mapped_fuel = _FUEL_CATEGORY_TO_DB.get(row.fuel_category)
-    fuel_type = _override_fuel_from_variant(
-        brand=row.brand,
-        model=row.model_name or row.type_code or "unknown",
-        variant=row.full_name or row.type_code or row.model_name or "unknown",
-        mapped_fuel=mapped_fuel,
-    )
-
-    # fuel_type and co2_g_km are NOT NULL columns on Catalogue (see db/models.py).
-    # A single None here fails the whole batch INSERT, taking every other row
-    # in that file's batch down with it — so skip individually instead.
-    if fuel_type is None or row.co2_g_km is None:
-        return None
-
     # series_name (from a BMW/MINI-style section-header banner row) is the
     # real model line when present — model_name in that case is only the
     # trim (e.g. "116d"), which stays useful for fuel-badge derivation
@@ -141,6 +127,32 @@ def _to_catalogue_dict(
             return None
     else:
         brand = row.brand
+
+    # Fuel derivation runs AFTER the brand is resolved, and is handed the
+    # RESOLVED brand rather than row.brand. _fuel_from_badge's brand-specific
+    # badge shapes (Mazda's leading-letter "G132"/"D150") are gated on the
+    # brand argument, and row.brand is the raw source cell — empty for every
+    # sheet whose price list has no brand column, which is all of Mazda's.
+    # Deriving first therefore closed the gate on exactly the brand it exists
+    # for: MX-5/CX-3/CX-5/Mazda2/Mazda6 rows came back with fuel_type None and
+    # were skipped as un-insertable, and the only Mazda sheets that survived
+    # were the ones whose model text happens to carry a brand-agnostic
+    # "Skyactiv-G/D" engine word (CX-30, Mazda3). snap_brand already recovers
+    # the marque from the folder group, so doing it in this order costs
+    # nothing and every brand-gated badge rule now sees a real brand.
+    mapped_fuel = _FUEL_CATEGORY_TO_DB.get(row.fuel_category)
+    fuel_type = _override_fuel_from_variant(
+        brand=brand,
+        model=row.model_name or row.type_code or "unknown",
+        variant=row.full_name or row.type_code or row.model_name or "unknown",
+        mapped_fuel=mapped_fuel,
+    )
+
+    # fuel_type and co2_g_km are NOT NULL columns on Catalogue (see db/models.py).
+    # A single None here fails the whole batch INSERT, taking every other row
+    # in that file's batch down with it — so skip individually instead.
+    if fuel_type is None or row.co2_g_km is None:
+        return None
 
     return {
         "brand": brand,
