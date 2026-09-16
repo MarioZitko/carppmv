@@ -225,6 +225,21 @@ for: only sheets whose model text happens to carry a brand-agnostic
 `Skyactiv-G/D` word (CX-30, Mazda3) survived, and CX-3/CX-5/MX-5/Mazda2/Mazda6
 were dropped whole for a NULL `fuel_type` (6,575 rows, 11,212 → 17,787).
 
+**Toyota/Lexus sheets are special-cased by their `KATASHIKI` header**
+(`canonical_schema._toyota_family_columns`). Their price lists have no full-name
+column: the variant is built from the MOTOR/KAROSERIJA/MJENJAČ/OPREMA/BOJA cells
+plus KATASHIKI + SFX, and power is read from the engine text ("(131 kW)"). Every
+one of those parts keeps price-distinct rows apart (paint is priced; KATASHIKI
+splits RWD/AWD), so don't trim it. Don't widen detection to the header words
+either: 64 cached layouts across Nissan/Kia/Hyundai/Dacia share them, and
+rebuilding their variants changes their unique key. Before this, the variant was
+the bare SFX code ("1D") and, because `_categorize_fuel` didn't strip the fused
+"BENZIN EURO 6" norm, every Toyota row from 2016 on was dropped (6,795 → 198,208
+rows; Lexus 0 → 15,530). A full replay of every manifest file showed zero rows
+changed for any other brand. On the query side, `matching._rewrite_toyota_query`
+maps the listing's "TS" → wagon and "hybrid" → the lists' "hibrid", and `cross`
+is a distinctive token (Corolla vs Corolla Cross) — see the comments there.
+
 `app/catalogue/brands.py` is the single source of truth for canonical
 brand spelling, shared by ingestion (fixing source typos like
 "Marcedes-Benz"), the autobid.de URL-slug parser, and matching's brand

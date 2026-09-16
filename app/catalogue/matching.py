@@ -452,9 +452,17 @@ def _gearbox_class(text: str) -> str | None:
 # a wagon/coupe/cabrio/allroad/sportback/gran-coupe the listing never named is.
 # normalize_text already folds avant/touring/estate/kombi/karavan -> "wagon" and
 # limousine/berline -> "sedan", so only the canonical tokens need listing here.
+#
+# "cross" is not a body word but behaves exactly like one: in every catalogue row
+# that carries it, it names a different vehicle from the plain model (Corolla
+# Cross, Yaris Cross, T-Cross, Eclipse Cross, V60 Cross Country, Panda/500X
+# Cross), and a listing for one of those always says so. Without it a plain
+# "Corolla" listing matched COROLLA CROSS HEV at a confident 90 — "corolla" is a
+# token subset of it, and its 145 kW happened to confirm the listing's 144 kW —
+# while the actual Corolla TS rows sat below the candidate floor.
 _DISTINCTIVE_BODY_TOKENS = frozenset({
     "wagon", "sportback", "coupe", "cabrio", "cabriolet", "roadster",
-    "allroad", "gran", "fastback", "liftback", "suv",
+    "allroad", "gran", "fastback", "liftback", "suv", "cross",
 })
 
 # AWD/4WD drivetrain markers — same asymmetric treatment as body style: a
@@ -813,6 +821,23 @@ def _strip_bmw_mini_query_noise(query_key: str) -> str:
     return " ".join(kept) if kept else query_key
 
 
+# Toyota/Lexus listing text vs the Croatian price lists. Two words, both
+# confirmed against the live table, each of which cost the correct row a whole
+# tier on its own:
+#   * "TS" is Toyota's Touring Sports estate. The price lists spell that body
+#     KARAVAN, which normalize_text folds to "wagon", so every correct TS row
+#     carried a body-mismatch penalty against a listing that did name the body.
+#   * the price lists write the Croatian "HIBRID" (36,948 Toyota rows) and
+#     almost never "hybrid" (105), so the listing's engine word matched nothing.
+# Query-side only, like _BMW_MINI_QUERY_NOISE: rewriting normalize_text instead
+# would change the stored match_key of every brand's rows.
+_TOYOTA_QUERY_SYNONYMS: dict[str, str] = {"ts": "wagon", "hybrid": "hibrid"}
+
+
+def _rewrite_toyota_query(query_key: str) -> str:
+    return " ".join(_TOYOTA_QUERY_SYNONYMS.get(t, t) for t in query_key.split())
+
+
 def _to_candidate(row: Catalogue) -> CandidateRow:
     return CandidateRow(
         catalogue_id=row.id,
@@ -860,6 +885,8 @@ async def find_match(
     query_key = build_match_key(brand, model, variant)
     if brand.strip().lower() in ("bmw", "mini"):
         query_key = _strip_bmw_mini_query_noise(query_key)
+    elif brand.strip().lower() in ("toyota", "lexus"):
+        query_key = _rewrite_toyota_query(query_key)
 
     stmt = select(Catalogue).where(func.lower(Catalogue.brand) == brand.strip().lower())
     rows = (await session.execute(stmt)).scalars().all()

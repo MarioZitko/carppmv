@@ -231,6 +231,9 @@ _WORD_FUEL_MAP: dict[str, FuelCategory] = {
     "electric": FuelCategory.ELECTRIC,
 }
 
+# A trailing emission norm fused into a fuel cell: "BENZIN EURO 6" -> "BENZIN".
+_EURO_NORM_SUFFIX_RE = re.compile(r"\s+euro\s*\d.*$", re.IGNORECASE)
+
 # Croatia adopted the euro on 2023-01-01 (Council Decision (EU) 2022/1211).
 # From that date the euro is the only legal tender, so a price list *valid
 # from* it is denominated in euro as a matter of law, not of probability.
@@ -608,6 +611,15 @@ def _categorize_fuel(
     if base is None:
         base = _WORD_FUEL_MAP.get(text.lower())
     if base is None:
+        # Toyota/Lexus fuse the emission norm into the fuel cell ("BENZIN EURO 6",
+        # "DIZEL EURO 5"). The exact lookups above miss it, and with no fuel every
+        # Toyota row from 2016 on was dropped at insert. Only reached once the
+        # exact lookups have already failed, so no value that resolves today can
+        # resolve differently.
+        stripped = _EURO_NORM_SUFFIX_RE.sub("", text)
+        if stripped != text:
+            base = _LETTER_CODE_FUEL_MAP.get(stripped.upper()) or _WORD_FUEL_MAP.get(stripped.lower())
+    if base is None:
         return FuelCategory.UNKNOWN
 
     if base is FuelCategory.PETROL:
@@ -654,6 +666,61 @@ def _cell(row: tuple, column_index: dict[str, int], column_name: str | None) -> 
     if index is None or index >= len(row):
         return None
     return row[index]
+
+
+# Toyota/Lexus price lists carry no full-name column: a priced row is described
+# by five separate cells — engine "2,5 HIBRID (131 kW)", body, gearbox, trim and
+# paint — followed by two type codes, KATASHIKI and SFX. With no full_name
+# mapped, ingest fell back to the type code as the variant, so a Corolla row
+# stored as variant "1D": nothing a listing's text could ever match, and nothing
+# a person picking from the candidate list could read.
+#
+# Detection is the KATASHIKI header, which only Toyota's and Lexus's sheets
+# carry. Header words alone ("MOTOR", "OPREMA", "MJENJAČ") are NOT used: 64
+# cached layouts across Nissan, Kia, Hyundai, Dacia and others share them, and
+# rebuilding their variants would change their unique key and orphan every row
+# already in the table.
+#
+# Every part is load-bearing for uniqueness, measured over every Toyota/Lexus
+# file: paint is priced (SOLID vs METALIK differ by ~600 EUR on one Corolla
+# trim), KATASHIKI separates same-text drivetrain variants (Lexus LS GVF50L RWD
+# vs GVF55L AWD) and SFX separates same-text trim sub-variants. Leaving any out
+# would let ingest's match_key dedupe keep one arbitrary price for rows that
+# genuinely differ. The ~1.6% that still collide are literal duplicate lines in
+# the source — identical text, different price — that no column can separate.
+_TOYOTA_FAMILY_MARKER = "katashiki"
+_TOYOTA_DESCRIPTION_WORDS = ("motor", "karoserija", "mjenjac", "mjenjač", "oprema", "boja")
+_TOYOTA_CODE_WORDS = ("katashiki", "sfx")
+_KW_IN_TEXT_RE = re.compile(r"(\d+(?:[.,]\d+)?)\s*kw\b", re.IGNORECASE)
+
+
+def _toyota_family_columns(header_row: list[str]) -> list[int] | None:
+    """Column indexes (in sheet order) that together describe one priced
+    Toyota/Lexus row, or None when this is not a Toyota-family sheet."""
+    normalized = [normalize_cell(h) if h else "" for h in header_row]
+    if not any(_TOYOTA_FAMILY_MARKER in n for n in normalized):
+        return None
+    description = [i for i, n in enumerate(normalized) if n.split(" ", 1)[0] in _TOYOTA_DESCRIPTION_WORDS]
+    codes = [i for i, n in enumerate(normalized) if any(w in n for w in _TOYOTA_CODE_WORDS)]
+    return description + codes if description else None
+
+
+def _toyota_family_description(row: tuple, columns: list[int]) -> str | None:
+    parts = [_to_str(row[i]) for i in columns if i < len(row)]
+    text = " ".join(p for p in parts if p)
+    return text or None
+
+
+def _power_from_engine_text(row: tuple, columns: list[int], header_row: list[str]) -> float | None:
+    """Toyota's engine cell carries power as "(131 kW)"; three of its cached
+    layouts map no power column at all, and the ones that do point at that
+    same text cell, which _parse_power cannot read."""
+    for i in columns:
+        if i < len(row) and normalize_cell(header_row[i] or "").startswith("motor"):
+            match = _KW_IN_TEXT_RE.search(str(row[i] or ""))
+            if match:
+                return float(match.group(1).replace(",", "."))
+    return None
 
 
 def _is_junk_row(
@@ -735,6 +802,16 @@ def apply_mapping(
         rows, column_index.get(mapping.price_column)
     )
 
+    # Toyota/Lexus only, and only when the mapping found no real full-name
+    # column — see _TOYOTA_FAMILY_MARKER. A full_name mapped onto the model
+    # column counts as none: one cached Toyota layout does exactly that, and it
+    # carries nothing the model column doesn't.
+    has_real_full_name = (
+        mapping.full_name_column is not None
+        and mapping.full_name_column != mapping.model_name_column
+    )
+    toyota_columns = None if has_real_full_name else _toyota_family_columns(header_row)
+
     # Defined once rather than per row: a closure built inside the loop would
     # capture `source_row_index` by reference, so it only happened to log the
     # right row because every call fired in the same iteration (ruff B023).
@@ -809,6 +886,8 @@ def apply_mapping(
             continue
 
         power_kw, power_boost_kw = _parse_power(_cell(row, column_index, mapping.power_kw_column))
+        if power_kw is None and toyota_columns is not None:
+            power_kw = _power_from_engine_text(row, toyota_columns, header_row)
         plug_in_range_km = _parse_numeric(_cell(row, column_index, mapping.plug_in_range_column))
 
         fuel_category = _categorize_fuel(fuel_raw, power_boost_kw, plug_in_range_km)
@@ -829,7 +908,11 @@ def apply_mapping(
                 model_name=_to_str(model_name_raw),
                 series_name=current_series,
                 type_code=_to_str(_cell(row, column_index, mapping.type_code_column)),
-                full_name=_to_str(_cell(row, column_index, mapping.full_name_column)),
+                full_name=(
+                    _toyota_family_description(row, toyota_columns)
+                    if toyota_columns is not None
+                    else _to_str(_cell(row, column_index, mapping.full_name_column))
+                ),
                 fuel_category=fuel_category,
                 fuel_raw_value=_to_str(fuel_raw) or "",
                 price_eur=price_eur,

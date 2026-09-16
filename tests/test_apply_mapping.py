@@ -713,3 +713,122 @@ def test_euro_adoption_boundary_is_the_first_of_january_2023():
     result = apply_mapping(rows, SILENT_HEADER, SILENT_MAPPING, "mazda.xlsx", "CX5")
     assert result[0].price_source_currency == "HRK"
     assert result[1].price_source_currency == "EUR"
+
+
+# ===========================================================================
+# Toyota/Lexus family
+# No full-name column: engine/body/gearbox/trim/paint live in separate cells,
+# followed by KATASHIKI + SFX codes. Fuel cell carries the Euro norm
+# ("BENZIN EURO 6"), and power sits inside the engine text ("(112 kW)").
+# ===========================================================================
+
+TOYOTA_HEADER = [
+    "MODEL", "MOTOR (SNAGA)", "KAROSERIJA", "MJENJAČ", "OPREMA", "GORIVO", "CO2",
+    "BOJA", "PREPORUČENA (€)", "KATASHIKI", "SFX", "VRIJEDI OD:",
+]
+
+# The cached LLM mapping for this layout, as stored: SFX as type code, no
+# full-name column.
+TOYOTA_MAPPING = _mapping(
+    brand_column=None,
+    model_name_column="MODEL",
+    type_code_column="SFX",
+    fuel_column="GORIVO",
+    price_column="PREPORUČENA (€)",
+    valid_from_column="VRIJEDI OD:",
+    co2_column="CO2",
+    power_kw_column="MOTOR (SNAGA)",
+)
+
+TOYOTA_ROWS = [
+    ("MC23 COROLLA TS", "2.0 HIBRID (112 kW)", "KARAVAN", "E-CVT", "STYLE", "BENZIN EURO 6", 120,
+     "SOLID", 38782.05, "MZEH19L-DWXNBW      ", "Y5", "1.1.2023."),
+    ("MC23 COROLLA TS", "2.0 HIBRID (112 kW)", "KARAVAN", "E-CVT", "STYLE", "BENZIN EURO 6", 120,
+     "METALIK", 39392.05, "MZEH19L-DWXNBW", "Y5", "1.1.2023."),
+    ("HILUX", "2,4 D-4D (110 kW)", "DOUBLE CAB", "RUČNI-6", "COMFORT", "DIZEL EURO 6", 245,
+     "SOLID", 40000.0, "GUN125L-DTFSXW", "B1", "1.1.2023."),
+]
+
+
+def _toyota_rows():
+    return apply_mapping(
+        rows=TOYOTA_ROWS, header_row=TOYOTA_HEADER, mapping=TOYOTA_MAPPING,
+        source_file="toyota.xlsx", source_sheet="SKUPNI", default_valid_from=date(2026, 5, 29),
+    )
+
+
+def test_toyota_fuel_with_euro_norm_suffix_is_recognised():
+    rows = _toyota_rows()
+    assert [r.fuel_category for r in rows] == [
+        FuelCategory.PETROL, FuelCategory.PETROL, FuelCategory.DIESEL,
+    ]
+
+
+def test_toyota_variant_is_built_from_description_cells_and_codes():
+    rows = _toyota_rows()
+    assert rows[0].full_name == "2.0 HIBRID (112 kW) KARAVAN E-CVT STYLE SOLID MZEH19L-DWXNBW Y5"
+
+
+def test_toyota_paint_keeps_differently_priced_rows_distinct():
+    """SOLID and METALIK are separate priced rows; the variant must differ or
+    ingest's match_key dedupe keeps one arbitrary price."""
+    solid, metalik, _ = _toyota_rows()
+    assert solid.price_eur != metalik.price_eur
+    assert solid.full_name != metalik.full_name
+
+
+def test_toyota_power_is_read_from_engine_text():
+    assert [r.power_kw for r in _toyota_rows()] == [112.0, 112.0, 110.0]
+
+
+def test_toyota_power_read_even_when_no_power_column_is_mapped():
+    rows = apply_mapping(
+        rows=TOYOTA_ROWS, header_row=TOYOTA_HEADER,
+        mapping=_mapping(**{**TOYOTA_MAPPING.__dict__, "power_kw_column": None}),
+        source_file="toyota.xlsx", source_sheet="SKUPNI", default_valid_from=date(2026, 5, 29),
+    )
+    assert rows[0].power_kw == 112.0
+
+
+def test_toyota_full_name_mapped_onto_model_column_is_ignored():
+    """One cached Toyota layout maps full_name onto MODEL; that must not
+    suppress the description."""
+    rows = apply_mapping(
+        rows=TOYOTA_ROWS, header_row=TOYOTA_HEADER,
+        mapping=_mapping(**{**TOYOTA_MAPPING.__dict__, "full_name_column": "MODEL"}),
+        source_file="toyota.xlsx", source_sheet="SKUPNI", default_valid_from=date(2026, 5, 29),
+    )
+    assert rows[0].full_name.startswith("2.0 HIBRID (112 kW)")
+
+
+def test_description_words_without_katashiki_leave_full_name_untouched():
+    """Nissan/Kia/Hyundai/Dacia sheets share MOTOR/OPREMA/MJENJAČ headers.
+    Rebuilding their variant would change their unique key, so only the
+    KATASHIKI-bearing Toyota/Lexus sheets get it."""
+    header = ["Model", "Motor", "Mjenjač", "Oprema", "GORIVO", "CO2 (g/km)", "CIJENA (EUR)", "Kod"]
+    rows = apply_mapping(
+        rows=[("QASHQAI", "1.3 DIG-T (103 kW)", "Ručni", "ACENTA", "B", 140, 30000.0, "Q1")],
+        header_row=header,
+        mapping=_mapping(brand_column=None, model_name_column="Model", type_code_column="Kod",
+                         valid_from_column=None),
+        source_file="nissan.xlsx", source_sheet="S", default_valid_from=date(2024, 1, 1),
+    )
+    assert rows[0].full_name is None
+    assert rows[0].power_kw is None
+
+
+@pytest.mark.parametrize(
+    "raw,expected",
+    [
+        ("BENZIN EURO 6", FuelCategory.PETROL),
+        ("DIZEL EURO 5", FuelCategory.DIESEL),
+        ("benzin euro 6d-TEMP", FuelCategory.PETROL),
+        ("EV", FuelCategory.UNKNOWN),  # unrecognised stays unknown, never guessed
+        ("B", FuelCategory.PETROL),
+        ("dizel", FuelCategory.DIESEL),
+    ],
+)
+def test_categorize_fuel_euro_norm_suffix(raw, expected):
+    from app.catalogue.canonical_schema import _categorize_fuel
+
+    assert _categorize_fuel(raw, None, None) == expected
