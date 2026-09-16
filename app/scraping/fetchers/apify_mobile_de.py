@@ -82,7 +82,7 @@ async def fetch_listing(url: str) -> ListingData:
         token=settings.apify_api_token,
         timeout=settings.apify_call_timeout_seconds,
     )
-    payload = {"urls": [{"url": _with_english_locale(url)}], "maxRecords": 10}
+    payload = {"urls": [{"url": _canonical_actor_url(url)}], "maxRecords": 10}
 
     async with httpx.AsyncClient(timeout=settings.apify_call_timeout_seconds + 10) as client:
         response = await client.post(endpoint, json=payload)
@@ -97,6 +97,29 @@ async def fetch_listing(url: str) -> ListingData:
         raise ScrapingError(f"Apify returned empty dataset for {url}")
 
     return _parse(items[0], url)
+
+
+CANONICAL_DETAILS_URL = "https://suchen.mobile.de/fahrzeuge/details.html?id={listing_id}&lang=en"
+
+
+def _canonical_actor_url(url: str) -> str:
+    """Rewrites any mobile.de listing URL into the one form the actor accepts.
+
+    The actor silently skips any URL not starting with one of its whitelisted
+    prefixes (https://suchen.mobile.de/fahrzeuge/details.html, .../auto-inserat/,
+    ...) and returns an empty dataset. Links shared from the mobile.de app or
+    mobile site are `https://m.mobile.de/fahrzeuge/details.html?id=...&utm_...`,
+    which fail that prefix check even though they name a perfectly valid
+    listing. Rebuilding the URL from the listing id fixes every host/path
+    variant at once and drops tracking params.
+
+    A URL with no recognisable listing id is passed through with only the
+    locale pinned (see _with_english_locale).
+    """
+    listing_id = extract_mobile_de_id(url)
+    if listing_id:
+        return CANONICAL_DETAILS_URL.format(listing_id=listing_id)
+    return _with_english_locale(url)
 
 
 def _with_english_locale(url: str) -> str:

@@ -5,6 +5,7 @@ from urllib.parse import parse_qs, urlparse
 import pytest
 
 from app.scraping.fetchers.apify_mobile_de import (
+    _canonical_actor_url,
     _normalise_fuel,
     _parse,
     _parse_mileage,
@@ -61,6 +62,17 @@ def test_extract_id_slug():
 def test_extract_id_query():
     url = "https://suchen.mobile.de/fahrzeuge/details.html?id=459632333&dam=false"
     assert extract_mobile_de_id(url) == "459632333"
+
+
+MOBILE_SITE_SHARE_URL = (
+    "https://m.mobile.de/fahrzeuge/details.html?id=45688064542528"
+    "&utm_campaign=socialbuttons&utm_source=other&utm_medium=social"
+    "&utm_content=app_android_vip&lang=en"
+)
+
+
+def test_extract_id_mobile_site():
+    assert extract_mobile_de_id(MOBILE_SITE_SHARE_URL) == "45688064542528"
 
 
 def test_extract_id_none_when_absent():
@@ -185,3 +197,27 @@ def test_parse_survives_null_co2(value):
         "properties": {"co2Emission": value},
     }
     assert _parse(item, "https://suchen.mobile.de/x/1.html").co2_g_km is None
+
+
+@pytest.mark.parametrize(
+    "url,listing_id",
+    [
+        # The app/mobile-site share link the actor skipped outright.
+        (MOBILE_SITE_SHARE_URL, "45688064542528"),
+        ("https://www.mobile.de/fahrzeuge/details.html?id=459632333", "459632333"),
+        ("https://suchen.mobile.de/auto-inserat/audi-a5/459632333.html", "459632333"),
+        ("https://suchen.mobile.de/fahrzeuge/details.html?id=459632333&dam=false&lang=de", "459632333"),
+    ],
+)
+def test_canonical_actor_url(url, listing_id):
+    """Every listing URL variant reaches the actor in its whitelisted form."""
+    assert _canonical_actor_url(url) == (
+        f"https://suchen.mobile.de/fahrzeuge/details.html?id={listing_id}&lang=en"
+    )
+
+
+def test_canonical_actor_url_without_id_keeps_url():
+    url = "https://suchen.mobile.de/fahrzeuge/search.html?ms=1900"
+    result = _canonical_actor_url(url)
+    assert result.startswith("https://suchen.mobile.de/fahrzeuge/search.html")
+    assert parse_qs(urlparse(result).query)["lang"] == ["en"]
